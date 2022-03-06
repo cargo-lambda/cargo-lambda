@@ -1,0 +1,24 @@
+[package]
+name = "cargo-lambda"
+description = "Cargo subcommand to work with AWS Lambda"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/calavera/cargo-lambda"
+repository = "https://github.com/calavera/cargo-lambda"
+keywords = ["cargo", "subcommand", "aws", "lambda"]
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+atty = "0.2.14"
+cargo-zigbuild = "0.6.3"
+cargo_metadata = "0.14.2"
+clap = { version = "3.1.5", features = ["cargo", "derive"] }
+indicatif = "0.16.2"
+inquire = "0.2.1"
+miette = { version = "4.2.1", features = ["fancy"] }
+rustc_version = "0.4.0"
+which = "4.2.4"
