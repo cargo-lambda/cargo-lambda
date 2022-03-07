@@ -21,4 +21,3 @@ indicatif = "0.16.2"
 inquire = "0.2.1"
 miette = { version = "4.2.1", features = ["fancy"] }
 rustc_version = "0.4.0"
-which = "4.2.4"
