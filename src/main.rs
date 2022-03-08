@@ -2,10 +2,9 @@ use atty::is;
 use cargo_zigbuild::{Build, Zig};
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
-use miette::{IntoDiagnostic, Result, WrapErr};
-use std::path::{Path, PathBuf};
+use miette::{miette, IntoDiagnostic, Result, WrapErr};
+use std::path::Path;
 use std::process::{Command, Stdio};
-use which::which;
 
 #[derive(Parser)]
 #[clap(name = "cargo")]
@@ -14,6 +13,8 @@ use which::which;
 enum App {
     #[clap(subcommand)]
     Lambda(Lambda),
+    #[clap(subcommand, hide = true)]
+    Zig(Zig),
 }
 
 /// Build AWS Lambda functions compiled with zig as the linker
@@ -23,9 +24,12 @@ pub enum Lambda {
 }
 
 fn main() -> Result<()> {
-    let App::Lambda(lambda) = App::parse();
-    match lambda {
-        Lambda::Build(mut b) => run_build(&mut b),
+    let app = App::parse();
+    match app {
+        App::Lambda(lambda) => match lambda {
+            Lambda::Build(mut b) => run_build(&mut b),
+        },
+        App::Zig(zig) => zig.execute().map_err(|e| miette!(e)),
     }
 }
 
@@ -53,14 +57,6 @@ fn run_build(build: &mut Build) -> Result<()> {
 
     if !build.disable_zig_linker {
         check_zig_installation()?;
-
-        // Force the location of cargo-zigbuild so the linker script points to the right binary
-        let zigbuild_path = match which("cargo-zigbuild") {
-            Ok(path) => path,
-            Err(_) => install_cargo_zigbuild()?,
-        };
-
-        std::env::set_var("CARGO_BIN_EXE_cargo-zigbuild", zigbuild_path);
     }
 
     let mut cmd = build
@@ -226,32 +222,6 @@ fn install_with_npm() -> Result<()> {
     Ok(())
 }
 
-fn install_cargo_zigbuild() -> Result<PathBuf> {
-    let pb = Progress::start("Installing Cargo ZigBuild...");
-
-    let mut child = Command::new("cargo")
-        .args(&["install", "cargo-zigbuild"])
-        .stderr(Stdio::null())
-        .stdout(Stdio::null())
-        .spawn()
-        .into_diagnostic()
-        .wrap_err("Failed to run `cargo install cargo-zigbuild`")?;
-
-    let status = child
-        .wait()
-        .into_diagnostic()
-        .wrap_err("Failed to wait on cargo process")?;
-    if !status.success() {
-        pb.finish("Failed to install cargo-zigbuild");
-        std::process::exit(status.code().unwrap_or(1));
-    } else {
-        pb.finish("Cargo ZigBuild installed");
-    }
-
-    which("cargo-zigbuild")
-        .into_diagnostic()
-        .wrap_err("failed to locate cargo-zigbuild")
-}
 struct Progress {
     bar: Option<ProgressBar>,
 }
