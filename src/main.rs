@@ -3,6 +3,7 @@ use cargo_zigbuild::{Build, Zig};
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 use miette::{miette, IntoDiagnostic, Result, WrapErr};
+use std::boxed::Box;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -12,7 +13,7 @@ use std::process::{Command, Stdio};
 #[clap(version, global_setting(clap::AppSettings::DeriveDisplayOrder))]
 enum App {
     #[clap(subcommand)]
-    Lambda(Lambda),
+    Lambda(Box<Lambda>),
     #[clap(subcommand, hide = true)]
     Zig(Zig),
 }
@@ -26,7 +27,7 @@ pub enum Lambda {
 fn main() -> Result<()> {
     let app = App::parse();
     match app {
-        App::Lambda(lambda) => match lambda {
+        App::Lambda(lambda) => match *lambda {
             Lambda::Build(mut b) => run_build(&mut b),
         },
         App::Zig(zig) => zig.execute().map_err(|e| miette!(e)),
