@@ -1,7 +1,6 @@
 # cargo-lambda
 
 [![crates.io][crate-image]][crate-link]
-[![Documentation][doc-image]][doc-link]
 [![Build Status][build-image]][build-link]
 
 cargo-lambda is a [Cargo](https://doc.rust-lang.org/cargo/) subcommand to help you work with AWS Lambda.
@@ -18,7 +17,7 @@ cargo install cargo-lambda
 ```
 
 Within a Rust project that includes a `Cargo.toml` file, run the `cargo lambda build` command to compile your
-Lambda functions present in the project. The resulting binary, or binaries, will be placed in the `target/lambda` directory. This is an example of what the output if this command is:
+Lambda functions present in the project. The resulting binary, or binaries, will be placed in the `target/lambda` directory. This is an example of what the output of this command is:
 
 ```
 ❯ tree target/lambda 
@@ -54,14 +53,12 @@ When you compile your code in release mode, cargo-lambda will strip the binaries
 ## How does cargo-lambda work?
 
 cargo-lambda uses [Zig](https://ziglang.org) and [cargo-zigbuild](https://crates.io/crates/cargo-zigbuild)
-to compile the code for the right architecture. If those dependencies are not installed in your host machine, the first time that your run cargo-lambda, it will guide you through some installation options. If you run cargo-lambda in a non-interactive shell, the build process will fail until you install those dependencies.
+to compile the code for the right architecture. If Zig is not installed in your host machine, the first time that your run cargo-lambda, it will guide you through some installation options. If you run cargo-lambda in a non-interactive shell, the build process will fail until you install that dependency.
 
 
 [//]: # (badges)
 
 [crate-image]: https://img.shields.io/crates/v/cargo-lambda.svg
 [crate-link]: https://crates.io/crates/cargo-lambda
-[doc-image]: https://docs.rs/cargo-lambda/badge.svg
-[doc-link]: https://docs.rs/cargo-lambda
 [build-image]: https://github.com/calavera/cargo-lambda/workflows/Build/badge.svg
 [build-link]: https://github.com/calavera/cargo-lambda/actions?query=workflow%3ACI+branch%3Amain
