@@ -1,7 +1,7 @@
 [package]
 name = "cargo-lambda"
 description = "Cargo subcommand to work with AWS Lambda"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 readme = "README.md"
@@ -9,8 +9,6 @@ homepage = "https://github.com/calavera/cargo-lambda"
 repository = "https://github.com/calavera/cargo-lambda"
 keywords = ["cargo", "subcommand", "aws", "lambda"]
 
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 atty = "0.2.14"
@@ -21,3 +19,10 @@ indicatif = "0.16.2"
 inquire = "0.2.1"
 miette = { version = "4.2.1", features = ["fancy"] }
 rustc_version = "0.4.0"
+
+# For String -> Enum macros for usage with the CLI.
+strum = "0.24.0"
+strum_macros = "0.24.0"
+
+# For creating zip files.
+zip = "0.5.13"
