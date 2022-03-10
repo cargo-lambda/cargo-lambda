@@ -1,10 +1,10 @@
 use atty::is;
 use cargo_zigbuild::{Build, Zig};
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueHint};
 use indicatif::{ProgressBar, ProgressStyle};
 use miette::{miette, IntoDiagnostic, Result, WrapErr};
 use std::boxed::Box;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 #[derive(Parser)]
@@ -21,20 +21,30 @@ enum App {
 /// Build AWS Lambda functions compiled with zig as the linker
 #[derive(Clone, Debug, Subcommand)]
 pub enum Lambda {
-    Build(Build),
+    Build(LambdaBuild),
+}
+
+#[derive(Args, Clone, Debug)]
+#[clap(name = "build")]
+pub struct LambdaBuild {
+    /// Directory where the final lambda binaries will be located
+    #[clap(short, long, value_hint = ValueHint::DirPath)]
+    lambda_dir: Option<PathBuf>,
+    #[clap(flatten)]
+    build: Build,
 }
 
 fn main() -> Result<()> {
     let app = App::parse();
     match app {
         App::Lambda(lambda) => match *lambda {
-            Lambda::Build(mut b) => run_build(&mut b),
+            Lambda::Build(mut b) => run_build(&mut b.build, b.lambda_dir),
         },
         App::Zig(zig) => zig.execute().map_err(|e| miette!(e)),
     }
 }
 
-fn run_build(build: &mut Build) -> Result<()> {
+fn run_build(build: &mut Build, lambda_dir: Option<PathBuf>) -> Result<()> {
     let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
     let host_target = &rustc_meta.host;
 
@@ -109,14 +119,18 @@ fn run_build(build: &mut Build) -> Result<()> {
         None => "debug",
     };
 
-    let target = Path::new("target");
-    let base = target.join(final_target).join(profile);
-    let build = target.join("lambda");
+    let target_dir = Path::new("target");
+    let lambda_dir = if let Some(dir) = lambda_dir {
+        dir
+    } else {
+        target_dir.join("lambda")
+    };
 
+    let base = target_dir.join(final_target).join(profile);
     for name in &binaries {
         let binary = base.join(name);
         if binary.exists() {
-            let bootstrap_dir = build.join(name);
+            let bootstrap_dir = lambda_dir.join(name);
             std::fs::create_dir_all(&bootstrap_dir).into_diagnostic()?;
             std::fs::rename(binary, bootstrap_dir.join("bootstrap")).into_diagnostic()?;
         }
