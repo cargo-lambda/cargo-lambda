@@ -1,11 +1,14 @@
+use std::boxed::Box;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+
 use atty::is;
 use cargo_zigbuild::{Build, Zig};
 use clap::{Args, Parser, Subcommand, ValueHint};
 use indicatif::{ProgressBar, ProgressStyle};
 use miette::{miette, IntoDiagnostic, Result, WrapErr};
-use std::boxed::Box;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use strum_macros::EnumString;
 
 #[derive(Parser)]
 #[clap(name = "cargo")]
@@ -27,6 +30,9 @@ pub enum Lambda {
 #[derive(Args, Clone, Debug)]
 #[clap(name = "build")]
 pub struct LambdaBuild {
+    /// The format to produce the compile Lambda into, acceptable values are [Binary, Zip].
+    #[clap(long, default_value_t = OutputFormat::Binary)]
+    output_format: OutputFormat,
     /// Directory where the final lambda binaries will be located
     #[clap(short, long, value_hint = ValueHint::DirPath)]
     lambda_dir: Option<PathBuf>,
@@ -38,13 +44,23 @@ fn main() -> Result<()> {
     let app = App::parse();
     match app {
         App::Lambda(lambda) => match *lambda {
-            Lambda::Build(mut b) => run_build(&mut b.build, b.lambda_dir),
+            Lambda::Build(mut b) => run_build(&mut b.build, b.lambda_dir, b.output_format),
         },
         App::Zig(zig) => zig.execute().map_err(|e| miette!(e)),
     }
 }
 
-fn run_build(build: &mut Build, lambda_dir: Option<PathBuf>) -> Result<()> {
+#[derive(Clone, Debug, strum_macros::Display, EnumString)]
+enum OutputFormat {
+    Binary,
+    Zip,
+}
+
+fn run_build(
+    build: &mut Build,
+    lambda_dir: Option<PathBuf>,
+    output_format: OutputFormat,
+) -> Result<()> {
     let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
     let host_target = &rustc_meta.host;
 
@@ -132,7 +148,21 @@ fn run_build(build: &mut Build, lambda_dir: Option<PathBuf>) -> Result<()> {
         if binary.exists() {
             let bootstrap_dir = lambda_dir.join(name);
             std::fs::create_dir_all(&bootstrap_dir).into_diagnostic()?;
-            std::fs::rename(binary, bootstrap_dir.join("bootstrap")).into_diagnostic()?;
+            match output_format {
+                OutputFormat::Binary => {
+                    std::fs::rename(binary, bootstrap_dir.join("bootstrap")).into_diagnostic()?;
+                }
+                OutputFormat::Zip => {
+                    let zipped_binary = std::fs::File::create(bootstrap_dir.join("bootstrap.zip"))
+                        .into_diagnostic()?;
+                    let mut zip = zip::ZipWriter::new(zipped_binary);
+                    zip.start_file("bootstrap", Default::default())
+                        .into_diagnostic()?;
+                    zip.write_all(&std::fs::read(binary).into_diagnostic()?)
+                        .into_diagnostic()?;
+                    zip.finish().into_diagnostic()?;
+                }
+            }
         }
     }
 
