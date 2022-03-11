@@ -51,6 +51,7 @@ fn main() -> Result<()> {
 }
 
 #[derive(Clone, Debug, strum_macros::Display, EnumString)]
+#[strum(ascii_case_insensitive)]
 enum OutputFormat {
     Binary,
     Zip,
