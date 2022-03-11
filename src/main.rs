@@ -13,7 +13,7 @@ use strum_macros::EnumString;
 #[derive(Parser)]
 #[clap(name = "cargo")]
 #[clap(bin_name = "cargo")]
-#[clap(version, global_setting(clap::AppSettings::DeriveDisplayOrder))]
+#[clap(global_setting(clap::AppSettings::DeriveDisplayOrder))]
 enum App {
     #[clap(subcommand)]
     Lambda(Box<Lambda>),
@@ -23,6 +23,7 @@ enum App {
 
 /// Build AWS Lambda functions compiled with zig as the linker
 #[derive(Clone, Debug, Subcommand)]
+#[clap(version)]
 pub enum Lambda {
     Build(LambdaBuild),
 }
