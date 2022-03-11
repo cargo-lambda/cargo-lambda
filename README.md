@@ -43,12 +43,12 @@ target/lambda
 By default, cargo-lambda produces a binary artifact for each Lambda functions in the project.
 However, you can configure cargo-lambda to produce a ready to upload zip artifact.
 
-The `--output-format` paramters controls the output format, the two current options are `Zip` and `Binary` with `Binary` being the default.
+The `--output-format` paramters controls the output format, the two current options are `zip` and `binary` with `binary` being the default.
 
 Example usage to create a zip.
 
 ```
-cargo lambda build --output-format Zip
+cargo lambda build --output-format zip
 ```
 
 ### Usage - Architectures
