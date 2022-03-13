@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use miette::{miette, Result};
 
 mod build;
+mod zig;
 
 #[derive(Parser)]
 #[clap(name = "cargo")]
