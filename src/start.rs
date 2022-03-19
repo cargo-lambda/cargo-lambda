@@ -11,16 +11,24 @@ use miette::{IntoDiagnostic, Result, WrapErr};
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     net::SocketAddr,
-    process::{Command, Stdio},
+    process::Stdio,
     sync::Arc,
 };
-use tokio::sync::{mpsc, mpsc::Sender, oneshot, Mutex};
+use tokio::{
+    process::Command,
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        oneshot, Mutex,
+    },
+    time::Duration,
+};
+use tokio_graceful_shutdown::{Error, SubsystemHandle, Toplevel};
 use tower_http::{
     catch_panic::CatchPanicLayer,
     request_id::{MakeRequestId, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
     trace::TraceLayer,
 };
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
@@ -44,7 +52,7 @@ impl Start {
     pub async fn run(&self) -> Result<()> {
         if which::which("cargo-watch").is_err() {
             let pb = crate::progress::Progress::start("Installing Cargo-watch...");
-            let result = install_cargo_watch();
+            let result = install_cargo_watch().await;
             let finish = if result.is_ok() {
                 "Cargo-watch installed"
             } else {
@@ -54,77 +62,68 @@ impl Start {
             let _ = result?;
         }
 
-        self.start_server().await
-    }
+        let port = self.invoke_port;
 
-    async fn start_server(&self) -> Result<()> {
-        tracing_subscriber::registry()
-            .with(tracing_subscriber::EnvFilter::new(
-                std::env::var("RUST_LOG")
-                    .unwrap_or_else(|_| "cargo_lambda=info,tower_http=info".into()),
-            ))
-            .with(tracing_subscriber::fmt::layer())
-            .init();
-
-        let (cmd_tx, mut cmd_rx) = mpsc::channel::<InvokeRequest>(100);
-        let (gc_tx, mut gc_rx) = mpsc::channel::<String>(100);
-
-        let addr = SocketAddr::from(([127, 0, 0, 1], self.invoke_port));
-        let server_addr: ServerAddr = format!("http://{addr}");
-        let scheduler = Scheduler::new(server_addr, gc_tx);
-
-        let scheduler_gc = scheduler.clone();
-        let scheduler_clone = scheduler.clone();
-
-        tokio::spawn(async move {
-            while let Some(function_name) = gc_rx.recv().await {
-                scheduler_gc.clean(&function_name).await;
-            }
-        });
-
-        tokio::spawn(async move {
-            while let Some(req) = cmd_rx.recv().await {
-                scheduler.call(req).await;
-            }
-        });
-
-        let resp_cache = ResponseCache::new();
-        let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
-
-        let app = Router::new()
-            .route(
-                "/2015-03-31/functions/:function_name/invocations",
-                post(invoke_handler),
-            )
-            .route(
-                "/:function_name/2018-06-01/runtime/invocation/next",
-                get(next_request),
-            )
-            .route(
-                "/:function_name/2018-06-01/runtime/invocation/:req_id/response",
-                post(next_invocation_response),
-            )
-            .route(
-                "/:function_name/2018-06-01/runtime/invocation/:req_id/error",
-                post(next_invocation_error),
-            )
-            .layer(SetRequestIdLayer::new(
-                x_request_id.clone(),
-                RequestUuidService::default(),
-            ))
-            .layer(PropagateRequestIdLayer::new(x_request_id))
-            .layer(Extension(cmd_tx.clone()))
-            .layer(Extension(scheduler_clone))
-            .layer(Extension(resp_cache))
-            .layer(TraceLayer::new_for_http())
-            .layer(CatchPanicLayer::new());
-
-        info!("invoke server listening on {}", addr);
-        axum::Server::bind(&addr)
-            .serve(app.into_make_service())
+        Toplevel::new()
+            .start("Lambda server", move |s| start_server(s, port))
+            .catch_signals()
+            .handle_shutdown_requests(Duration::from_millis(1000))
             .await
-            .into_diagnostic()
+            .map_err(|e| miette::miette!("{}", e))
     }
+}
+
+async fn start_server(subsys: SubsystemHandle, invoke_port: u16) -> std::result::Result<(), Error> {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG")
+                .unwrap_or_else(|_| "cargo_lambda=info,tower_http=info".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], invoke_port));
+    let server_addr: ServerAddr = format!("http://{addr}");
+
+    let req_cache = RequestCache::new(server_addr);
+    let req_tx = init_scheduler(&subsys, req_cache.clone()).await;
+    let resp_cache = ResponseCache::new();
+    let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
+
+    let app = Router::new()
+        .route(
+            "/2015-03-31/functions/:function_name/invocations",
+            post(invoke_handler),
+        )
+        .route(
+            "/:function_name/2018-06-01/runtime/invocation/next",
+            get(next_request),
+        )
+        .route(
+            "/:function_name/2018-06-01/runtime/invocation/:req_id/response",
+            post(next_invocation_response),
+        )
+        .route(
+            "/:function_name/2018-06-01/runtime/invocation/:req_id/error",
+            post(next_invocation_error),
+        )
+        .layer(SetRequestIdLayer::new(
+            x_request_id.clone(),
+            RequestUuidService::default(),
+        ))
+        .layer(PropagateRequestIdLayer::new(x_request_id))
+        .layer(Extension(req_tx.clone()))
+        .layer(Extension(req_cache))
+        .layer(Extension(resp_cache))
+        .layer(TraceLayer::new_for_http())
+        .layer(CatchPanicLayer::new());
+
+    info!("invoke server listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .with_graceful_shutdown(subsys.on_shutdown_requested())
+        .await
+        .map_err(|e| e.into())
 }
 
 async fn invoke_handler(
@@ -145,8 +144,8 @@ async fn invoke_handler(
 }
 
 async fn next_request(
-    Extension(scheduler): Extension<Scheduler>,
-    Extension(cache): Extension<ResponseCache>,
+    Extension(req_cache): Extension<RequestCache>,
+    Extension(resp_cache): Extension<ResponseCache>,
     Path(function_name): Path<String>,
     req: Request<Body>,
 ) -> Response<Body> {
@@ -163,7 +162,7 @@ async fn next_request(
         .header("lambda-runtime-deadline-ms", 600_000_u32)
         .header("lambda-runtime-invoked-function-arn", "function-arn");
 
-    match scheduler.pop(&function_name).await {
+    match req_cache.pop(&function_name).await {
         None => builder
             .status(StatusCode::NO_CONTENT)
             .body(Body::empty())
@@ -174,7 +173,7 @@ async fn next_request(
             let (parts, body) = invoke.req.into_parts();
 
             let resp_tx = invoke.resp_tx;
-            cache.push(&req_id, resp_tx).await;
+            resp_cache.push(&req_id, resp_tx).await;
 
             let headers = parts.headers;
             if let Some(h) = headers.get("lambda-runtime-client-context") {
@@ -249,6 +248,64 @@ impl RequestQueue {
     }
 }
 
+impl std::default::Default for RequestQueue {
+    fn default() -> Self {
+        RequestQueue::new()
+    }
+}
+
+#[derive(Clone)]
+struct RequestCache {
+    server_addr: ServerAddr,
+    inner: Arc<Mutex<HashMap<String, RequestQueue>>>,
+}
+
+impl RequestCache {
+    fn new(server_addr: ServerAddr) -> RequestCache {
+        RequestCache {
+            server_addr,
+            inner: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    async fn get_or_insert(&self, req: InvokeRequest) -> Option<(String, String)> {
+        let mut inner = self.inner.lock().await;
+        let name = req.function_name.clone();
+
+        match inner.entry(name) {
+            Entry::Vacant(v) => {
+                let name = req.function_name.clone();
+                let runtime_api = format!("{}/{}", &self.server_addr, &name);
+
+                let stack = RequestQueue::new();
+                stack.push(req).await;
+                v.insert(stack);
+
+                Some((name, runtime_api))
+            }
+            Entry::Occupied(o) => {
+                o.into_mut().push(req).await;
+                None
+            }
+        }
+    }
+
+    async fn pop(&self, function_name: &str) -> Option<InvokeRequest> {
+        let inner = self.inner.lock().await;
+        let stack = match inner.get(function_name) {
+            None => return None,
+            Some(s) => s,
+        };
+
+        stack.pop().await
+    }
+
+    async fn clean(&self, function_name: &str) {
+        let mut inner = self.inner.lock().await;
+        inner.remove(function_name);
+    }
+}
+
 #[derive(Clone)]
 struct ResponseCache {
     inner: Arc<Mutex<HashMap<String, oneshot::Sender<Response<Body>>>>>,
@@ -272,61 +329,78 @@ impl ResponseCache {
     }
 }
 
-#[derive(Clone)]
-struct Scheduler {
-    server_addr: ServerAddr,
-    gc_tx: Sender<String>,
-    inner: Arc<Mutex<HashMap<String, RequestQueue>>>,
+async fn init_scheduler(
+    subsys: &SubsystemHandle,
+    req_cache: RequestCache,
+) -> Sender<InvokeRequest> {
+    let (req_tx, req_rx) = mpsc::channel::<InvokeRequest>(100);
+
+    subsys.start("Lambda scheduler", move |s| {
+        start_scheduler(s, req_cache, req_rx)
+    });
+
+    req_tx
 }
 
-impl Scheduler {
-    fn new(server_addr: ServerAddr, gc_tx: Sender<String>) -> Scheduler {
-        Scheduler {
-            server_addr,
-            gc_tx,
-            inner: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
+async fn start_scheduler(
+    subsys: SubsystemHandle,
+    req_cache: RequestCache,
+    mut req_rx: Receiver<InvokeRequest>,
+) -> Result<(), Error> {
+    let (gc_tx, mut gc_rx) = mpsc::channel::<String>(10);
 
-    async fn call(&self, req: InvokeRequest) {
-        let mut inner = self.inner.lock().await;
-        let name = req.function_name.clone();
-        let runtime_api = format!("{}/{}", &self.server_addr, &name);
+    loop {
+        tokio::select! {
+            Some(req) = req_rx.recv() => {
+                if let Some((name, api)) = req_cache.get_or_insert(req).await {
+                    let name = name.clone();
+                    let api = api.clone();
+                    let gc_tx = gc_tx.clone();
+                    subsys.start("Lambda runtime", |s| start_function(s, name, api, gc_tx));
+                }
+            },
+            Some(gc) = gc_rx.recv() => {
+                req_cache.clean(&gc).await;
+            },
+            _ = subsys.on_shutdown_requested() => {
+                info!("terminating Lambda scheduler");
+                return Ok(());
+            },
 
-        match inner.entry(name) {
-            Entry::Vacant(v) => {
-                let name = req.function_name.clone();
-
-                let stack = RequestQueue::new();
-                stack.push(req).await;
-                v.insert(stack);
-
-                let gc = self.gc_tx.clone();
-                tokio::spawn(async move {
-                    let _ = watch_project(&name, &runtime_api);
-                    gc.send(name).await.unwrap();
-                });
-            }
-            Entry::Occupied(o) => {
-                o.into_mut().push(req).await;
-            }
-        }
-    }
-
-    async fn pop(&self, function_name: &str) -> Option<InvokeRequest> {
-        let inner = self.inner.lock().await;
-        let stack = match inner.get(function_name) {
-            None => return None,
-            Some(s) => s,
         };
+    }
+}
 
-        stack.pop().await
+async fn start_function(
+    subsys: SubsystemHandle,
+    name: String,
+    runtime_api: String,
+    gc_tx: Sender<String>,
+) -> Result<(), Error> {
+    info!("Starting lambda function {name}");
+
+    let mut child = Command::new("cargo")
+        .args(["watch", "--", "cargo", "run", "--bin", &name])
+        .env("RUST_LOG", std::env::var("RUST_LOG").unwrap_or_default())
+        .env("AWS_LAMBDA_RUNTIME_API", &runtime_api)
+        .env("AWS_LAMBDA_FUNCTION_NAME", &name)
+        .env("AWS_LAMBDA_FUNCTION_VERSION", "1")
+        .env("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", "4096")
+        .spawn()?;
+
+    tokio::select! {
+        _ = child.wait() => {
+            if let Err(err) = gc_tx.send(name).await {
+                error!("{err}");
+            }
+        },
+        _ = subsys.on_shutdown_requested() => {
+            info!("terminating Lambda function {name}");
+            let _ = child.kill().await;
+        }
     }
 
-    async fn clean(&self, function_name: &str) {
-        let mut inner = self.inner.lock().await;
-        inner.remove(function_name);
-    }
+    Ok(())
 }
 
 #[derive(Clone, Copy, Default)]
@@ -339,27 +413,7 @@ impl MakeRequestId for RequestUuidService {
     }
 }
 
-fn watch_project(name: &str, runtime_api: &str) -> Result<std::process::ExitStatus> {
-    info!("Starting lambda function {name}");
-
-    let mut child = Command::new("cargo")
-        .args(["watch", "--", "cargo", "run", "--bin", name])
-        .env("RUST_LOG", std::env::var("RUST_LOG").unwrap_or_default())
-        .env("AWS_LAMBDA_RUNTIME_API", runtime_api)
-        .env("AWS_LAMBDA_FUNCTION_NAME", name)
-        .env("AWS_LAMBDA_FUNCTION_VERSION", "1")
-        .env("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", "4096")
-        .spawn()
-        .into_diagnostic()
-        .wrap_err("Failed to run `cargo-watch`")?;
-
-    child
-        .wait()
-        .into_diagnostic()
-        .wrap_err("Failed to wait on cargo-watch process")
-}
-
-fn install_cargo_watch() -> Result<()> {
+async fn install_cargo_watch() -> Result<()> {
     let mut child = Command::new("cargo")
         .args(&["install", "cargo-watch"])
         .stderr(Stdio::null())
@@ -370,6 +424,7 @@ fn install_cargo_watch() -> Result<()> {
 
     let status = child
         .wait()
+        .await
         .into_diagnostic()
         .wrap_err("Failed to wait on cargo process")?;
     if !status.success() {
