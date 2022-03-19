@@ -208,6 +208,7 @@ dependencies = [
  "cargo-zigbuild",
  "cargo_metadata",
  "clap",
+ "dirs",
  "indicatif",
  "inquire",
  "miette",

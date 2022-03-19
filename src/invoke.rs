@@ -1,6 +1,10 @@
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
-use std::path::PathBuf;
+use std::{
+    fs::{create_dir_all, read_to_string, File},
+    io::copy,
+    path::{Path, PathBuf},
+};
 
 #[derive(Args, Clone, Debug)]
 #[clap(name = "invoke")]
@@ -24,31 +28,28 @@ pub struct Invoke {
 impl Invoke {
     pub async fn run(&self) -> Result<()> {
         let data = if let Some(file) = &self.data_file {
-            std::fs::read_to_string(file)
+            read_to_string(file)
                 .into_diagnostic()
                 .wrap_err("error reading data file")?
         } else if let Some(data) = &self.data_ascii {
             data.clone()
         } else if let Some(example) = &self.data_example {
-            let target = format!("https://raw.githubusercontent.com/LegNeato/aws-lambda-events/master/aws_lambda_events/src/generated/fixtures/example-{example}.json");
+            let name = format!("example-{example}.json");
 
-            let response = reqwest::get(target)
-                .await
-                .into_diagnostic()
-                .wrap_err("error dowloading example data")?;
+            let cache = dirs::home_dir()
+                .unwrap()
+                .join(".cargo")
+                .join("lambda")
+                .join("invoke-fixtures")
+                .join(&name);
 
-            if response.status() != axum::http::StatusCode::OK {
-                return Err(miette::miette!(
-                    "error downloading example data -- {:?}",
-                    response
-                ));
+            if cache.exists() {
+                read_to_string(cache)
+                    .into_diagnostic()
+                    .wrap_err("error reading data file")?
+            } else {
+                download_example(&name, &cache).await?
             }
-
-            response
-                .text()
-                .await
-                .into_diagnostic()
-                .wrap_err("error reading example data")?
         } else {
             return Err(miette::miette!("no data payload provided, use one of the data flags: `--data-file`, `--data-ascii`, `--data-example`"));
         };
@@ -77,4 +78,31 @@ impl Invoke {
 
         Ok(())
     }
+}
+
+async fn download_example(name: &str, cache: &Path) -> Result<String> {
+    let target = format!("https://raw.githubusercontent.com/LegNeato/aws-lambda-events/master/aws_lambda_events/src/generated/fixtures/{name}");
+
+    let response = reqwest::get(target)
+        .await
+        .into_diagnostic()
+        .wrap_err("error dowloading example data")?;
+
+    if response.status() != axum::http::StatusCode::OK {
+        return Err(miette::miette!(
+            "error downloading example data -- {:?}",
+            response
+        ));
+    }
+
+    let content = response
+        .text()
+        .await
+        .into_diagnostic()
+        .wrap_err("error reading example data")?;
+
+    create_dir_all(cache.parent().unwrap()).into_diagnostic()?;
+    let mut dest = File::create(cache).into_diagnostic()?;
+    copy(&mut content.as_bytes(), &mut dest).into_diagnostic()?;
+    Ok(content)
 }

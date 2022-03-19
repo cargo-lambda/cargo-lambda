@@ -20,6 +20,7 @@ axum = "0.4.8"
 cargo-zigbuild = "0.6.3"
 cargo_metadata = "0.14.2"
 clap = { version = "3.1.5", features = ["cargo", "derive"] }
+dirs = "4.0.0"
 indicatif = "0.16.2"
 inquire = "0.2.1"
 miette = { version = "4.2.1", features = ["fancy"] }

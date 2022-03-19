@@ -116,6 +116,8 @@ The `--example-data` flag allows you to fetch an example payload from the [aws-l
 cargo lambda invoke http-lambda --example-data apigw-request
 ```
 
+After the first download, these examples are cached in your home directory, under `.cargo/lambda/invoke-fixtures`.
+
 [//]: # (badges)
 
 [crate-image]: https://img.shields.io/crates/v/cargo-lambda.svg
