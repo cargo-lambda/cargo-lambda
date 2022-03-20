@@ -84,6 +84,8 @@ to compile the code for the right architecture. If Zig is not installed in your 
 
 The start subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions.
 
+:warning: This command works best with the **[Lambda Runtime version 0.5.1](https://crates.io/crates/lambda_runtime/0.5.1)**. Previous versions of the rumtime are likely to crash with serialization errors.
+
 ```
 cargo lambda start
 ```
