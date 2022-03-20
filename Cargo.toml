@@ -29,7 +29,7 @@ rustc_version = "0.4.0"
 strum = "0.24.0" # For String -> Enum macros for usage with the CLI.
 strum_macros = "0.24.0"
 tokio = { version = "1.17.0", features = ["full"] }
-tokio-graceful-shutdown = { git = "https://github.com/calavera/tokio-graceful-shutdown", branch = "remove_anyhow" }
+tokio-graceful-shutdown-without-anyhow = "0.6.0"
 tower-http = { version = "0.2.5", features = ["catch-panic", "request-id", "trace"] }
 tracing = "0.1.32"
 tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
