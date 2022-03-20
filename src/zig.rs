@@ -1,6 +1,4 @@
-use atty::is;
 use cargo_zigbuild::Zig;
-use indicatif::{ProgressBar, ProgressStyle};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use std::process::{Command, Stdio};
 
@@ -46,7 +44,7 @@ impl std::fmt::Display for InstallOption {
 
 impl InstallOption {
     fn install(self) -> Result<()> {
-        let pb = Progress::start("Installing Zig...");
+        let pb = crate::progress::Progress::start("Installing Zig...");
         let result = match self {
             InstallOption::Pip3 => install_with_pip3(),
             InstallOption::Npm => install_with_npm(),
@@ -100,48 +98,4 @@ fn install_with_npm() -> Result<()> {
     }
 
     Ok(())
-}
-
-struct Progress {
-    bar: Option<ProgressBar>,
-}
-
-impl Progress {
-    fn start(msg: &str) -> Progress {
-        let bar = if is(atty::Stream::Stdout) {
-            Some(show_progress(msg))
-        } else {
-            println!("▹▹▹▹▹ {}", msg);
-            None
-        };
-        Progress { bar }
-    }
-
-    fn finish(&self, msg: &str) {
-        if let Some(bar) = &self.bar {
-            bar.finish_with_message(msg.to_string());
-        } else {
-            println!("▪▪▪▪▪ {}", msg);
-        }
-    }
-}
-
-fn show_progress(msg: &str) -> ProgressBar {
-    let pb = ProgressBar::new_spinner();
-    pb.enable_steady_tick(120);
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.blue} {msg}")
-            .tick_strings(&[
-                "▹▹▹▹▹",
-                "▸▹▹▹▹",
-                "▹▸▹▹▹",
-                "▹▹▸▹▹",
-                "▹▹▹▸▹",
-                "▹▹▹▹▸",
-                "▪▪▪▪▪",
-            ]),
-    );
-    pb.set_message(msg.to_string());
-    pb
 }
