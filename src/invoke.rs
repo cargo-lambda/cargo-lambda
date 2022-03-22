@@ -115,7 +115,7 @@ async fn download_example(name: &str, cache: &Path) -> Result<String> {
 }
 
 fn parse_invoke_ip_address(address: &str) -> Result<String> {
-    let invoke_address = IpAddr::from_str(address).map_err(|e| miette::miette!(e.to_string()))?;
+    let invoke_address = IpAddr::from_str(address).map_err(|e| miette::miette!(e))?;
 
     let invoke_address = match invoke_address {
         IpAddr::V4(address) => address.to_string(),
