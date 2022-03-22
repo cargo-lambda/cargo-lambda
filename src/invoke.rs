@@ -1,3 +1,4 @@
+use crate::utils::validate_ip;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use std::{
@@ -9,6 +10,9 @@ use std::{
 #[derive(Args, Clone, Debug)]
 #[clap(name = "invoke")]
 pub struct Invoke {
+    /// Address host (IPV4) where users send invoke requests
+    #[clap(long, validator = validate_ip, default_value = "127.0.0.1")]
+    invoke_host: String,
     /// Address port where users send invoke requests
     #[clap(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
@@ -55,8 +59,8 @@ impl Invoke {
         };
 
         let url = format!(
-            "http://127.0.0.1:{}/2015-03-31/functions/{}/invocations",
-            self.invoke_port, &self.function_name
+            "http://{}:{}/2015-03-31/functions/{}/invocations",
+            &self.invoke_host, self.invoke_port, &self.function_name
         );
 
         let client = reqwest::Client::new();
