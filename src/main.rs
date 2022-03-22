@@ -3,7 +3,6 @@ use std::boxed::Box;
 use cargo_zigbuild::Zig;
 use clap::{Parser, Subcommand};
 use miette::{miette, Result};
-
 mod build;
 mod invoke;
 mod progress;
