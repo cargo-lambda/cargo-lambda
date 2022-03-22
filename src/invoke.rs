@@ -12,8 +12,8 @@ use std::{
 #[clap(name = "invoke")]
 pub struct Invoke {
     /// Address host (IPV4) where users send invoke requests
-    #[clap(short = 'a', long, parse(try_from_str = IpAddr::from_str), default_value = "127.0.0.1")]
-    invoke_address: IpAddr,
+    #[clap(short = 'a', long, default_value = "127.0.0.1")]
+    invoke_address: String,
     /// Address port where users send invoke requests
     #[clap(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
@@ -59,10 +59,7 @@ impl Invoke {
             return Err(miette::miette!("no data payload provided, use one of the data flags: `--data-file`, `--data-ascii`, `--data-example`"));
         };
 
-        let host = match self.invoke_address {
-            IpAddr::V4(address) => address.to_string(),
-            IpAddr::V6(address) => format!("[{}]", address),
-        };
+        let host = parse_invoke_ip_address(&self.invoke_address)?;
 
         let url = format!(
             "http://{}:{}/2015-03-31/functions/{}/invocations",
@@ -115,4 +112,15 @@ async fn download_example(name: &str, cache: &Path) -> Result<String> {
     let mut dest = File::create(cache).into_diagnostic()?;
     copy(&mut content.as_bytes(), &mut dest).into_diagnostic()?;
     Ok(content)
+}
+
+fn parse_invoke_ip_address(address: &str) -> Result<String> {
+    let invoke_address = IpAddr::from_str(address).map_err(|e| miette::miette!(e.to_string()))?;
+
+    let invoke_address = match invoke_address {
+        IpAddr::V4(address) => address.to_string(),
+        IpAddr::V6(address) => format!("[{}]", address),
+    };
+
+    Ok(invoke_address)
 }
