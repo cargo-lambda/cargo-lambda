@@ -7,7 +7,6 @@ mod build;
 mod invoke;
 mod progress;
 mod start;
-mod utils;
 mod zig;
 
 #[derive(Parser)]

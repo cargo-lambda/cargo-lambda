@@ -1,18 +1,19 @@
-use crate::utils::validate_ip;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use std::{
     fs::{create_dir_all, read_to_string, File},
     io::copy,
+    net::IpAddr,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 #[derive(Args, Clone, Debug)]
 #[clap(name = "invoke")]
 pub struct Invoke {
     /// Address host (IPV4) where users send invoke requests
-    #[clap(long, validator = validate_ip, default_value = "127.0.0.1")]
-    invoke_address: String,
+    #[clap(short = 'a', long, parse(try_from_str = IpAddr::from_str), default_value = "127.0.0.1")]
+    invoke_address: IpAddr,
     /// Address port where users send invoke requests
     #[clap(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
@@ -58,9 +59,14 @@ impl Invoke {
             return Err(miette::miette!("no data payload provided, use one of the data flags: `--data-file`, `--data-ascii`, `--data-example`"));
         };
 
+        let host = match self.invoke_address {
+            IpAddr::V4(address) => address.to_string(),
+            IpAddr::V6(address) => format!("[{}]", address),
+        };
+
         let url = format!(
             "http://{}:{}/2015-03-31/functions/{}/invocations",
-            &self.invoke_address, self.invoke_port, &self.function_name
+            &host, self.invoke_port, &self.function_name
         );
 
         let client = reqwest::Client::new();
