@@ -96,26 +96,26 @@ The invoke subcomand helps you send requests to the control plane emulator. To u
 
 ### Invoke - Ascii data
 
-The `--ascii-data` flag allows you to send a payload directly from the command line:
+The `--data-ascii` flag allows you to send a payload directly from the command line:
 
 ```
-cargo lambda invoke basic-lambda --ascii-data '{"command": "hi"}'
+cargo lambda invoke basic-lambda --data-ascii '{"command": "hi"}'
 ```
 
 ### Invoke - File data
 
-The `--file-data` flag allows you to read the payload from a file in your file system:
+The `--data-file` flag allows you to read the payload from a file in your file system:
 
 ```
-cargo lambda invoke basic-lambda --file-data examples/my-payload.json
+cargo lambda invoke basic-lambda --data-file examples/my-payload.json
 ```
 
 ### Invoke - Example data
 
-The `--example-data` flag allows you to fetch an example payload from the [aws-lambda-events repository](https://github.com/LegNeato/aws-lambda-events/), and use it as your request payload. For example, if you want to use the [example-apigw-request.json](https://github.com/LegNeato/aws-lambda-events/blob/master/aws_lambda_events/src/generated/fixtures/example-apigw-request.json) payload, you have to pass the name `apigw-request` into this flag:
+The `--data-example` flag allows you to fetch an example payload from the [aws-lambda-events repository](https://github.com/LegNeato/aws-lambda-events/), and use it as your request payload. For example, if you want to use the [example-apigw-request.json](https://github.com/LegNeato/aws-lambda-events/blob/master/aws_lambda_events/src/generated/fixtures/example-apigw-request.json) payload, you have to pass the name `apigw-request` into this flag:
 
 ```
-cargo lambda invoke http-lambda --example-data apigw-request
+cargo lambda invoke http-lambda --data-example apigw-request
 ```
 
 After the first download, these examples are cached in your home directory, under `.cargo/lambda/invoke-fixtures`.
