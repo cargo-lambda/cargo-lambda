@@ -2,8 +2,11 @@ use crate::zig;
 use cargo_zigbuild::Build as ZigBuild;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    io::Write,
+    path::{Path, PathBuf},
+};
 use strum_macros::EnumString;
 
 #[derive(Args, Clone, Debug)]
@@ -49,6 +52,36 @@ impl Build {
             _ => {}
         }
 
+        let manifest_path = self
+            .build
+            .manifest_path
+            .as_deref()
+            .unwrap_or_else(|| Path::new("Cargo.toml"));
+        let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
+        metadata_cmd.no_deps();
+        metadata_cmd.manifest_path(&manifest_path);
+        let metadata = metadata_cmd.exec().into_diagnostic()?;
+
+        let mut binaries: HashSet<String> = HashSet::new();
+        for pkg in metadata.packages {
+            for target in pkg.targets {
+                if target.kind.iter().any(|s| s == "bin") {
+                    binaries.insert(target.name);
+                }
+            }
+        }
+
+        if !self.build.bin.is_empty() {
+            for name in &self.build.bin {
+                if !binaries.contains(name) {
+                    return Err(miette::miette!(
+                        "binary target is missing from this project: {}",
+                        name
+                    ));
+                }
+            }
+        }
+
         if !self.build.disable_zig_linker {
             zig::check_installation()?;
         }
@@ -71,25 +104,6 @@ impl Build {
             .wrap_err("Failed to wait on cargo build process")?;
         if !status.success() {
             std::process::exit(status.code().unwrap_or(1));
-        }
-
-        let manifest_path = self
-            .build
-            .manifest_path
-            .as_deref()
-            .unwrap_or_else(|| Path::new("Cargo.toml"));
-        let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
-        metadata_cmd.no_deps();
-        metadata_cmd.manifest_path(&manifest_path);
-        let metadata = metadata_cmd.exec().into_diagnostic()?;
-
-        let mut binaries: Vec<String> = Vec::new();
-        for pkg in metadata.packages {
-            for target in pkg.targets {
-                if target.kind.iter().any(|s| s == "bin") {
-                    binaries.push(target.name);
-                }
-            }
         }
 
         let final_target = self
