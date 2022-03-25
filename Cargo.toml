@@ -35,4 +35,4 @@ tracing = "0.1.32"
 tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
 uuid = { version = "0.8.2", features = ["v4"] }
 which = "4.2.4"
-zip = "0.5.13" # For creating zip files.
+zip = { version = "0.6.0", default-features = false, features = ["bzip2", "deflate", "time"] } # For creating zip files.
