@@ -34,7 +34,8 @@ impl Build {
         let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
         let host_target = &rustc_meta.host;
 
-        match self.build.target.as_ref() {
+        let build_target = self.build.target.get(0);
+        match build_target {
             // Same explicit target as host target
             Some(target) if host_target == target => self.build.disable_zig_linker = true,
             // No explicit target, but build host same as target host
@@ -43,11 +44,11 @@ impl Build {
             {
                 self.build.disable_zig_linker = true;
                 // Set the target explicitly, so it's easier to find the binaries later
-                self.build.target = Some(host_target.into());
+                self.build.target = vec![host_target.into()];
             }
             // No explicit target, and build host not compatible with Lambda hosts
             None => {
-                self.build.target = Some("x86_64-unknown-linux-gnu".into());
+                self.build.target = vec!["x86_64-unknown-linux-gnu".into()];
             }
             _ => {}
         }
@@ -109,7 +110,8 @@ impl Build {
         let final_target = self
             .build
             .target
-            .as_deref()
+            .get(0)
+            .map(|x| x.as_str())
             .unwrap_or("x86_64-unknown-linux-gnu");
         let profile = match self.build.profile.as_deref() {
             Some("dev" | "test") => "debug",
