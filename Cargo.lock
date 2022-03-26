@@ -209,6 +209,7 @@ dependencies = [
  "cargo_metadata",
  "clap",
  "dirs",
+ "http-api-problem",
  "indicatif",
  "inquire",
  "miette",
@@ -216,8 +217,9 @@ dependencies = [
  "rustc_version",
  "strum",
  "strum_macros",
+ "thiserror",
  "tokio",
- "tokio-graceful-shutdown-without-anyhow",
+ "tokio-graceful-shutdown",
  "tower-http",
  "tracing",
  "tracing-subscriber",
@@ -587,6 +589,18 @@ dependencies = [
  "bytes",
  "fnv",
  "itoa",
+]
+
+[[package]]
+name = "http-api-problem"
+version = "0.51.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d43e8970113f6e4a9138e6cd57b20de3ed99585cab427eb99d27a440827dbe2"
+dependencies = [
+ "http",
+ "hyper",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1575,10 +1589,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-graceful-shutdown-without-anyhow"
-version = "0.6.0"
+name = "tokio-graceful-shutdown"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bb06801a4a0d061285228e0922dfd1673e3b60edd1f5ffe8b16ea3e82ef25fe"
+checksum = "2b9614e6d7b687b4daf9b5191d45039258b19405fb1493051cee400f29ec0e57"
 dependencies = [
  "anyhow",
  "async-recursion",

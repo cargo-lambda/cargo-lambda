@@ -21,6 +21,7 @@ cargo-zigbuild = "0.7.0"
 cargo_metadata = "0.14.2"
 clap = { version = "3.1.5", features = ["cargo", "derive"] }
 dirs = "4.0.0"
+http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
 indicatif = "0.16.2"
 inquire = "0.2.1"
 miette = { version = "4.2.1", features = ["fancy"] }
@@ -28,8 +29,9 @@ reqwest = { version = "0.11.10", default-features = false, features = ["json", "
 rustc_version = "0.4.0"
 strum = "0.24.0" # For String -> Enum macros for usage with the CLI.
 strum_macros = "0.24.0"
+thiserror = "1.0.30"
 tokio = { version = "1.17.0", features = ["full"] }
-tokio-graceful-shutdown-without-anyhow = "0.6.0"
+tokio-graceful-shutdown = "0.5.0"
 tower-http = { version = "0.2.5", features = ["catch-panic", "request-id", "trace"] }
 tracing = "0.1.32"
 tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
