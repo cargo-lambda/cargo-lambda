@@ -123,7 +123,10 @@ async fn invoke_handler(
         resp_tx,
     };
 
-    cmd_tx.send(req).await.map_err(|e| ServerError::SendInvokeMessage(Box::new(e)))?;
+    cmd_tx
+        .send(req)
+        .await
+        .map_err(|e| ServerError::SendInvokeMessage(Box::new(e)))?;
 
     resp_rx.await.map_err(ServerError::ReceiveFunctionMessage)
 }
@@ -203,7 +206,9 @@ async fn respond_to_next_invocation(
             .body(body)
             .map_err(ServerError::ResponseBuild)?;
 
-        resp_tx.send(resp).map_err(|_| ServerError::SendFunctionMessage)?;
+        resp_tx
+            .send(resp)
+            .map_err(|_| ServerError::SendFunctionMessage)?;
     }
 
     Ok(Response::new(Body::empty()))
