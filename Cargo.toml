@@ -25,7 +25,9 @@ http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
 indicatif = "0.16.2"
 inquire = "0.2.1"
 miette = { version = "4.2.1", features = ["fancy"] }
-reqwest = { version = "0.11.10", default-features = false, features = ["json", "rustls-tls"] }
+opentelemetry = { version = "0.17.0", features = ["trace", "rt-tokio"] }
+opentelemetry-aws = "0.5.0"
+reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls"] }
 rustc_version = "0.4.0"
 strum = "0.24.0" # For String -> Enum macros for usage with the CLI.
 strum_macros = "0.24.0"
@@ -34,6 +36,7 @@ tokio = { version = "1.17.0", features = ["full"] }
 tokio-graceful-shutdown = "0.5.0"
 tower-http = { version = "0.2.5", features = ["catch-panic", "request-id", "trace"] }
 tracing = "0.1.32"
+tracing-opentelemetry = "0.17.2"
 tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
 uuid = { version = "0.8.2", features = ["v4"] }
 which = "4.2.4"
