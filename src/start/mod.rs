@@ -8,7 +8,12 @@ use axum::{
 };
 use clap::Args;
 use miette::{IntoDiagnostic, Result, WrapErr};
-use std::{net::SocketAddr, process::Stdio};
+use opentelemetry::{
+    global,
+    trace::{TraceContextExt, Tracer},
+    Context, KeyValue,
+};
+use std::{collections::HashMap, net::SocketAddr, process::Stdio};
 use tokio::{
     process::Command,
     sync::{mpsc::Sender, oneshot},
@@ -21,7 +26,6 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{debug, info};
-use uuid::Uuid;
 
 mod requests;
 use requests::*;
@@ -30,12 +34,23 @@ use scheduler::*;
 mod trace;
 use trace::*;
 
+const AWS_XRAY_TRACE_HEADER: &str = "x-amzn-trace-id";
+const LAMBDA_RUNTIME_XRAY_TRACE_HEADER: &str = "lambda-runtime-trace-id";
+const LAMBDA_RUNTIME_COGNITO_IDENTITY: &str = "lambda-runtime-cognito-identity";
+const LAMBDA_RUNTIME_CLIENT_CONTEXT: &str = "lambda-runtime-client-context";
+const LAMBDA_RUNTIME_AWS_REQUEST_ID: &str = "lambda-runtime-aws-request-id";
+const LAMBDA_RUNTIME_DEADLINE_MS: &str = "lambda-runtime-deadline-ms";
+const LAMBDA_RUNTIME_FUNCTION_ARN: &str = "lambda-runtime-invoked-function-arn";
+
 #[derive(Args, Clone, Debug)]
 #[clap(name = "start")]
 pub struct Start {
     /// Address port where users send invoke requests
     #[clap(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
+    /// Print OpenTelemetry traces after each function invocation
+    #[clap(long)]
+    print_traces: bool,
 }
 
 impl Start {
@@ -53,9 +68,12 @@ impl Start {
         }
 
         let port = self.invoke_port;
+        let print_traces = self.print_traces;
 
         Toplevel::new()
-            .start("Lambda server", move |s| start_server(s, port))
+            .start("Lambda server", move |s| {
+                start_server(s, port, print_traces)
+            })
             .catch_signals()
             .handle_shutdown_requests(Duration::from_millis(1000))
             .await
@@ -63,8 +81,12 @@ impl Start {
     }
 }
 
-async fn start_server(subsys: SubsystemHandle, invoke_port: u16) -> Result<(), axum::Error> {
-    init_tracing();
+async fn start_server(
+    subsys: SubsystemHandle,
+    invoke_port: u16,
+    print_traces: bool,
+) -> Result<(), axum::Error> {
+    init_tracing(print_traces);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], invoke_port));
     let server_addr = format!("http://{addr}");
@@ -115,6 +137,23 @@ async fn invoke_handler(
     Path(function_name): Path<String>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
+    let mut req = req;
+    let headers = req.headers_mut();
+
+    let span = global::tracer("cargo-lambda/emulator").start("invoke request");
+    let cx = Context::current_with_span(span);
+
+    let mut injector = HashMap::new();
+    global::get_text_map_propagator(|propagator| {
+        propagator.inject_context(&cx, &mut injector);
+    });
+    let xray_header = injector
+        .get(AWS_XRAY_TRACE_HEADER)
+        .expect("x-amzn-trace-id header not injected by the propagator") // this is Infaliable
+        .parse()
+        .expect("x-amzn-trace-id header is not in the expected format"); // this is Infaliable
+    headers.insert(LAMBDA_RUNTIME_XRAY_TRACE_HEADER, xray_header);
+
     let (resp_tx, resp_rx) = oneshot::channel::<Response<Body>>();
 
     let req = InvokeRequest {
@@ -128,7 +167,14 @@ async fn invoke_handler(
         .await
         .map_err(|e| ServerError::SendInvokeMessage(Box::new(e)))?;
 
-    resp_rx.await.map_err(ServerError::ReceiveFunctionMessage)
+    let resp = resp_rx.await.map_err(ServerError::ReceiveFunctionMessage)?;
+
+    cx.span().add_event(
+        "function call completed",
+        vec![KeyValue::new("status", resp.status().to_string())],
+    );
+
+    Ok(resp)
 }
 
 async fn next_request(
@@ -139,33 +185,37 @@ async fn next_request(
 ) -> Result<Response<Body>, ServerError> {
     let req_id = req
         .headers()
-        .get("lambda-runtime-aws-request-id")
-        .and_then(|h| h.to_str().ok())
-        .map(|h| h.to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| Uuid::new_v4().to_string());
+        .get(LAMBDA_RUNTIME_AWS_REQUEST_ID)
+        .expect("missing request id");
 
     let mut builder = Response::builder()
-        .header("lambda-runtime-aws-request-id", &req_id)
-        .header("lambda-runtime-deadline-ms", 600_000_u32)
-        .header("lambda-runtime-invoked-function-arn", "function-arn");
+        .header(LAMBDA_RUNTIME_AWS_REQUEST_ID, req_id)
+        .header(LAMBDA_RUNTIME_DEADLINE_MS, 600_000_u32)
+        .header(LAMBDA_RUNTIME_FUNCTION_ARN, "function-arn");
 
     let resp = match req_cache.pop(&function_name).await {
         None => builder.status(StatusCode::NO_CONTENT).body(Body::empty()),
         Some(invoke) => {
+            let req_id = req_id
+                .to_str()
+                .map_err(ServerError::InvalidRequestIdHeader)?;
+
             debug!(req_id = ?req_id, "processing request");
 
             let (parts, body) = invoke.req.into_parts();
 
             let resp_tx = invoke.resp_tx;
-            resp_cache.push(&req_id, resp_tx).await;
+            resp_cache.push(req_id, resp_tx).await;
 
             let headers = parts.headers;
-            if let Some(h) = headers.get("lambda-runtime-client-context") {
-                builder = builder.header("lambda-runtime-client-context", h);
+            if let Some(h) = headers.get(LAMBDA_RUNTIME_CLIENT_CONTEXT) {
+                builder = builder.header(LAMBDA_RUNTIME_CLIENT_CONTEXT, h);
             }
-            if let Some(h) = headers.get("lambda-runtime-cognito-identity") {
-                builder = builder.header("lambda-runtime-cognito-identity", h);
+            if let Some(h) = headers.get(LAMBDA_RUNTIME_COGNITO_IDENTITY) {
+                builder = builder.header(LAMBDA_RUNTIME_COGNITO_IDENTITY, h);
+            }
+            if let Some(h) = headers.get(LAMBDA_RUNTIME_XRAY_TRACE_HEADER) {
+                builder = builder.header(LAMBDA_RUNTIME_XRAY_TRACE_HEADER, h);
             }
 
             builder.status(StatusCode::OK).body(body)

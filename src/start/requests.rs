@@ -36,6 +36,10 @@ pub enum ServerError {
     #[error("failed to start function process")]
     #[diagnostic()]
     SpawnCommand(#[from] std::io::Error),
+
+    #[error("invalid request id header")]
+    #[diagnostic()]
+    InvalidRequestIdHeader(#[from] axum::http::header::ToStrError),
 }
 
 impl IntoResponse for ServerError {
