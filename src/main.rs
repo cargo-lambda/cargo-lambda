@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use miette::{miette, Result};
 mod build;
 mod invoke;
+mod metadata;
 mod progress;
 mod start;
 mod zig;

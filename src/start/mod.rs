@@ -6,14 +6,14 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use clap::Args;
+use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
     global,
     trace::{TraceContextExt, Tracer},
     Context, KeyValue,
 };
-use std::{collections::HashMap, net::SocketAddr, process::Stdio};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf, process::Stdio};
 use tokio::{
     process::Command,
     sync::{mpsc::Sender, oneshot},
@@ -48,9 +48,15 @@ pub struct Start {
     /// Address port where users send invoke requests
     #[clap(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
+
     /// Print OpenTelemetry traces after each function invocation
     #[clap(long)]
     print_traces: bool,
+
+    /// Path to Cargo.toml
+    #[clap(long, value_name = "PATH", parse(from_os_str), value_hint = ValueHint::FilePath)]
+    #[clap(default_value = "Cargo.toml")]
+    pub manifest_path: PathBuf,
 }
 
 impl Start {
@@ -69,10 +75,11 @@ impl Start {
 
         let port = self.invoke_port;
         let print_traces = self.print_traces;
+        let manifest_path = self.manifest_path.clone();
 
         Toplevel::new()
             .start("Lambda server", move |s| {
-                start_server(s, port, print_traces)
+                start_server(s, port, print_traces, manifest_path)
             })
             .catch_signals()
             .handle_shutdown_requests(Duration::from_millis(1000))
@@ -85,6 +92,7 @@ async fn start_server(
     subsys: SubsystemHandle,
     invoke_port: u16,
     print_traces: bool,
+    manifest_path: PathBuf,
 ) -> Result<(), axum::Error> {
     init_tracing(print_traces);
 
@@ -92,7 +100,7 @@ async fn start_server(
     let server_addr = format!("http://{addr}");
 
     let req_cache = RequestCache::new(server_addr);
-    let req_tx = init_scheduler(&subsys, req_cache.clone()).await;
+    let req_tx = init_scheduler(&subsys, req_cache.clone(), manifest_path).await;
     let resp_cache = ResponseCache::new();
     let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
 

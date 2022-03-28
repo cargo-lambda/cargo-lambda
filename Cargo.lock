@@ -217,6 +217,8 @@ dependencies = [
  "opentelemetry-aws",
  "reqwest",
  "rustc_version",
+ "serde",
+ "serde_json",
  "strum",
  "strum_macros",
  "thiserror",
