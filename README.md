@@ -92,7 +92,7 @@ cargo lambda start
 
 The function is not compiled until the first time that you try to execute. See the [invoke](#invoke) command to learn how to execute a function. Cargo will run the command `cargo run --bin FUNCTION_NAME` to try to compile the function. `FUNCTION_NAME` can be either the name of the package if the package has only one binary, or the binary name in the `[[bin]]` section if the package includes more than one binary.
 
-### Start - Environment variables
+#### Start - Environment variables
 
 If you need to set environment variables for your function to run, you can specify them in the metadata section of your Cargo.toml file.
 
@@ -135,7 +135,7 @@ path = "src/bin/add-product.rs"
 
 The invoke subcomand helps you send requests to the control plane emulator. To use this subcommand, you have to provide the name of the Lambda function that you want to invoke, and the payload that you want to send. When the control plane emulator receives the request, it will compile your Lambda function and handle your request.
 
-### Invoke - Ascii data
+#### Invoke - Ascii data
 
 The `--data-ascii` flag allows you to send a payload directly from the command line:
 
@@ -143,7 +143,7 @@ The `--data-ascii` flag allows you to send a payload directly from the command l
 cargo lambda invoke basic-lambda --data-ascii '{"command": "hi"}'
 ```
 
-### Invoke - File data
+#### Invoke - File data
 
 The `--data-file` flag allows you to read the payload from a file in your file system:
 
@@ -151,7 +151,7 @@ The `--data-file` flag allows you to read the payload from a file in your file s
 cargo lambda invoke basic-lambda --data-file examples/my-payload.json
 ```
 
-### Invoke - Example data
+#### Invoke - Example data
 
 The `--data-example` flag allows you to fetch an example payload from the [aws-lambda-events repository](https://github.com/LegNeato/aws-lambda-events/), and use it as your request payload. For example, if you want to use the [example-apigw-request.json](https://github.com/LegNeato/aws-lambda-events/blob/master/aws_lambda_events/src/generated/fixtures/example-apigw-request.json) payload, you have to pass the name `apigw-request` into this flag:
 
