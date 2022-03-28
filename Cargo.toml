@@ -29,6 +29,8 @@ opentelemetry = { version = "0.17.0", features = ["trace", "rt-tokio"] }
 opentelemetry-aws = "0.5.0"
 reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls"] }
 rustc_version = "0.4.0"
+serde = { version = "1.0.136", features = ["derive"] }
+serde_json = "1.0.79"
 strum = "0.24.0" # For String -> Enum macros for usage with the CLI.
 strum_macros = "0.24.0"
 thiserror = "1.0.30"

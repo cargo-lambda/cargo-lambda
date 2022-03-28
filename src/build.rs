@@ -1,9 +1,8 @@
-use crate::zig;
+use crate::{metadata, zig};
 use cargo_zigbuild::Build as ZigBuild;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use std::{
-    collections::HashSet,
     io::Write,
     path::{Path, PathBuf},
 };
@@ -58,23 +57,11 @@ impl Build {
             .manifest_path
             .as_deref()
             .unwrap_or_else(|| Path::new("Cargo.toml"));
-        let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
-        metadata_cmd.no_deps();
-        metadata_cmd.manifest_path(&manifest_path);
-        let metadata = metadata_cmd.exec().into_diagnostic()?;
-
-        let mut binaries: HashSet<String> = HashSet::new();
-        for pkg in metadata.packages {
-            for target in pkg.targets {
-                if target.kind.iter().any(|s| s == "bin") {
-                    binaries.insert(target.name);
-                }
-            }
-        }
+        let binaries = metadata::binary_packages(manifest_path.to_path_buf())?;
 
         if !self.build.bin.is_empty() {
             for name in &self.build.bin {
-                if !binaries.contains(name) {
+                if !binaries.contains_key(name) {
                     return Err(miette::miette!(
                         "binary target is missing from this project: {}",
                         name
@@ -129,7 +116,7 @@ impl Build {
         };
 
         let base = target_dir.join(final_target).join(profile);
-        for name in &binaries {
+        for name in binaries.keys() {
             let binary = base.join(name);
             if binary.exists() {
                 let bootstrap_dir = lambda_dir.join(name);

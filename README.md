@@ -90,6 +90,47 @@ The start subcommand emulates the AWS Lambda control plane API. Run this command
 cargo lambda start
 ```
 
+The function is not compiled until the first time that you try to execute. See the [invoke](#invoke) command to learn how to execute a function. Cargo will run the command `cargo run --bin FUNCTION_NAME` to try to compile the function. `FUNCTION_NAME` can be either the name of the package if the package has only one binary, or the binary name in the `[[bin]]` section if the package includes more than one binary.
+
+### Start - Environment variables
+
+If you need to set environment variables for your function to run, you can specify them in the metadata section of your Cargo.toml file.
+
+Use the section `package.metadata.lambda.env` to set global variables that will applied to all functions in your package:
+
+```toml
+[package]
+name = "basic-lambda"
+
+[package.metadata.lambda.env]
+RUST_LOG = "debug"
+MY_CUSTOM_ENV_VARIABLE = "custom value"
+```
+
+If you have more than one function in the same package, and you want to set specific variables for each one of them, you can use a section named after each one of the binaries in your package, `package.metadata.lambda.bin.BINARY_NAME`:
+
+```toml
+[package]
+name = "lambda-project"
+
+[package.metadata.lambda.env]
+RUST_LOG = "debug"
+
+[[package.metadata.lambda.bin.get-product]]
+GET_PRODUCT_ENV_VARIABLE = "custom value"
+
+[[package.metadata.lambda.bin.add-product]]
+ADD_PRODUCT_ENV_VARIABLE = "custom value"
+
+[[bin]]
+name = "get-product"
+path = "src/bin/get-product.rs"
+
+[[bin]]
+name = "add-product"
+path = "src/bin/add-product.rs"
+```
+
 ### Invoke
 
 The invoke subcomand helps you send requests to the control plane emulator. To use this subcommand, you have to provide the name of the Lambda function that you want to invoke, and the payload that you want to send. When the control plane emulator receives the request, it will compile your Lambda function and handle your request.

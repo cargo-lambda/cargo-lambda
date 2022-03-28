@@ -1,7 +1,11 @@
-use crate::start::requests::{InvokeRequest, ServerError};
+use crate::{
+    metadata::{self, PackageMetadata},
+    start::requests::{InvokeRequest, ServerError},
+};
 use axum::{body::Body, response::Response};
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
+    path::PathBuf,
     sync::Arc,
 };
 use tokio::{
@@ -115,12 +119,13 @@ impl ResponseCache {
 pub(crate) async fn init_scheduler(
     subsys: &SubsystemHandle,
     req_cache: RequestCache,
+    manifest_path: PathBuf,
 ) -> Sender<InvokeRequest> {
     let (req_tx, req_rx) = mpsc::channel::<InvokeRequest>(100);
 
     subsys.start("lambda scheduler", move |s| async {
-        start_scheduler(s, req_cache, req_rx).await;
-        Ok::<(), std::convert::Infallible>(())
+        start_scheduler(s, req_cache, manifest_path, req_rx).await;
+        Ok::<_, std::convert::Infallible>(())
     });
 
     req_tx
@@ -129,6 +134,7 @@ pub(crate) async fn init_scheduler(
 async fn start_scheduler(
     subsys: SubsystemHandle,
     req_cache: RequestCache,
+    manifest_path: PathBuf,
     mut req_rx: Receiver<InvokeRequest>,
 ) {
     let (gc_tx, mut gc_rx) = mpsc::channel::<String>(10);
@@ -140,14 +146,15 @@ async fn start_scheduler(
                     let name = name.clone();
                     let api = api.clone();
                     let gc_tx = gc_tx.clone();
-                    subsys.start("lambda runtime", |s| start_function(s, name, api, gc_tx));
+                    let pb = manifest_path.clone();
+                    subsys.start("lambda runtime", |s| start_function(s, name, api, pb, gc_tx));
                 }
             },
             Some(gc) = gc_rx.recv() => {
                 req_cache.clean(&gc).await;
             },
             _ = subsys.on_shutdown_requested() => {
-                info!("terminating Lambda scheduler");
+                info!("terminating lambda scheduler");
                 return;
             },
 
@@ -159,17 +166,29 @@ async fn start_function(
     subsys: SubsystemHandle,
     name: String,
     runtime_api: String,
+    manifest_path: PathBuf,
     gc_tx: Sender<String>,
 ) -> Result<(), ServerError> {
     info!(function = ?name, "starting lambda function");
 
+    let meta = match metadata::function_metadata(manifest_path, &name) {
+        Err(e) => {
+            error!(error = %e, "ignoring invalid function metadata");
+            PackageMetadata::default()
+        }
+        Ok(m) => m.unwrap_or_default(),
+    };
+
     let mut child = Command::new("cargo")
         .args(["watch", "--", "cargo", "run", "--bin", &name])
         .env("RUST_LOG", std::env::var("RUST_LOG").unwrap_or_default())
-        .env("AWS_LAMBDA_RUNTIME_API", &runtime_api)
-        .env("AWS_LAMBDA_FUNCTION_NAME", &name)
         .env("AWS_LAMBDA_FUNCTION_VERSION", "1")
         .env("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", "4096")
+        // Variables above the following call can be updated by variables in the metadata
+        .envs(meta.env)
+        // Variables below cannot be updated by variables in the metadata
+        .env("AWS_LAMBDA_RUNTIME_API", &runtime_api)
+        .env("AWS_LAMBDA_FUNCTION_NAME", &name)
         .spawn()
         .map_err(ServerError::SpawnCommand)?;
 
@@ -180,7 +199,7 @@ async fn start_function(
             }
         },
         _ = subsys.on_shutdown_requested() => {
-            info!(function = ?name, "terminating Lambda function");
+            info!(function = ?name, "terminating lambda function");
             let _ = child.kill().await;
         }
     }
