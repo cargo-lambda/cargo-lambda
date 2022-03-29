@@ -9,7 +9,7 @@ use rustc_version::Channel;
 /// it with `rustup` as needed.
 ///
 /// # Note
-/// This function calls `rustc -vV` to retrieve the host triple and the host
+/// This function calls `rustc -vV` to retrieve the host triple and the release
 /// channel name.
 #[allow(unused)]
 pub fn check_target_component(component: &str) -> Result<()> {
