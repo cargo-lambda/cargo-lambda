@@ -29,8 +29,8 @@ pub(crate) struct PackageMetadata {
     pub env: HashMap<String, String>,
 }
 
-/// Extract all the binary names from a Cargo.toml file
-pub(crate) fn binary_packages(manifest_path: PathBuf) -> Result<HashSet<String>> {
+/// Extract all the binary target names from a Cargo.toml file
+pub(crate) fn binary_targets(manifest_path: PathBuf) -> Result<HashSet<String>> {
     let metadata = load_metadata(manifest_path)?;
 
     let bins = metadata
@@ -98,15 +98,14 @@ mod tests {
 
     #[test]
     fn test_binary_packages() {
-        let bins =
-            binary_packages("test/fixtures/single-binary-package/Cargo.toml".into()).unwrap();
+        let bins = binary_targets("test/fixtures/single-binary-package/Cargo.toml".into()).unwrap();
         assert_eq!(1, bins.len());
         assert!(bins.contains("basic-lambda"));
     }
 
     #[test]
     fn test_binary_packages_with_mutiple_bin_entries() {
-        let bins = binary_packages("test/fixtures/multi-binary-package/Cargo.toml".into()).unwrap();
+        let bins = binary_targets("test/fixtures/multi-binary-package/Cargo.toml".into()).unwrap();
         assert_eq!(5, bins.len());
         assert!(bins.contains("delete-product"));
         assert!(bins.contains("get-product"));
@@ -117,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_binary_packages_with_workspace() {
-        let bins = binary_packages("test/fixtures/workspace-package/Cargo.toml".into()).unwrap();
+        let bins = binary_targets("test/fixtures/workspace-package/Cargo.toml".into()).unwrap();
         assert_eq!(2, bins.len());
         assert!(bins.contains("basic-lambda-1"));
         assert!(bins.contains("basic-lambda-2"));
@@ -126,7 +125,7 @@ mod tests {
     #[test]
     fn test_binary_packages_with_missing_binary_info() {
         let err =
-            binary_packages("test/fixtures/missing-binary-package/Cargo.toml".into()).unwrap_err();
+            binary_targets("test/fixtures/missing-binary-package/Cargo.toml".into()).unwrap_err();
         assert!(err
             .to_string()
             .contains("a [lib] section, or [[bin]] section must be present"));
