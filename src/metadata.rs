@@ -1,7 +1,10 @@
-use cargo_metadata::Package;
+use cargo_metadata::Metadata as CargoMetadata;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Deserialize;
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 #[derive(Default, Deserialize)]
 #[non_exhaustive]
@@ -26,35 +29,40 @@ pub(crate) struct PackageMetadata {
     pub env: HashMap<String, String>,
 }
 
-pub(crate) fn binary_packages(manifest_path: PathBuf) -> Result<HashMap<String, Package>> {
-    let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
-    metadata_cmd.no_deps();
-    metadata_cmd.manifest_path(manifest_path);
-    let metadata = metadata_cmd.exec().into_diagnostic()?;
+/// Extract all the binary names from a Cargo.toml file
+pub(crate) fn binary_packages(manifest_path: PathBuf) -> Result<HashSet<String>> {
+    let metadata = load_metadata(manifest_path)?;
 
-    let mut binaries = HashMap::new();
-    for pkg in metadata.packages {
-        let mut bin_name = None;
-        for target in &pkg.targets {
-            if target.kind.iter().any(|s| s == "bin") {
-                bin_name = Some(target.name.clone());
-                break;
-            }
-        }
-        if let Some(name) = bin_name {
-            binaries.insert(name, pkg);
-        }
-    }
+    let bins = metadata
+        .packages
+        .iter()
+        .flat_map(|p| {
+            p.targets
+                .iter()
+                .filter(|target| target.kind.iter().any(|k| k == "bin"))
+        })
+        .map(|target| target.name.clone())
+        .collect::<_>();
 
-    Ok(binaries)
+    Ok(bins)
 }
 
+/// Return the lambda metadata section for a function
+/// See the documentation to learn about how we use this metadata:
+/// https://github.com/calavera/cargo-lambda#start---environment-variables
 pub(crate) fn function_metadata(
     manifest_path: PathBuf,
     name: &str,
 ) -> Result<Option<PackageMetadata>> {
-    let binaries = binary_packages(manifest_path)?;
-    let package = match binaries.get(name) {
+    let metadata = load_metadata(manifest_path)?;
+
+    let package = metadata.packages.iter().find(|p| {
+        p.targets
+            .iter()
+            .any(|target| target.kind.iter().any(|k| k == "bin") && target.name == name)
+    });
+
+    let package = match package {
         None => return Ok(None),
         Some(p) => p,
     };
@@ -70,4 +78,106 @@ pub(crate) fn function_metadata(
     }
 
     Ok(Some(PackageMetadata { env }))
+}
+
+fn load_metadata(manifest_path: PathBuf) -> Result<CargoMetadata> {
+    let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
+    metadata_cmd.no_deps();
+    metadata_cmd.manifest_path(manifest_path);
+    metadata_cmd.exec().into_diagnostic()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_binary_packages() {
+        let bins =
+            binary_packages("test/fixtures/single-binary-package/Cargo.toml".into()).unwrap();
+        assert_eq!(1, bins.len());
+        assert!(bins.contains("basic-lambda"));
+    }
+
+    #[test]
+    fn test_binary_packages_with_mutiple_bin_entries() {
+        let bins = binary_packages("test/fixtures/multi-binary-package/Cargo.toml".into()).unwrap();
+        assert_eq!(5, bins.len());
+        assert!(bins.contains("delete-product"));
+        assert!(bins.contains("get-product"));
+        assert!(bins.contains("get-products"));
+        assert!(bins.contains("put-product"));
+        assert!(bins.contains("dynamodb-streams"));
+    }
+
+    #[test]
+    fn test_binary_packages_with_workspace() {
+        let bins = binary_packages("test/fixtures/workspace-package/Cargo.toml".into()).unwrap();
+        assert_eq!(2, bins.len());
+        assert!(bins.contains("basic-lambda-1"));
+        assert!(bins.contains("basic-lambda-2"));
+    }
+
+    #[test]
+    fn test_binary_packages_with_missing_binary_info() {
+        let err =
+            binary_packages("test/fixtures/missing-binary-package/Cargo.toml".into()).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("a [lib] section, or [[bin]] section must be present"));
+    }
+
+    #[test]
+    fn test_metadata_packages() {
+        let meta = function_metadata(
+            "test/fixtures/single-binary-package/Cargo.toml".into(),
+            "basic-lambda",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!("BAR", meta.env["FOO"]);
+    }
+
+    #[test]
+    fn test_metadata_multi_packages() {
+        let meta = function_metadata(
+            "test/fixtures/multi-binary-package/Cargo.toml".into(),
+            "get-product",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!("BAR", meta.env["FOO"]);
+
+        let meta = function_metadata(
+            "test/fixtures/multi-binary-package/Cargo.toml".into(),
+            "delete-product",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!("QUX", meta.env["BAZ"]);
+    }
+
+    #[test]
+    fn test_metadata_workspace_packages() {
+        let meta = function_metadata(
+            "test/fixtures/workspace-package/Cargo.toml".into(),
+            "basic-lambda-1",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!("BAR", meta.env["FOO"]);
+
+        let meta = function_metadata(
+            "test/fixtures/workspace-package/Cargo.toml".into(),
+            "basic-lambda-2",
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!("BAR", meta.env["FOO"]);
+    }
 }

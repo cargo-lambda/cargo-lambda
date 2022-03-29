@@ -67,7 +67,7 @@ impl Build {
 
         if !self.build.bin.is_empty() {
             for name in &self.build.bin {
-                if !binaries.contains_key(name) {
+                if !binaries.contains(name) {
                     return Err(miette::miette!(
                         "binary target is missing from this project: {}",
                         name
@@ -130,7 +130,8 @@ impl Build {
         };
 
         let base = target_dir.join(final_target).join(profile);
-        for name in binaries.keys() {
+
+        for name in &binaries {
             let binary = base.join(name);
             if binary.exists() {
                 let bootstrap_dir = lambda_dir.join(name);
