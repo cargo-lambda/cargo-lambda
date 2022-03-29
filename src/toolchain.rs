@@ -78,7 +78,7 @@ fn install_target_component(component: &str, toolchain: &str) -> Result<()> {
         .stdout(Stdio::null())
         .spawn()
         .into_diagnostic()
-        .wrap_err_with(|| format!("Failed to run `{:?} target add {}`", cmd, component))?;
+        .wrap_err_with(|| format!("Failed to run `{cmd:?} +{toolchain} target add {component}`"))?;
 
     let status = child
         .wait()
