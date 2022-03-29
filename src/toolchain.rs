@@ -32,7 +32,7 @@ pub fn check_target_component_with_rustc_meta(
     let rustup_home = home::rustup_home().into_diagnostic()?;
 
     // convert `Channel` enum to a lower-cased string representation
-    let channel_name = match channel {
+    let toolchain = match channel {
         Channel::Stable => "stable",
         Channel::Nightly => "nightly",
         Channel::Dev => "dev",
@@ -42,7 +42,7 @@ pub fn check_target_component_with_rustc_meta(
     // check if the target component is installed in the host toolchain
     let target_component_is_added = rustup_home
         .join("toolchains")
-        .join(format!("{channel_name}-{host}"))
+        .join(format!("{toolchain}-{host}"))
         .join("lib")
         .join("rustlib")
         .join(component)
@@ -55,7 +55,7 @@ pub fn check_target_component_with_rustc_meta(
             component
         ));
 
-        let result = install_target_component(component, channel_name);
+        let result = install_target_component(component, toolchain);
         let finish = if result.is_ok() {
             "Target component installed"
         } else {
