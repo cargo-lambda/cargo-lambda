@@ -1,0 +1,21 @@
+[package]
+name = "basic-lambda"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lambda_runtime = "0.5.0"
+serde = "1.0.136"
+tokio = { version = "1.17.0", features = ["full"] }
+tracing = "0.1.32"
+tracing-subscriber = "0.3.9"
+
+[[bin]]
+name = "basic-lambda"
+path = "src/bin/main.rs"
+test = false
+
+[package.metadata.lambda.env]
+FOO = "BAR"

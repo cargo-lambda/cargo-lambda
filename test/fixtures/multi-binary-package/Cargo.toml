@@ -1,0 +1,74 @@
+[package]
+name = "products"
+version = "0.1.0"
+license-file = "LICENSE"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1"
+aws-config = "0.7"
+aws-sdk-dynamodb = "0.7"
+aws-sdk-eventbridge = "0.7"
+aws-smithy-client = { version = "0.37", features = ["test-util"] }
+aws-smithy-http = "0.37"
+aws-types = "0.7"
+futures = { version = "0.3", features = ["std"] }
+lambda_runtime = { version = "0.5", optional = true }
+lambda_http = { version = "0.5", optional = true }
+rayon = { version = "1.5", optional = true }
+serde = "1"
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.2", features = ["fmt", "json"] }
+tokio = { version = "1", features = ["full"] }
+
+[dev-dependencies]
+# Only allow hardcoded credentials for unit tests
+aws-types = { version = "0.7", features = ["hardcoded-credentials"] }
+float-cmp = "0.9"
+http = "0.2"
+rand = "0.8"
+reqwest = { version = "0.11", features = ["json"] }
+
+[features]
+default = ["lambda"]
+lambda = ["lambda_runtime", "lambda_http", "rayon"]
+
+[[bin]]
+name = "delete-product"
+path = "src/bin/lambda/delete-product.rs"
+test = false
+required-features = ["lambda"]
+environment = ".env"
+
+[[bin]]
+name = "get-product"
+path = "src/bin/lambda/get-product.rs"
+test = false
+required-features = ["lambda"]
+
+[[bin]]
+name = "get-products"
+path = "src/bin/lambda/get-products.rs"
+test = false
+required-features = ["lambda"]
+
+[[bin]]
+name = "put-product"
+path = "src/bin/lambda/put-product.rs"
+test = false
+required-features = ["lambda"]
+
+[[bin]]
+name = "dynamodb-streams"
+path = "src/bin/lambda/dynamodb-streams.rs"
+test = false
+required-features = ["lambda"]
+
+
+[[package.metadata.lambda.bin.get-product]]
+FOO = "BAR"
+
+
+[[package.metadata.lambda.bin.delete-product]]
+BAZ = "QUX"
