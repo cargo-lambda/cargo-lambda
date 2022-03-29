@@ -55,7 +55,7 @@ pub fn check_target_component_with_rustc_meta(
             component
         ));
 
-        let result = install_target_component(component);
+        let result = install_target_component(component, channel_name);
         let finish = if result.is_ok() {
             "Target component installed"
         } else {
@@ -69,11 +69,11 @@ pub fn check_target_component_with_rustc_meta(
 }
 
 /// Install target component in the host toolchain, using `rustup target add`
-fn install_target_component(component: &str) -> Result<()> {
+fn install_target_component(component: &str, toolchain: &str) -> Result<()> {
     let cmd = env::var_os("RUSTUP").unwrap_or_else(|| OsString::from("rustup"));
 
     let mut child = Command::new(&cmd)
-        .args(&["target", "add", component])
+        .args(&[&format!("+{toolchain}"), "target", "add", component])
         .stderr(Stdio::null())
         .stdout(Stdio::null())
         .spawn()
