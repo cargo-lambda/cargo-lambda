@@ -54,22 +54,10 @@ pub(crate) fn function_metadata(
     manifest_path: PathBuf,
     name: &str,
 ) -> Result<Option<PackageMetadata>> {
-    let metadata = load_metadata(manifest_path)?;
-
-    let package = metadata.packages.iter().find(|p| {
-        p.targets
-            .iter()
-            .any(|target| target.kind.iter().any(|k| k == "bin") && target.name == name)
-    });
-
-    let package = match package {
+    let metadata = match package_metadata(manifest_path, name)? {
         None => return Ok(None),
-        Some(p) => p,
+        Some(m) => m,
     };
-
-    let metadata: Metadata = serde_json::from_value(package.metadata.clone())
-        .into_diagnostic()
-        .wrap_err("invalid lambda metadata in Cargo.toml file")?;
 
     let mut env = HashMap::new();
     env.extend(metadata.lambda.env);
@@ -80,11 +68,28 @@ pub(crate) fn function_metadata(
     Ok(Some(PackageMetadata { env }))
 }
 
+/// Create metadata about the root package in the Cargo manifest, without any dependencies.
 fn load_metadata(manifest_path: PathBuf) -> Result<CargoMetadata> {
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
     metadata_cmd.manifest_path(manifest_path);
     metadata_cmd.exec().into_diagnostic()
+}
+
+// Find the package in the Cargo manifest that contains a binary `name`.
+fn package_metadata(manifest_path: PathBuf, name: &str) -> Result<Option<Metadata>> {
+    let metadata = load_metadata(manifest_path)?;
+    for pkg in metadata.packages {
+        for target in &pkg.targets {
+            if target.name == name && target.kind.iter().any(|kind| kind == "bin") {
+                let metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
+                    .into_diagnostic()
+                    .wrap_err("invalid lambda metadata in Cargo.toml file")?;
+                return Ok(Some(metadata));
+            }
+        }
+    }
+    Ok(None)
 }
 
 #[cfg(test)]
