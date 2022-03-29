@@ -24,6 +24,7 @@ cargo-zigbuild = "0.7.0"
 cargo_metadata = "0.14.2"
 clap = { version = "3.1.5", features = ["cargo", "derive"] }
 dirs = "4.0.0"
+home = "0.5.3"
 http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
 indicatif = "0.16.2"
 inquire = "0.2.1"

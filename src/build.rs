@@ -1,4 +1,4 @@
-use crate::{metadata, zig};
+use crate::{metadata, toolchain, zig};
 use cargo_zigbuild::Build as ZigBuild;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
@@ -32,6 +32,7 @@ impl Build {
     pub fn run(&mut self) -> Result<()> {
         let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
         let host_target = &rustc_meta.host;
+        let host_channel = &rustc_meta.channel;
 
         let build_target = self.build.target.get(0);
         match build_target {
@@ -107,6 +108,10 @@ impl Build {
             None if self.build.release => "release",
             None => "debug",
         };
+
+        // confirm that target component is included in host toolchain, or add
+        // it with `rustup` otherwise.
+        toolchain::check_target_component_with_rustc_meta(final_target, host_target, host_channel)?;
 
         let target_dir = Path::new("target");
         let lambda_dir = if let Some(dir) = &self.lambda_dir {

@@ -201,7 +201,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "atty",
  "axum",
@@ -209,6 +209,7 @@ dependencies = [
  "cargo_metadata",
  "clap",
  "dirs",
+ "home",
  "http-api-problem",
  "indicatif",
  "inquire",
@@ -603,6 +604,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62b467343b94ba476dcb2500d242dadbb39557df889310ac77c5d99100aaac33"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "home"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2456aef2e6b6a9784192ae780c0f15bc57df0e918585282325e8c8ac27737654"
+dependencies = [
+ "winapi",
 ]
 
 [[package]]
