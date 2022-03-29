@@ -97,7 +97,12 @@ mod tests {
 
     /// Check target component is installed in the host toolchain, and install
     /// it via `rustup target add` otherwise.
+    ///
+    /// # Note
+    /// This test is marked as **ignored** so it doesn't add the target
+    /// component in a CI build.
     #[test]
+    #[ignore]
     fn test_check_target_component() -> crate::Result<()> {
         let component = "aarch64-unknown-linux-gnu";
         check_target_component(component)
