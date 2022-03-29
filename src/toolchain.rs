@@ -15,9 +15,9 @@ use rustc_version::Channel;
 pub fn check_target_component(component: &str) -> Result<()> {
     let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
     let host_target = &rustc_meta.host;
-    let host_channel = &rustc_meta.channel;
+    let release_channel = &rustc_meta.channel;
 
-    check_target_component_with_rustc_meta(component, host_target, host_channel)
+    check_target_component_with_rustc_meta(component, host_target, release_channel)
 }
 
 /// Check if the target component is installed in the host toolchain, and add
