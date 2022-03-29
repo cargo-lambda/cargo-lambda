@@ -116,7 +116,18 @@ impl Build {
         };
 
         let base = target_dir.join(final_target).join(profile);
-        for name in binaries.keys() {
+
+        let binaries = binaries
+            .values()
+            .flat_map(|package| {
+                package
+                    .targets
+                    .iter()
+                    .filter(|target| target.kind.iter().any(|k| k == "bin"))
+            })
+            .map(|target| target.name.as_str());
+
+        for name in binaries {
             let binary = base.join(name);
             if binary.exists() {
                 let bootstrap_dir = lambda_dir.join(name);
