@@ -29,8 +29,8 @@ pub(crate) struct PackageMetadata {
     pub env: HashMap<String, String>,
 }
 
-/// Extract all the binary names from a Cargo.toml file
-pub(crate) fn binary_packages(manifest_path: PathBuf) -> Result<HashSet<String>> {
+/// Extract all the binary target names from a Cargo.toml file
+pub(crate) fn binary_targets(manifest_path: PathBuf) -> Result<HashSet<String>> {
     let metadata = load_metadata(manifest_path)?;
 
     let bins = metadata
@@ -54,22 +54,10 @@ pub(crate) fn function_metadata(
     manifest_path: PathBuf,
     name: &str,
 ) -> Result<Option<PackageMetadata>> {
-    let metadata = load_metadata(manifest_path)?;
-
-    let package = metadata.packages.iter().find(|p| {
-        p.targets
-            .iter()
-            .any(|target| target.kind.iter().any(|k| k == "bin") && target.name == name)
-    });
-
-    let package = match package {
+    let metadata = match package_metadata(manifest_path, name)? {
         None => return Ok(None),
-        Some(p) => p,
+        Some(m) => m,
     };
-
-    let metadata: Metadata = serde_json::from_value(package.metadata.clone())
-        .into_diagnostic()
-        .wrap_err("invalid lambda metadata in Cargo.toml file")?;
 
     let mut env = HashMap::new();
     env.extend(metadata.lambda.env);
@@ -80,11 +68,28 @@ pub(crate) fn function_metadata(
     Ok(Some(PackageMetadata { env }))
 }
 
+/// Create metadata about the root package in the Cargo manifest, without any dependencies.
 fn load_metadata(manifest_path: PathBuf) -> Result<CargoMetadata> {
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
     metadata_cmd.manifest_path(manifest_path);
     metadata_cmd.exec().into_diagnostic()
+}
+
+// Find the package in the Cargo manifest that contains a binary `name`.
+fn package_metadata(manifest_path: PathBuf, name: &str) -> Result<Option<Metadata>> {
+    let metadata = load_metadata(manifest_path)?;
+    for pkg in metadata.packages {
+        for target in &pkg.targets {
+            if target.name == name && target.kind.iter().any(|kind| kind == "bin") {
+                let metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
+                    .into_diagnostic()
+                    .wrap_err("invalid lambda metadata in Cargo.toml file")?;
+                return Ok(Some(metadata));
+            }
+        }
+    }
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -93,15 +98,14 @@ mod tests {
 
     #[test]
     fn test_binary_packages() {
-        let bins =
-            binary_packages("test/fixtures/single-binary-package/Cargo.toml".into()).unwrap();
+        let bins = binary_targets("test/fixtures/single-binary-package/Cargo.toml".into()).unwrap();
         assert_eq!(1, bins.len());
         assert!(bins.contains("basic-lambda"));
     }
 
     #[test]
     fn test_binary_packages_with_mutiple_bin_entries() {
-        let bins = binary_packages("test/fixtures/multi-binary-package/Cargo.toml".into()).unwrap();
+        let bins = binary_targets("test/fixtures/multi-binary-package/Cargo.toml".into()).unwrap();
         assert_eq!(5, bins.len());
         assert!(bins.contains("delete-product"));
         assert!(bins.contains("get-product"));
@@ -112,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_binary_packages_with_workspace() {
-        let bins = binary_packages("test/fixtures/workspace-package/Cargo.toml".into()).unwrap();
+        let bins = binary_targets("test/fixtures/workspace-package/Cargo.toml".into()).unwrap();
         assert_eq!(2, bins.len());
         assert!(bins.contains("basic-lambda-1"));
         assert!(bins.contains("basic-lambda-2"));
@@ -121,7 +125,7 @@ mod tests {
     #[test]
     fn test_binary_packages_with_missing_binary_info() {
         let err =
-            binary_packages("test/fixtures/missing-binary-package/Cargo.toml".into()).unwrap_err();
+            binary_targets("test/fixtures/missing-binary-package/Cargo.toml".into()).unwrap_err();
         assert!(err
             .to_string()
             .contains("a [lib] section, or [[bin]] section must be present"));

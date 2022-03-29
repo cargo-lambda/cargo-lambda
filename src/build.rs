@@ -57,7 +57,7 @@ impl Build {
             .manifest_path
             .as_deref()
             .unwrap_or_else(|| Path::new("Cargo.toml"));
-        let binaries = metadata::binary_packages(manifest_path.to_path_buf())?;
+        let binaries = metadata::binary_targets(manifest_path.to_path_buf())?;
 
         if !self.build.bin.is_empty() {
             for name in &self.build.bin {
