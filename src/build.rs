@@ -36,8 +36,14 @@ impl Build {
 
         let build_target = self.build.target.get(0);
         match build_target {
-            // Same explicit target as host target
-            Some(target) if host_target == target => self.build.disable_zig_linker = true,
+            Some(target) => {
+                // Validate that the build target is supported in AWS Lambda
+                check_build_target(target)?;
+                // Same explicit target as host target
+                if host_target == target {
+                    self.build.disable_zig_linker = true
+                }
+            }
             // No explicit target, but build host same as target host
             None if host_target == "aarch64-unknown-linux-gnu"
                 || host_target == "x86_64-unknown-linux-gnu" =>
@@ -50,7 +56,6 @@ impl Build {
             None => {
                 self.build.target = vec!["x86_64-unknown-linux-gnu".into()];
             }
-            _ => {}
         }
 
         let manifest_path = self
@@ -152,4 +157,23 @@ impl Build {
 
         Ok(())
     }
+}
+
+/// Validate that the build target is supported in AWS Lambda
+///
+/// Here we use *starts with* instead of an exact match because:
+///   - the target could also also be a *musl* variant: `x86_64-unknown-linux-musl`
+///   - the target could also [specify a glibc version], which `cargo-zigbuild` supports
+///
+/// [specify a glibc version]: https://github.com/messense/cargo-zigbuild#specify-glibc-version
+fn check_build_target(target: &str) -> Result<()> {
+    if !target.starts_with("aarch64-unknown-linux") && !target.starts_with("x86_64-unknown-linux") {
+        // Unsupported target for an AWS Lambda environment
+        return Err(miette::miette!(
+            "Invalid or unsupported target for AWS Lambda: {}",
+            target
+        ));
+    }
+
+    Ok(())
 }
