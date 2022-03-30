@@ -35,7 +35,7 @@ impl Build {
         let release_channel = &rustc_meta.channel;
 
         let build_target = self.build.target.get(0);
-        let resolved_build_target: &str = match build_target {
+        match build_target {
             Some(target) => {
                 // Validate that the build target is supported in AWS Lambda
                 check_build_target(target)?;
@@ -43,7 +43,6 @@ impl Build {
                 if host_target == target {
                     self.build.disable_zig_linker = true
                 }
-                target
             }
             // No explicit target, but build host same as target host
             None if host_target == "aarch64-unknown-linux-gnu"
@@ -52,20 +51,31 @@ impl Build {
                 self.build.disable_zig_linker = true;
                 // Set the target explicitly, so it's easier to find the binaries later
                 self.build.target = vec![host_target.into()];
-                host_target
             }
             // No explicit target, and build host not compatible with Lambda hosts
             None => {
-                let default_target = "x86_64-unknown-linux-gnu";
-                self.build.target = vec![default_target.into()];
-                default_target
+                self.build.target = vec!["x86_64-unknown-linux-gnu".into()];
             }
+        };
+
+        let final_target = self
+            .build
+            .target
+            .get(0)
+            .map(|x| x.as_str())
+            .unwrap_or("x86_64-unknown-linux-gnu");
+        let profile = match self.build.profile.as_deref() {
+            Some("dev" | "test") => "debug",
+            Some("release" | "bench") => "release",
+            Some(profile) => profile,
+            None if self.build.release => "release",
+            None => "debug",
         };
 
         // confirm that target component is included in host toolchain, or add
         // it with `rustup` otherwise.
         toolchain::check_target_component_with_rustc_meta(
-            resolved_build_target,
+            final_target,
             host_target,
             release_channel,
         )?;
@@ -111,21 +121,6 @@ impl Build {
         if !status.success() {
             std::process::exit(status.code().unwrap_or(1));
         }
-
-        // technically, this value should be the same as `resolved_build_target`
-        let final_target = self
-            .build
-            .target
-            .get(0)
-            .map(|x| x.as_str())
-            .unwrap_or("x86_64-unknown-linux-gnu");
-        let profile = match self.build.profile.as_deref() {
-            Some("dev" | "test") => "debug",
-            Some("release" | "bench") => "release",
-            Some(profile) => profile,
-            None if self.build.release => "release",
-            None => "debug",
-        };
 
         let target_dir = Path::new("target");
         let lambda_dir = if let Some(dir) = &self.lambda_dir {
