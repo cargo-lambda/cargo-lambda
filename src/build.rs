@@ -56,9 +56,9 @@ impl Build {
             }
             // No explicit target, and build host not compatible with Lambda hosts
             None => {
-                let target = "x86_64-unknown-linux-gnu";
-                self.build.target = vec![target.into()];
-                target
+                let default_target = "x86_64-unknown-linux-gnu";
+                self.build.target = vec![default_target.into()];
+                default_target
             }
         };
 
