@@ -112,6 +112,7 @@ impl Build {
             std::process::exit(status.code().unwrap_or(1));
         }
 
+        // technically, this value should be the same as `resolved_build_target`
         let final_target = self
             .build
             .target
