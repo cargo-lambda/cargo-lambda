@@ -35,7 +35,7 @@ impl Build {
         let release_channel = &rustc_meta.channel;
 
         let build_target = self.build.target.get(0);
-        match build_target {
+        let resolved_build_target: &str = match build_target {
             Some(target) => {
                 // Validate that the build target is supported in AWS Lambda
                 check_build_target(target)?;
@@ -43,6 +43,7 @@ impl Build {
                 if host_target == target {
                     self.build.disable_zig_linker = true
                 }
+                target
             }
             // No explicit target, but build host same as target host
             None if host_target == "aarch64-unknown-linux-gnu"
@@ -51,12 +52,23 @@ impl Build {
                 self.build.disable_zig_linker = true;
                 // Set the target explicitly, so it's easier to find the binaries later
                 self.build.target = vec![host_target.into()];
+                host_target
             }
             // No explicit target, and build host not compatible with Lambda hosts
             None => {
-                self.build.target = vec!["x86_64-unknown-linux-gnu".into()];
+                let target = "x86_64-unknown-linux-gnu";
+                self.build.target = vec![target.into()];
+                target
             }
-        }
+        };
+
+        // confirm that target component is included in host toolchain, or add
+        // it with `rustup` otherwise.
+        toolchain::check_target_component_with_rustc_meta(
+            resolved_build_target,
+            host_target,
+            release_channel,
+        )?;
 
         let manifest_path = self
             .build
@@ -113,14 +125,6 @@ impl Build {
             None if self.build.release => "release",
             None => "debug",
         };
-
-        // confirm that target component is included in host toolchain, or add
-        // it with `rustup` otherwise.
-        toolchain::check_target_component_with_rustc_meta(
-            final_target,
-            host_target,
-            release_channel,
-        )?;
 
         let target_dir = Path::new("target");
         let lambda_dir = if let Some(dir) = &self.lambda_dir {
