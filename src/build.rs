@@ -40,7 +40,10 @@ impl Build {
                 // Validate that the build target is supported in AWS Lambda
                 check_build_target(target)?;
                 // Same explicit target as host target
-                if host_target == target {
+                //
+                // Note: check with *starts with* instead of equality, as
+                // the `--target` might have a trailing glibc version.
+                if target.starts_with(host_target) {
                     self.build.disable_zig_linker = true
                 }
             }
@@ -62,7 +65,7 @@ impl Build {
             .build
             .target
             .get(0)
-            .map(|x| x.as_str())
+            .map(|x| x.split_once('.').map(|(t, _)| t).unwrap_or(x.as_str()))
             .unwrap_or("x86_64-unknown-linux-gnu");
         let profile = match self.build.profile.as_deref() {
             Some("dev" | "test") => "debug",
