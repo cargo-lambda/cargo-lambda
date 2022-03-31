@@ -6,11 +6,11 @@ pub(crate) struct Progress {
 }
 
 impl Progress {
-    pub fn start(msg: &str) -> Progress {
+    pub fn start(msg: impl ToString) -> Progress {
         let bar = if is(atty::Stream::Stdout) {
             Some(show_progress(msg))
         } else {
-            println!("▹▹▹▹▹ {}", msg);
+            println!("▹▹▹▹▹ {}", msg.to_string());
             None
         };
         Progress { bar }
@@ -25,7 +25,7 @@ impl Progress {
     }
 }
 
-fn show_progress(msg: &str) -> ProgressBar {
+fn show_progress(msg: impl ToString) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
     pb.enable_steady_tick(120);
     pb.set_style(

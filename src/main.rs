@@ -8,6 +8,7 @@ mod invoke;
 mod metadata;
 mod progress;
 mod start;
+mod toolchain;
 mod zig;
 
 #[derive(Parser)]

@@ -1,4 +1,4 @@
-use crate::{metadata, zig};
+use crate::{metadata, toolchain, zig};
 use cargo_zigbuild::Build as ZigBuild;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
@@ -32,11 +32,18 @@ impl Build {
     pub fn run(&mut self) -> Result<()> {
         let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
         let host_target = &rustc_meta.host;
+        let release_channel = &rustc_meta.channel;
 
         let build_target = self.build.target.get(0);
         match build_target {
-            // Same explicit target as host target
-            Some(target) if host_target == target => self.build.disable_zig_linker = true,
+            Some(target) => {
+                // Validate that the build target is supported in AWS Lambda
+                check_build_target(target)?;
+                // Same explicit target as host target
+                if host_target == target {
+                    self.build.disable_zig_linker = true
+                }
+            }
             // No explicit target, but build host same as target host
             None if host_target == "aarch64-unknown-linux-gnu"
                 || host_target == "x86_64-unknown-linux-gnu" =>
@@ -49,8 +56,29 @@ impl Build {
             None => {
                 self.build.target = vec!["x86_64-unknown-linux-gnu".into()];
             }
-            _ => {}
-        }
+        };
+
+        let final_target = self
+            .build
+            .target
+            .get(0)
+            .map(|x| x.as_str())
+            .unwrap_or("x86_64-unknown-linux-gnu");
+        let profile = match self.build.profile.as_deref() {
+            Some("dev" | "test") => "debug",
+            Some("release" | "bench") => "release",
+            Some(profile) => profile,
+            None if self.build.release => "release",
+            None => "debug",
+        };
+
+        // confirm that target component is included in host toolchain, or add
+        // it with `rustup` otherwise.
+        toolchain::check_target_component_with_rustc_meta(
+            final_target,
+            host_target,
+            release_channel,
+        )?;
 
         let manifest_path = self
             .build
@@ -94,20 +122,6 @@ impl Build {
             std::process::exit(status.code().unwrap_or(1));
         }
 
-        let final_target = self
-            .build
-            .target
-            .get(0)
-            .map(|x| x.as_str())
-            .unwrap_or("x86_64-unknown-linux-gnu");
-        let profile = match self.build.profile.as_deref() {
-            Some("dev" | "test") => "debug",
-            Some("release" | "bench") => "release",
-            Some(profile) => profile,
-            None if self.build.release => "release",
-            None => "debug",
-        };
-
         let target_dir = Path::new("target");
         let lambda_dir = if let Some(dir) = &self.lambda_dir {
             dir.clone()
@@ -144,4 +158,23 @@ impl Build {
 
         Ok(())
     }
+}
+
+/// Validate that the build target is supported in AWS Lambda
+///
+/// Here we use *starts with* instead of an exact match because:
+///   - the target could also also be a *musl* variant: `x86_64-unknown-linux-musl`
+///   - the target could also [specify a glibc version], which `cargo-zigbuild` supports
+///
+/// [specify a glibc version]: https://github.com/messense/cargo-zigbuild#specify-glibc-version
+fn check_build_target(target: &str) -> Result<()> {
+    if !target.starts_with("aarch64-unknown-linux") && !target.starts_with("x86_64-unknown-linux") {
+        // Unsupported target for an AWS Lambda environment
+        return Err(miette::miette!(
+            "Invalid or unsupported target for AWS Lambda: {}",
+            target
+        ));
+    }
+
+    Ok(())
 }
