@@ -1,3 +1,4 @@
+use crate::command::silent_command;
 use axum::{
     body::Body,
     extract::{Extension, Path},
@@ -7,15 +8,14 @@ use axum::{
     Router,
 };
 use clap::{Args, ValueHint};
-use miette::{IntoDiagnostic, Result, WrapErr};
+use miette::Result;
 use opentelemetry::{
     global,
     trace::{TraceContextExt, Tracer},
     Context, KeyValue,
 };
-use std::{collections::HashMap, net::SocketAddr, path::PathBuf, process::Stdio};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
 use tokio::{
-    process::Command,
     sync::{mpsc::Sender, oneshot},
     time::Duration,
 };
@@ -62,15 +62,7 @@ pub struct Start {
 impl Start {
     pub async fn run(&self) -> Result<()> {
         if which::which("cargo-watch").is_err() {
-            let pb = crate::progress::Progress::start("Installing Cargo-watch...");
-            let result = install_cargo_watch().await;
-            let finish = if result.is_ok() {
-                "Cargo-watch installed"
-            } else {
-                "Failed to install Cargo-watch"
-            };
-            pb.finish(finish);
-            let _ = result?;
+            install_cargo_watch().await?;
         }
 
         let port = self.invoke_port;
@@ -273,22 +265,13 @@ async fn respond_to_next_invocation(
 }
 
 async fn install_cargo_watch() -> Result<()> {
-    let mut child = Command::new("cargo")
-        .args(&["install", "cargo-watch"])
-        .stderr(Stdio::null())
-        .stdout(Stdio::null())
-        .spawn()
-        .into_diagnostic()
-        .wrap_err("Failed to run `cargo install cargo-watch`")?;
-
-    let status = child
-        .wait()
-        .await
-        .into_diagnostic()
-        .wrap_err("Failed to wait on cargo process")?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-
-    Ok(())
+    let pb = crate::progress::Progress::start("Installing cargo-watch...");
+    let result = silent_command("cargo", &["install", "cargo-watch"]).await;
+    let finish = if result.is_ok() {
+        "cargo-watch installed"
+    } else {
+        "Failed to install cargo-watch"
+    };
+    pb.finish(finish);
+    result
 }

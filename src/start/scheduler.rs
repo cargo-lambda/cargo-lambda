@@ -1,4 +1,5 @@
 use crate::{
+    command::new_command,
     metadata::{self, PackageMetadata},
     start::requests::{InvokeRequest, ServerError},
 };
@@ -8,12 +9,9 @@ use std::{
     path::PathBuf,
     sync::Arc,
 };
-use tokio::{
-    process::Command,
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        oneshot, Mutex,
-    },
+use tokio::sync::{
+    mpsc::{self, Receiver, Sender},
+    oneshot, Mutex,
 };
 use tokio_graceful_shutdown::SubsystemHandle;
 use tracing::{error, info};
@@ -179,7 +177,7 @@ async fn start_function(
         Ok(m) => m.unwrap_or_default(),
     };
 
-    let mut child = Command::new("cargo")
+    let mut child = new_command("cargo")
         .args(["watch", "--", "cargo", "run", "--bin", &name])
         .env("RUST_LOG", std::env::var("RUST_LOG").unwrap_or_default())
         .env("AWS_LAMBDA_FUNCTION_VERSION", "1")
