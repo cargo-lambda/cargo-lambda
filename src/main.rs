@@ -3,7 +3,9 @@ use std::boxed::Box;
 use cargo_zigbuild::Zig;
 use clap::{Parser, Subcommand};
 use miette::{miette, Result};
+
 mod build;
+mod command;
 mod invoke;
 mod metadata;
 mod progress;
@@ -39,7 +41,7 @@ async fn main() -> Result<()> {
     let app = App::parse();
     match app {
         App::Lambda(lambda) => match *lambda {
-            Lambda::Build(mut b) => b.run(),
+            Lambda::Build(mut b) => b.run().await,
             Lambda::Invoke(i) => i.run().await,
             Lambda::Start(s) => s.run().await,
         },

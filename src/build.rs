@@ -29,7 +29,7 @@ enum OutputFormat {
 }
 
 impl Build {
-    pub fn run(&mut self) -> Result<()> {
+    pub async fn run(&mut self) -> Result<()> {
         let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
         let host_target = &rustc_meta.host;
         let release_channel = &rustc_meta.channel;
@@ -81,7 +81,8 @@ impl Build {
             final_target,
             host_target,
             release_channel,
-        )?;
+        )
+        .await?;
 
         let manifest_path = self
             .build
@@ -102,7 +103,7 @@ impl Build {
         }
 
         if !self.build.disable_zig_linker {
-            zig::check_installation()?;
+            zig::check_installation().await?;
         }
 
         let mut cmd = self

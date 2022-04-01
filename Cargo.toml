@@ -20,7 +20,7 @@ strip = "symbols"
 [dependencies]
 atty = "0.2.14"
 axum = "0.4.8"
-cargo-zigbuild = "0.7.0"
+cargo-zigbuild = "0.7.2"
 cargo_metadata = "0.14.2"
 clap = { version = "3.1.5", features = ["cargo", "derive"] }
 dirs = "4.0.0"

@@ -1,8 +1,8 @@
+use crate::command::silent_command;
 use cargo_zigbuild::Zig;
-use miette::{IntoDiagnostic, Result, WrapErr};
-use std::process::{Command, Stdio};
+use miette::{IntoDiagnostic, Result};
 
-pub fn check_installation() -> Result<()> {
+pub async fn check_installation() -> Result<()> {
     if Zig::find_zig().is_ok() {
         return Ok(());
     }
@@ -25,7 +25,7 @@ pub fn check_installation() -> Result<()> {
     .prompt()
     .into_diagnostic()?;
 
-    choice.install()
+    choice.install().await
 }
 
 enum InstallOption {
@@ -43,11 +43,11 @@ impl std::fmt::Display for InstallOption {
 }
 
 impl InstallOption {
-    fn install(self) -> Result<()> {
+    async fn install(self) -> Result<()> {
         let pb = crate::progress::Progress::start("Installing Zig...");
         let result = match self {
-            InstallOption::Pip3 => install_with_pip3(),
-            InstallOption::Npm => install_with_npm(),
+            InstallOption::Pip3 => silent_command("pip3", &["install", "ziglang"]).await,
+            InstallOption::Npm => silent_command("npm", &["install", "-g", "@ziglang/cli"]).await,
         };
         let finish = if result.is_ok() {
             "Zig installed"
@@ -58,44 +58,4 @@ impl InstallOption {
 
         result
     }
-}
-
-fn install_with_pip3() -> Result<()> {
-    let mut child = Command::new("pip3")
-        .args(&["install", "ziglang"])
-        .stderr(Stdio::null())
-        .stdout(Stdio::null())
-        .spawn()
-        .into_diagnostic()
-        .wrap_err("Failed to run `pip3 install ziglang`")?;
-
-    let status = child
-        .wait()
-        .into_diagnostic()
-        .wrap_err("Failed to wait on pip3 process")?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-
-    Ok(())
-}
-
-fn install_with_npm() -> Result<()> {
-    let mut child = Command::new("npm")
-        .args(&["install", "-g", "@ziglang/cli"])
-        .stderr(Stdio::null())
-        .stdout(Stdio::null())
-        .spawn()
-        .into_diagnostic()
-        .wrap_err("Failed to run `npm install @ziglang/cli`")?;
-
-    let status = child
-        .wait()
-        .into_diagnostic()
-        .wrap_err("Failed to wait on npm process")?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-
-    Ok(())
 }

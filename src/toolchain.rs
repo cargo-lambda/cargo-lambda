@@ -1,9 +1,7 @@
-use std::env;
-use std::ffi::OsString;
-use std::process::{Command, Stdio};
-
-use miette::{IntoDiagnostic, Result, WrapErr};
+use crate::command::silent_command;
+use miette::{IntoDiagnostic, Result};
 use rustc_version::Channel;
+use std::env;
 
 /// Check if the target component is installed in the host toolchain, and add
 /// it with `rustup` as needed.
@@ -12,17 +10,17 @@ use rustc_version::Channel;
 /// This function calls `rustc -vV` to retrieve the host triple and the release
 /// channel name.
 #[allow(unused)]
-pub fn check_target_component(component: &str) -> Result<()> {
+pub async fn check_target_component(component: &str) -> Result<()> {
     let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
     let host_target = &rustc_meta.host;
     let release_channel = &rustc_meta.channel;
 
-    check_target_component_with_rustc_meta(component, host_target, release_channel)
+    check_target_component_with_rustc_meta(component, host_target, release_channel).await
 }
 
 /// Check if the target component is installed in the host toolchain, and add
 /// it with `rustup` as needed.
-pub fn check_target_component_with_rustc_meta(
+pub async fn check_target_component_with_rustc_meta(
     component: &str,
     host: &str,
     channel: &Channel,
@@ -55,7 +53,7 @@ pub fn check_target_component_with_rustc_meta(
             component
         ));
 
-        let result = install_target_component(component, toolchain);
+        let result = install_target_component(component, toolchain).await;
         let finish = if result.is_ok() {
             "Target component installed"
         } else {
@@ -69,26 +67,14 @@ pub fn check_target_component_with_rustc_meta(
 }
 
 /// Install target component in the host toolchain, using `rustup target add`
-fn install_target_component(component: &str, toolchain: &str) -> Result<()> {
-    let cmd = env::var_os("RUSTUP").unwrap_or_else(|| OsString::from("rustup"));
+async fn install_target_component(component: &str, toolchain: &str) -> Result<()> {
+    let cmd = env::var("RUSTUP").unwrap_or_else(|_| "rustup".to_string());
 
-    let mut child = Command::new(&cmd)
-        .args(&[&format!("+{toolchain}"), "target", "add", component])
-        .stderr(Stdio::null())
-        .stdout(Stdio::null())
-        .spawn()
-        .into_diagnostic()
-        .wrap_err_with(|| format!("Failed to run `{cmd:?} +{toolchain} target add {component}`"))?;
-
-    let status = child
-        .wait()
-        .into_diagnostic()
-        .wrap_err("Failed to wait on rustup process")?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-
-    Ok(())
+    silent_command(
+        &cmd,
+        &[&format!("+{toolchain}"), "target", "add", component],
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -101,10 +87,10 @@ mod tests {
     /// # Note
     /// This test is marked as **ignored** so it doesn't add the target
     /// component in a CI build.
-    #[test]
+    #[tokio::test]
     #[ignore]
-    fn test_check_target_component() -> crate::Result<()> {
+    async fn test_check_target_component() -> Result<()> {
         let component = "aarch64-unknown-linux-gnu";
-        check_target_component(component)
+        check_target_component(component).await
     }
 }
