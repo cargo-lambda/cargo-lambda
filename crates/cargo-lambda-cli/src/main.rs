@@ -1,17 +1,10 @@
 use std::boxed::Box;
 
-use cargo_zigbuild::Zig;
+use cargo_lambda_build::{Build, Zig};
+use cargo_lambda_invoke::Invoke;
+use cargo_lambda_watch::Watch;
 use clap::{Parser, Subcommand};
 use miette::{miette, Result};
-
-mod build;
-mod command;
-mod invoke;
-mod metadata;
-mod progress;
-mod start;
-mod toolchain;
-mod zig;
 
 #[derive(Parser)]
 #[clap(name = "cargo")]
@@ -29,11 +22,11 @@ enum App {
 #[clap(version)]
 pub enum Lambda {
     /// Build AWS Lambda functions compiled with zig as the linker
-    Build(Box<build::Build>),
+    Build(Box<Build>),
     /// Send requests to Lambda functions running on the emulator
-    Invoke(invoke::Invoke),
+    Invoke(Invoke),
     /// Start a Lambda Runtime emulator to test and debug functions locally
-    Start(start::Start),
+    Watch(Watch),
 }
 
 #[tokio::main]
@@ -43,7 +36,7 @@ async fn main() -> Result<()> {
         App::Lambda(lambda) => match *lambda {
             Lambda::Build(mut b) => b.run().await,
             Lambda::Invoke(i) => i.run().await,
-            Lambda::Start(s) => s.run().await,
+            Lambda::Watch(s) => s.run().await,
         },
         App::Zig(zig) => zig.execute().map_err(|e| miette!(e)),
     }

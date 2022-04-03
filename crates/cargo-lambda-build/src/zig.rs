@@ -1,4 +1,6 @@
-use crate::command::silent_command;
+use cargo_lambda_interactive::{
+    choose_option, command::silent_command, is_stdin_tty, progress::Progress,
+};
 use cargo_zigbuild::Zig;
 use miette::{IntoDiagnostic, Result};
 
@@ -7,7 +9,7 @@ pub async fn check_installation() -> Result<()> {
         return Ok(());
     }
 
-    if atty::isnt(atty::Stream::Stdin) {
+    if !is_stdin_tty() {
         println!("Zig is not installed in your system.\nYou can use any of the following options to install it:");
         println!("\t* pip3 install ziglang (Python 3 required)");
         println!("\t* npm install -g @ziglang/cli (NPM required)");
@@ -16,13 +18,10 @@ pub async fn check_installation() -> Result<()> {
     }
 
     let options = vec![InstallOption::Pip3, InstallOption::Npm];
-    let choice = inquire::Select::new(
+    let choice = choose_option(
         "Zig is not installed in your system.\nHow do you want to install Zig?",
         options,
     )
-    .with_vim_mode(true)
-    .with_help_message("Press Ctrl+C to abort and exit cargo-lambda")
-    .prompt()
     .into_diagnostic()?;
 
     choice.install().await
@@ -44,7 +43,7 @@ impl std::fmt::Display for InstallOption {
 
 impl InstallOption {
     async fn install(self) -> Result<()> {
-        let pb = crate::progress::Progress::start("Installing Zig...");
+        let pb = Progress::start("Installing Zig...");
         let result = match self {
             InstallOption::Pip3 => silent_command("pip3", &["install", "ziglang"]).await,
             InstallOption::Npm => silent_command("npm", &["install", "-g", "@ziglang/cli"]).await,

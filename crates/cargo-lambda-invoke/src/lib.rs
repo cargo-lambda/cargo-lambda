@@ -1,5 +1,6 @@
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
+use reqwest::{Client, StatusCode};
 use std::{
     fs::{create_dir_all, read_to_string, File},
     io::copy,
@@ -41,9 +42,8 @@ impl Invoke {
         } else if let Some(example) = &self.data_example {
             let name = format!("example-{example}.json");
 
-            let cache = dirs::home_dir()
-                .unwrap()
-                .join(".cargo")
+            let cache = home::cargo_home()
+                .into_diagnostic()?
                 .join("lambda")
                 .join("invoke-fixtures")
                 .join(&name);
@@ -66,7 +66,7 @@ impl Invoke {
             &host, self.invoke_port, &self.function_name
         );
 
-        let client = reqwest::Client::new();
+        let client = Client::new();
         let resp = client
             .post(url)
             .body(data)
@@ -95,7 +95,7 @@ async fn download_example(name: &str, cache: &Path) -> Result<String> {
         .into_diagnostic()
         .wrap_err("error dowloading example data")?;
 
-    if response.status() != axum::http::StatusCode::OK {
+    if response.status() != StatusCode::OK {
         return Err(miette::miette!(
             "error downloading example data -- {:?}",
             response

@@ -1,9 +1,7 @@
-use crate::{
-    command::new_command,
-    metadata::{self, PackageMetadata},
-    start::requests::{InvokeRequest, ServerError},
-};
+use crate::requests::{InvokeRequest, ServerError};
 use axum::{body::Body, response::Response};
+use cargo_lambda_interactive::command::new_command;
+use cargo_lambda_metadata::{function_metadata, PackageMetadata};
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     path::PathBuf,
@@ -169,7 +167,7 @@ async fn start_function(
 ) -> Result<(), ServerError> {
     info!(function = ?name, "starting lambda function");
 
-    let meta = match metadata::function_metadata(manifest_path, &name) {
+    let meta = match function_metadata(manifest_path, &name) {
         Err(e) => {
             error!(error = %e, "ignoring invalid function metadata");
             PackageMetadata::default()

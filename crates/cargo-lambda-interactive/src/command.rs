@@ -3,7 +3,7 @@ use std::process::Stdio;
 use tokio::process::Command;
 
 #[cfg(target_os = "windows")]
-pub(crate) fn new_command(cmd: &str) -> Command {
+pub fn new_command(cmd: &str) -> Command {
     let mut command = Command::new("cmd.exe");
     command.arg("/c");
     command.arg(cmd);
@@ -11,12 +11,12 @@ pub(crate) fn new_command(cmd: &str) -> Command {
 }
 
 #[cfg(not(target_os = "windows"))]
-pub(crate) fn new_command(cmd: &str) -> Command {
+pub fn new_command(cmd: &str) -> Command {
     Command::new(cmd)
 }
 
 /// Run a command without producing any output in STDOUT and STDERR
-pub(crate) async fn silent_command(cmd: &str, args: &[&str]) -> Result<()> {
+pub async fn silent_command(cmd: &str, args: &[&str]) -> Result<()> {
     let mut child = new_command(cmd)
         .args(args)
         .stderr(Stdio::null())

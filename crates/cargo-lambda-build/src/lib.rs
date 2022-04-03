@@ -1,4 +1,4 @@
-use crate::{metadata, toolchain, zig};
+use cargo_lambda_metadata::binary_targets;
 use cargo_zigbuild::Build as ZigBuild;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
@@ -7,6 +7,9 @@ use std::{
     path::{Path, PathBuf},
 };
 use strum_macros::EnumString;
+
+mod toolchain;
+mod zig;
 
 #[derive(Args, Clone, Debug)]
 #[clap(name = "build")]
@@ -20,6 +23,8 @@ pub struct Build {
     #[clap(flatten)]
     build: ZigBuild,
 }
+
+pub use cargo_zigbuild::Zig;
 
 #[derive(Clone, Debug, strum_macros::Display, EnumString)]
 #[strum(ascii_case_insensitive)]
@@ -89,7 +94,7 @@ impl Build {
             .manifest_path
             .as_deref()
             .unwrap_or_else(|| Path::new("Cargo.toml"));
-        let binaries = metadata::binary_targets(manifest_path.to_path_buf())?;
+        let binaries = binary_targets(manifest_path.to_path_buf())?;
 
         if !self.build.bin.is_empty() {
             for name in &self.build.bin {

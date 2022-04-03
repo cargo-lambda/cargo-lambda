@@ -1,4 +1,4 @@
-use crate::command::silent_command;
+use cargo_lambda_interactive::{command::silent_command, progress::Progress};
 use miette::{IntoDiagnostic, Result};
 use rustc_version::Channel;
 use std::env;
@@ -48,7 +48,7 @@ pub async fn check_target_component_with_rustc_meta(
 
     if !target_component_is_added {
         // install target component using `rustup`
-        let pb = crate::progress::Progress::start(format_args!(
+        let pb = Progress::start(format_args!(
             "Installing target component `{}`...",
             component
         ));

@@ -1,49 +1,19 @@
-[package]
-name = "cargo-lambda"
-description = "Cargo subcommand to work with AWS Lambda"
-version = "0.5.3"
-edition = "2021"
-license = "MIT"
-readme = "README.md"
-homepage = "https://github.com/calavera/cargo-lambda"
-repository = "https://github.com/calavera/cargo-lambda"
-keywords = ["cargo", "subcommand", "aws", "lambda"]
+[workspace]
+members = [
+    "crates/cargo-lambda-build",
+    "crates/cargo-lambda-cli",
+    "crates/cargo-lambda-interactive",
+    "crates/cargo-lambda-invoke",
+    "crates/cargo-lambda-metadata",
+    "crates/cargo-lambda-watch"
+]
+
+exclude = [
+    "test/fixtures/single-binary-package",
+    "test/fixtures/missing-binary-package",
+    "test/fixtures/multi-binary-package",
+    "test/fixtures/workspace-package"
+]
 
 [profile.release]
 strip = "symbols"
-
-# Use cargo-edit(https://github.com/killercup/cargo-edit#installation)
-# to manage dependencies.
-# Running `cargo add DEPENDENCY_NAME` will
-# add the latest version of a dependency to the list,
-# and it will keep the alphabetic ordering for you.
-[dependencies]
-atty = "0.2.14"
-axum = "0.4.8"
-cargo-zigbuild = "0.8.1"
-cargo_metadata = "0.14.2"
-clap = { version = "3.1.5", features = ["cargo", "derive"] }
-dirs = "4.0.0"
-home = "0.5.3"
-http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
-indicatif = "0.16.2"
-inquire = "0.2.1"
-miette = { version = "4.2.1", features = ["fancy"] }
-opentelemetry = { version = "0.17.0", features = ["trace", "rt-tokio"] }
-opentelemetry-aws = "0.5.0"
-reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls"] }
-rustc_version = "0.4.0"
-serde = { version = "1.0.136", features = ["derive"] }
-serde_json = "1.0.79"
-strum = "0.24.0" # For String -> Enum macros for usage with the CLI.
-strum_macros = "0.24.0"
-thiserror = "1.0.30"
-tokio = { version = "1.17.0", features = ["full"] }
-tokio-graceful-shutdown = "0.5.0"
-tower-http = { version = "0.2.5", features = ["catch-panic", "request-id", "trace"] }
-tracing = "0.1.32"
-tracing-opentelemetry = "0.17.2"
-tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
-uuid = { version = "0.8.2", features = ["v4"] }
-which = "4.2.4"
-zip = { version = "0.6.0", default-features = false, features = ["bzip2", "deflate", "time"] } # For creating zip files.
