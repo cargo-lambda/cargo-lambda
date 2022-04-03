@@ -7,7 +7,7 @@ cargo-lambda is a [Cargo](https://doc.rust-lang.org/cargo/) subcommand to help y
 
 The [build](#build) subcommand compiles AWS Lambda functions natively and produces artifacts which you can then upload to AWS Lambda or use with other echosystem tools, like [SAM Cli](https://github.com/aws/aws-sam-cli) or the [AWS CDK](https://github.com/aws/aws-cdk).
 
-The [start](#start) subcommand boots a development server that emulates interations with the AWS Lambda control plane. This subcommand also reloads your Rust code as you work on it.
+The [watch](#watch) subcommand boots a development server that emulates interations with the AWS Lambda control plane. This subcommand also reloads your Rust code as you work on it.
 
 The [invoke](#invoke) subcommand sends request to the control plane emulator to test and debug interactions with your Lambda functions.
 
@@ -80,19 +80,21 @@ When you compile your code in release mode, cargo-lambda will strip the binaries
 cargo-lambda uses [Zig](https://ziglang.org) and [cargo-zigbuild](https://crates.io/crates/cargo-zigbuild)
 to compile the code for the right architecture. If Zig is not installed in your host machine, the first time that your run cargo-lambda, it will guide you through some installation options. If you run cargo-lambda in a non-interactive shell, the build process will fail until you install that dependency.
 
-### Start
+### Watch
 
-The start subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions.
+:warning: This subcommand used to be called `start`. Both names still work, as `start` is an alias for `watch`.
+
+The watch subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions.
 
 :warning: This command works best with the **[Lambda Runtime version 0.5.1](https://crates.io/crates/lambda_runtime/0.5.1)**. Previous versions of the rumtime are likely to crash with serialization errors.
 
 ```
-cargo lambda start
+cargo lambda watch
 ```
 
 The function is not compiled until the first time that you try to execute. See the [invoke](#invoke) command to learn how to execute a function. Cargo will run the command `cargo run --bin FUNCTION_NAME` to try to compile the function. `FUNCTION_NAME` can be either the name of the package if the package has only one binary, or the binary name in the `[[bin]]` section if the package includes more than one binary.
 
-#### Start - Environment variables
+#### Watch - Environment variables
 
 If you need to set environment variables for your function to run, you can specify them in the metadata section of your Cargo.toml file.
 
@@ -116,10 +118,10 @@ name = "lambda-project"
 [package.metadata.lambda.env]
 RUST_LOG = "debug"
 
-[[package.metadata.lambda.bin.get-product]]
+[package.metadata.lambda.bin.get-product.env]
 GET_PRODUCT_ENV_VARIABLE = "custom value"
 
-[[package.metadata.lambda.bin.add-product]]
+[package.metadata.lambda.bin.add-product.env]
 ADD_PRODUCT_ENV_VARIABLE = "custom value"
 
 [[bin]]

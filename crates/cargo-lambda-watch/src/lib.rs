@@ -1,4 +1,3 @@
-use crate::command::silent_command;
 use axum::{
     body::Body,
     extract::{Extension, Path},
@@ -7,6 +6,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use cargo_lambda_interactive::{command::silent_command, progress::Progress};
 use clap::{Args, ValueHint};
 use miette::Result;
 use opentelemetry::{
@@ -43,8 +43,8 @@ const LAMBDA_RUNTIME_DEADLINE_MS: &str = "lambda-runtime-deadline-ms";
 const LAMBDA_RUNTIME_FUNCTION_ARN: &str = "lambda-runtime-invoked-function-arn";
 
 #[derive(Args, Clone, Debug)]
-#[clap(name = "start")]
-pub struct Start {
+#[clap(name = "watch", visible_alias = "start")]
+pub struct Watch {
     /// Address port where users send invoke requests
     #[clap(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
@@ -59,7 +59,7 @@ pub struct Start {
     pub manifest_path: PathBuf,
 }
 
-impl Start {
+impl Watch {
     pub async fn run(&self) -> Result<()> {
         if which::which("cargo-watch").is_err() {
             install_cargo_watch().await?;
@@ -265,7 +265,7 @@ async fn respond_to_next_invocation(
 }
 
 async fn install_cargo_watch() -> Result<()> {
-    let pb = crate::progress::Progress::start("Installing cargo-watch...");
+    let pb = Progress::start("Installing cargo-watch...");
     let result = silent_command("cargo", &["install", "cargo-watch"]).await;
     let finish = if result.is_ok() {
         "cargo-watch installed"

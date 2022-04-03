@@ -1,0 +1,23 @@
+[package]
+name = "cargo-lambda"
+description = "Cargo subcommand to work with AWS Lambda"
+version = "0.5.3"
+edition = "2021"
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/calavera/cargo-lambda"
+repository = "https://github.com/calavera/cargo-lambda"
+keywords = ["cargo", "subcommand", "aws", "lambda"]
+
+# Use cargo-edit(https://github.com/killercup/cargo-edit#installation)
+# to manage dependencies.
+# Running `cargo add DEPENDENCY_NAME` will
+# add the latest version of a dependency to the list,
+# and it will keep the alphabetic ordering for you.
+[dependencies]
+cargo-lambda-build = { path = "../cargo-lambda-build" }
+cargo-lambda-invoke = { path = "../cargo-lambda-invoke" }
+cargo-lambda-watch = { path = "../cargo-lambda-watch" }
+clap = { version = "3.1.8", features = ["cargo", "derive"] }
+miette = { version = "4.3.0", features = ["fancy"] }
+tokio = { version = "1.17.0", features = ["macros", "rt-multi-thread"] }

@@ -1,7 +1,7 @@
 use atty::is;
 use indicatif::{ProgressBar, ProgressStyle};
 
-pub(crate) struct Progress {
+pub struct Progress {
     bar: Option<ProgressBar>,
 }
 

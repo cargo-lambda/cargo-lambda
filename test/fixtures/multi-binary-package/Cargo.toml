@@ -65,10 +65,9 @@ path = "src/bin/lambda/dynamodb-streams.rs"
 test = false
 required-features = ["lambda"]
 
-
-[[package.metadata.lambda.bin.get-product]]
+[package.metadata.lambda.bin.get-product.env]
 FOO = "BAR"
 
 
-[[package.metadata.lambda.bin.delete-product]]
+[package.metadata.lambda.bin.delete-product.env]
 BAZ = "QUX"

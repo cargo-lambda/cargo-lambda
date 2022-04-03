@@ -8,14 +8,14 @@ use std::{
 
 #[derive(Default, Deserialize)]
 #[non_exhaustive]
-pub(crate) struct Metadata {
+pub struct Metadata {
     #[serde(default)]
     pub lambda: LambdaMetadata,
 }
 
 #[derive(Clone, Default, Deserialize)]
 #[non_exhaustive]
-pub(crate) struct LambdaMetadata {
+pub struct LambdaMetadata {
     #[serde(default)]
     pub env: HashMap<String, String>,
     #[serde(default)]
@@ -24,13 +24,13 @@ pub(crate) struct LambdaMetadata {
 
 #[derive(Clone, Default, Deserialize)]
 #[non_exhaustive]
-pub(crate) struct PackageMetadata {
+pub struct PackageMetadata {
     #[serde(default)]
     pub env: HashMap<String, String>,
 }
 
 /// Extract all the binary target names from a Cargo.toml file
-pub(crate) fn binary_targets(manifest_path: PathBuf) -> Result<HashSet<String>> {
+pub fn binary_targets(manifest_path: PathBuf) -> Result<HashSet<String>> {
     let metadata = load_metadata(manifest_path)?;
 
     let bins = metadata
@@ -50,10 +50,7 @@ pub(crate) fn binary_targets(manifest_path: PathBuf) -> Result<HashSet<String>> 
 /// Return the lambda metadata section for a function
 /// See the documentation to learn about how we use this metadata:
 /// https://github.com/calavera/cargo-lambda#start---environment-variables
-pub(crate) fn function_metadata(
-    manifest_path: PathBuf,
-    name: &str,
-) -> Result<Option<PackageMetadata>> {
+pub fn function_metadata(manifest_path: PathBuf, name: &str) -> Result<Option<PackageMetadata>> {
     let metadata = match package_metadata(manifest_path, name)? {
         None => return Ok(None),
         Some(m) => m,
@@ -96,16 +93,20 @@ fn package_metadata(manifest_path: PathBuf, name: &str) -> Result<Option<Metadat
 mod tests {
     use super::*;
 
+    fn fixture(name: &str) -> PathBuf {
+        format!("../../test/fixtures/{name}/Cargo.toml").into()
+    }
+
     #[test]
     fn test_binary_packages() {
-        let bins = binary_targets("test/fixtures/single-binary-package/Cargo.toml".into()).unwrap();
+        let bins = binary_targets(fixture("single-binary-package")).unwrap();
         assert_eq!(1, bins.len());
         assert!(bins.contains("basic-lambda"));
     }
 
     #[test]
     fn test_binary_packages_with_mutiple_bin_entries() {
-        let bins = binary_targets("test/fixtures/multi-binary-package/Cargo.toml".into()).unwrap();
+        let bins = binary_targets(fixture("multi-binary-package")).unwrap();
         assert_eq!(5, bins.len());
         assert!(bins.contains("delete-product"));
         assert!(bins.contains("get-product"));
@@ -116,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_binary_packages_with_workspace() {
-        let bins = binary_targets("test/fixtures/workspace-package/Cargo.toml".into()).unwrap();
+        let bins = binary_targets(fixture("workspace-package")).unwrap();
         assert_eq!(2, bins.len());
         assert!(bins.contains("basic-lambda-1"));
         assert!(bins.contains("basic-lambda-2"));
@@ -124,8 +125,7 @@ mod tests {
 
     #[test]
     fn test_binary_packages_with_missing_binary_info() {
-        let err =
-            binary_targets("test/fixtures/missing-binary-package/Cargo.toml".into()).unwrap_err();
+        let err = binary_targets(fixture("missing-binary-package")).unwrap_err();
         assert!(err
             .to_string()
             .contains("a [lib] section, or [[bin]] section must be present"));
@@ -133,54 +133,39 @@ mod tests {
 
     #[test]
     fn test_metadata_packages() {
-        let meta = function_metadata(
-            "test/fixtures/single-binary-package/Cargo.toml".into(),
-            "basic-lambda",
-        )
-        .unwrap()
-        .unwrap();
+        let meta = function_metadata(fixture("single-binary-package"), "basic-lambda")
+            .unwrap()
+            .unwrap();
 
         assert_eq!("BAR", meta.env["FOO"]);
     }
 
     #[test]
     fn test_metadata_multi_packages() {
-        let meta = function_metadata(
-            "test/fixtures/multi-binary-package/Cargo.toml".into(),
-            "get-product",
-        )
-        .unwrap()
-        .unwrap();
+        let meta = function_metadata(fixture("multi-binary-package"), "get-product")
+            .unwrap()
+            .unwrap();
 
         assert_eq!("BAR", meta.env["FOO"]);
 
-        let meta = function_metadata(
-            "test/fixtures/multi-binary-package/Cargo.toml".into(),
-            "delete-product",
-        )
-        .unwrap()
-        .unwrap();
+        let meta = function_metadata(fixture("multi-binary-package"), "delete-product")
+            .unwrap()
+            .unwrap();
 
         assert_eq!("QUX", meta.env["BAZ"]);
     }
 
     #[test]
     fn test_metadata_workspace_packages() {
-        let meta = function_metadata(
-            "test/fixtures/workspace-package/Cargo.toml".into(),
-            "basic-lambda-1",
-        )
-        .unwrap()
-        .unwrap();
+        let meta = function_metadata(fixture("workspace-package"), "basic-lambda-1")
+            .unwrap()
+            .unwrap();
 
         assert_eq!("BAR", meta.env["FOO"]);
 
-        let meta = function_metadata(
-            "test/fixtures/workspace-package/Cargo.toml".into(),
-            "basic-lambda-2",
-        )
-        .unwrap()
-        .unwrap();
+        let meta = function_metadata(fixture("workspace-package"), "basic-lambda-2")
+            .unwrap()
+            .unwrap();
 
         assert_eq!("BAR", meta.env["FOO"]);
     }
