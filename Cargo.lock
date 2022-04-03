@@ -201,7 +201,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "atty",
  "axum",
@@ -235,6 +235,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo-options"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b1b3181382eb094f7eeff8390f0e482f2792ba80ed61530b5437cf721886557"
+dependencies = [
+ "clap",
+]
+
+[[package]]
 name = "cargo-platform"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -245,11 +254,12 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.7.2"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e565f435c78a45b54db46b53615c541a0d4061503ffbd4fba17fed09a558c847"
+checksum = "152d42dc8e2e5fc30381527e17b2e9536dfa50d9f82b5fd20183cd88ccb7bdd1"
 dependencies = [
  "anyhow",
+ "cargo-options",
  "cargo_metadata",
  "clap",
  "dirs",
