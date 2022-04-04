@@ -92,7 +92,7 @@ The watch subcommand emulates the AWS Lambda control plane API. Run this command
 cargo lambda watch
 ```
 
-The function is not compiled until the first time that you try to execute. See the [invoke](#invoke) command to learn how to execute a function. Cargo will run the command `cargo run --bin FUNCTION_NAME` to try to compile the function. `FUNCTION_NAME` can be either the name of the package if the package has only one binary, or the binary name in the `[[bin]]` section if the package includes more than one binary.
+The function is not compiled until the first time that you try to execute it. See the [invoke](#invoke) command to learn how to execute a function. Cargo will run the command `cargo run --bin FUNCTION_NAME` to try to compile the function. `FUNCTION_NAME` can be either the name of the package if the package has only one binary, or the binary name in the `[[bin]]` section if the package includes more than one binary.
 
 #### Watch - Environment variables
 
@@ -135,7 +135,12 @@ path = "src/bin/add-product.rs"
 
 ### Invoke
 
-The invoke subcomand helps you send requests to the control plane emulator. To use this subcommand, you have to provide the name of the Lambda function that you want to invoke, and the payload that you want to send. When the control plane emulator receives the request, it will compile your Lambda function and handle your request.
+The invoke subcomand helps you send requests to the control plane emulator. To use this subcommand, you have to provide the name of the Lambda function that you want to invoke, and the payload that you want to send. If you don't know how to find your function's name, it can be in two places:
+
+- If your Cargo.toml file includes a `[package]` section, and it does **not** include a `[[bin]]` section, the function's name is in the `name` attribute under the `[package]` section.
+- If your Cargo.toml file includes one or more `[[bin]]` sections, the function's name is in the `name` attribute under the `[[bin]]` section that you want to compile.
+
+Cargo-Lambda compiles functions on demand when they receive the first invocation. It's normal that the first invocation takes a long time if your code has not compiled with the host compiler before. After the first compilation, Cargo-Lambda will re-compile your code every time you make a change in it, without having to send any other invocation requests.
 
 #### Invoke - Ascii data
 
