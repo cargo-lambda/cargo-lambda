@@ -1,6 +1,7 @@
 use crate::requests::{InvokeRequest, ServerError};
 use axum::{body::Body, response::Response};
 use cargo_lambda_interactive::command::new_command;
+use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
 use cargo_lambda_metadata::{function_metadata, PackageMetadata};
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
@@ -175,8 +176,14 @@ async fn start_function(
         Ok(m) => m.unwrap_or_default(),
     };
 
-    let mut child = new_command("cargo")
-        .args(["watch", "--", "cargo", "run", "--bin", &name])
+    let mut cmd = new_command("cargo");
+    cmd.args(["watch", "--", "cargo", "run"]);
+    if name != DEFAULT_PACKAGE_FUNCTION {
+        cmd.arg("--bin");
+        cmd.arg(&name);
+    }
+
+    let mut child = cmd
         .env("RUST_LOG", std::env::var("RUST_LOG").unwrap_or_default())
         .env("AWS_LAMBDA_FUNCTION_VERSION", "1")
         .env("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", "4096")

@@ -9,6 +9,13 @@ use std::{
     str::FromStr,
 };
 
+/// Name for the function when no name is provided.
+/// This will make the watch command to compile
+/// the binary without the `--bin` option, and will
+/// assume that the package only has one function,
+/// which is the main binary for that package.
+pub const DEFAULT_PACKAGE_FUNCTION: &str = "@package-bootstrap@";
+
 #[derive(Args, Clone, Debug)]
 #[clap(name = "invoke")]
 pub struct Invoke {
@@ -28,6 +35,7 @@ pub struct Invoke {
     #[clap(long)]
     data_example: Option<String>,
     /// Name of the function to invoke
+    #[clap(default_value = DEFAULT_PACKAGE_FUNCTION)]
     function_name: String,
 }
 

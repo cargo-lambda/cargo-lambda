@@ -12,6 +12,7 @@ publish = false
 [dependencies]
 axum = "0.5.1"
 cargo-lambda-interactive = { path = "../cargo-lambda-interactive" }
+cargo-lambda-invoke = { path = "../cargo-lambda-invoke" }
 cargo-lambda-metadata = { path = "../cargo-lambda-metadata" }
 clap = { version = "3.1.8", features = ["cargo", "derive"] }
 http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
