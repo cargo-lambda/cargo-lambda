@@ -293,6 +293,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "cargo-lambda-interactive",
+ "cargo-lambda-invoke",
  "cargo-lambda-metadata",
  "clap",
  "http-api-problem",
