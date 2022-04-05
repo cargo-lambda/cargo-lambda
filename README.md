@@ -5,6 +5,8 @@
 
 cargo-lambda is a [Cargo](https://doc.rust-lang.org/cargo/) subcommand to help you work with AWS Lambda.
 
+The [new](#new) subcommand creates a basic Rust package from a well defined template to help you start writing AWS Lambda functions in Rust.
+
 The [build](#build) subcommand compiles AWS Lambda functions natively and produces artifacts which you can then upload to AWS Lambda or use with other echosystem tools, like [SAM Cli](https://github.com/aws/aws-sam-cli) or the [AWS CDK](https://github.com/aws/aws-cdk).
 
 The [watch](#watch) subcommand boots a development server that emulates interations with the AWS Lambda control plane. This subcommand also reloads your Rust code as you work on it.
@@ -20,6 +22,16 @@ cargo install cargo-lambda
 ```
 
 ## Usage
+
+### New
+
+The `new` command creates new Rust packages with a basic scheleton to help you start writing AWS Lambda functions with Rust. This command will create this package in a new sub-directory inside the directory where it's invoked. Run `cargo lambda new PACKAGE-NAME` to generate your new package.
+
+This command uses templates packed as zip files, or from local directories. The [default template](https://github.com/cargo-lambda/default-template) supports HTTP Lambda functions, as well as functions that receive events defined in the [aws_lambda_events crate](https://crates.io/crates/aws-lambda-events). You can provide your own template using the `--template` flag.
+
+The files `Cargo.toml`, `README.md`, and `src/main.rs` in the template are parsed with [Liquid](https://crates.io/crates/liquid) to dynamically render different files based on a series of global variables. You can see all the variables in [the source code](https://github.com/calavera/cargo-lambda/blob/main/crates/cargo-lambda-new/src/lib.rs#L167-L178).
+
+After creating a new package, you can use the [build](#build) command described below to compile the source code.
 
 ### Build
 

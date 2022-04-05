@@ -17,6 +17,7 @@ keywords = ["cargo", "subcommand", "aws", "lambda"]
 [dependencies]
 cargo-lambda-build = { path = "../cargo-lambda-build" }
 cargo-lambda-invoke = { path = "../cargo-lambda-invoke" }
+cargo-lambda-new = { path = "../cargo-lambda-new" }
 cargo-lambda-watch = { path = "../cargo-lambda-watch" }
 clap = { version = "3.1.8", features = ["cargo", "derive"] }
 miette = { version = "4.3.0", features = ["fancy"] }

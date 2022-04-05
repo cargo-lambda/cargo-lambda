@@ -1,0 +1,21 @@
+[package]
+name = "cargo-lambda-new"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Use cargo-edit(https://github.com/killercup/cargo-edit#installation)
+# to manage dependencies.
+# Running `cargo add DEPENDENCY_NAME` will
+# add the latest version of a dependency to the list,
+# and it will keep the alphabetic ordering for you.
+[dependencies]
+cargo-lambda-interactive = { path = "../cargo-lambda-interactive" }
+clap = { version = "3.1.8", features = ["cargo", "derive"] }
+liquid = "0.26.0"
+miette = { version = "4.3.0", features = ["fancy"] }
+regex = "1.5.5"
+reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls"] }
+tempfile = "3.3.0"
+walkdir = "2.3.2"
+zip = { version = "0.6.2", features = ["bzip2", "deflate", "time"] }
