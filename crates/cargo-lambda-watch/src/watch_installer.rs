@@ -20,6 +20,11 @@ const DEFAULT_CARGO_WATCH_VERSION: &str = "v8.1.1";
 const CARGO_WATCH_GITHUB_RELEASES_URL: &str =
     "https://github.com/watchexec/cargo-watch/releases/download";
 
+#[cfg(target_os = "windows")]
+const CARGO_WATCH_BINARY_INFO: (&str, &str) = ("cargo-watch.exe", "zip");
+#[cfg(not(target_os = "windows"))]
+const CARGO_WATCH_BINARY_INFO: (&str, &str) = ("cargo-watch", "tar.xz");
+
 pub(crate) async fn install() -> Result<()> {
     let pb = Progress::start("Installing cargo-watch...");
 
@@ -51,11 +56,7 @@ fn is_matching_platform(triple: &str) -> bool {
 async fn download_binary_release(plat: &Platform) -> Result<()> {
     let version =
         option_env!("CARGO_LAMBDA_CARGO_WATCH_VERSION").unwrap_or(DEFAULT_CARGO_WATCH_VERSION);
-    let (bin_name, format) = if cfg!(target_os = "windows") {
-        ("cargo-watch.exe", "zip")
-    } else {
-        ("cargo-watch", "tar.xz")
-    };
+    let (bin_name, format) = CARGO_WATCH_BINARY_INFO;
 
     let name = format!("cargo-watch-{}-{}.{}", &version, plat.target_triple, format);
     let url = format!("{}/{}/{}", CARGO_WATCH_GITHUB_RELEASES_URL, version, &name);
