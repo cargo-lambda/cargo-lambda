@@ -6,7 +6,6 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use cargo_lambda_interactive::{command::silent_command, progress::Progress};
 use clap::{Args, ValueHint};
 use miette::Result;
 use opentelemetry::{
@@ -33,6 +32,7 @@ mod scheduler;
 use scheduler::*;
 mod trace;
 use trace::*;
+mod watch_installer;
 
 const AWS_XRAY_TRACE_HEADER: &str = "x-amzn-trace-id";
 const LAMBDA_RUNTIME_XRAY_TRACE_HEADER: &str = "lambda-runtime-trace-id";
@@ -62,7 +62,7 @@ pub struct Watch {
 impl Watch {
     pub async fn run(&self) -> Result<()> {
         if which::which("cargo-watch").is_err() {
-            install_cargo_watch().await?;
+            watch_installer::install().await?;
         }
 
         let port = self.invoke_port;
@@ -262,16 +262,4 @@ async fn respond_to_next_invocation(
     }
 
     Ok(Response::new(Body::empty()))
-}
-
-async fn install_cargo_watch() -> Result<()> {
-    let pb = Progress::start("Installing cargo-watch...");
-    let result = silent_command("cargo", &["install", "cargo-watch"]).await;
-    let finish = if result.is_ok() {
-        "cargo-watch installed"
-    } else {
-        "Failed to install cargo-watch"
-    };
-    pb.finish(finish);
-    result
 }

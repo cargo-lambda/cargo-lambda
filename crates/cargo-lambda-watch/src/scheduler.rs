@@ -13,7 +13,7 @@ use tokio::sync::{
     oneshot, Mutex,
 };
 use tokio_graceful_shutdown::SubsystemHandle;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Clone)]
 pub(crate) struct RequestQueue {
@@ -170,7 +170,7 @@ async fn start_function(
 
     let meta = match function_metadata(manifest_path, &name) {
         Err(e) => {
-            error!(error = %e, "ignoring invalid function metadata");
+            warn!(error = %e, "ignoring invalid function metadata");
             PackageMetadata::default()
         }
         Ok(m) => m.unwrap_or_default(),
