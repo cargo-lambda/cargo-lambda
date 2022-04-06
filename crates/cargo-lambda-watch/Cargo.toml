@@ -22,7 +22,6 @@ opentelemetry = "0.17.0"
 opentelemetry-aws = "0.5.0"
 platforms = "2.0.0"
 reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls"] }
-tar = "0.4.38"
 tempfile = "3.3.0"
 thiserror = "1.0.30"
 tokio = { version = "1.17.0", features = ["sync", "time"] }
@@ -33,5 +32,10 @@ tracing-opentelemetry = "0.17.2"
 tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
 uuid = { version = "0.8.2", features = ["v4"] }
 which = "4.2.4"
+
+[target.'cfg(not(windows))'.dependencies]
+tar = "0.4.38"
 xz2 = "0.1.6"
+
+[target.'cfg(windows)'.dependencies]
 zip = { version = "0.6.2", features = ["bzip2", "deflate", "time"] }
