@@ -117,11 +117,12 @@ pub(crate) async fn init_scheduler(
     subsys: &SubsystemHandle,
     req_cache: RequestCache,
     manifest_path: PathBuf,
+    no_reload: bool,
 ) -> Sender<InvokeRequest> {
     let (req_tx, req_rx) = mpsc::channel::<InvokeRequest>(100);
 
-    subsys.start("lambda scheduler", move |s| async {
-        start_scheduler(s, req_cache, manifest_path, req_rx).await;
+    subsys.start("lambda scheduler", move |s| async move {
+        start_scheduler(s, req_cache, manifest_path, no_reload, req_rx).await;
         Ok::<_, std::convert::Infallible>(())
     });
 
@@ -132,6 +133,7 @@ async fn start_scheduler(
     subsys: SubsystemHandle,
     req_cache: RequestCache,
     manifest_path: PathBuf,
+    no_reload: bool,
     mut req_rx: Receiver<InvokeRequest>,
 ) {
     let (gc_tx, mut gc_rx) = mpsc::channel::<String>(10);
@@ -140,11 +142,9 @@ async fn start_scheduler(
         tokio::select! {
             Some(req) = req_rx.recv() => {
                 if let Some((name, api)) = req_cache.upsert(req).await {
-                    let name = name.clone();
-                    let api = api.clone();
                     let gc_tx = gc_tx.clone();
                     let pb = manifest_path.clone();
-                    subsys.start("lambda runtime", |s| start_function(s, name, api, pb, gc_tx));
+                    subsys.start("lambda runtime", move |s| start_function(s, name, api, pb, no_reload, gc_tx));
                 }
             },
             Some(gc) = gc_rx.recv() => {
@@ -164,6 +164,7 @@ async fn start_function(
     name: String,
     runtime_api: String,
     manifest_path: PathBuf,
+    no_reload: bool,
     gc_tx: Sender<String>,
 ) -> Result<(), ServerError> {
     info!(function = ?name, "starting lambda function");
@@ -177,7 +178,13 @@ async fn start_function(
     };
 
     let mut cmd = new_command("cargo");
-    cmd.args(["watch", "--", "cargo", "run"]);
+
+    if !no_reload {
+        cmd.args(["watch", "--", "cargo"]);
+    }
+
+    cmd.arg("run");
+
     if name != DEFAULT_PACKAGE_FUNCTION {
         cmd.arg("--bin");
         cmd.arg(&name);

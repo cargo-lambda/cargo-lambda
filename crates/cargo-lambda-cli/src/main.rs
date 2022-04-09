@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
         App::Lambda(lambda) => match *lambda {
             Lambda::Build(mut b) => b.run().await,
             Lambda::Invoke(i) => i.run().await,
-            Lambda::Watch(s) => s.run().await,
+            Lambda::Watch(w) => w.run().await,
         },
         App::Zig(zig) => zig.execute().map_err(|e| miette!(e)),
     }
