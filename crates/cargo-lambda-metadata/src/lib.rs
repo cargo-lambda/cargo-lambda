@@ -49,7 +49,7 @@ pub fn binary_targets(manifest_path: PathBuf) -> Result<HashSet<String>> {
 
 /// Return the lambda metadata section for a function
 /// See the documentation to learn about how we use this metadata:
-/// https://github.com/calavera/cargo-lambda#start---environment-variables
+/// https://github.com/cargo-lambda/cargo-lambda#start---environment-variables
 pub fn function_metadata(manifest_path: PathBuf, name: &str) -> Result<Option<PackageMetadata>> {
     let metadata = match package_metadata(manifest_path, name)? {
         None => return Ok(None),

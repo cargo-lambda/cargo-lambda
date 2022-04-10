@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda"
-version = "0.5.3"
+version = "0.6.0"
 dependencies = [
  "cargo-lambda-build",
  "cargo-lambda-invoke",
