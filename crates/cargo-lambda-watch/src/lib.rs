@@ -45,6 +45,10 @@ const LAMBDA_RUNTIME_FUNCTION_ARN: &str = "lambda-runtime-invoked-function-arn";
 #[derive(Args, Clone, Debug)]
 #[clap(name = "watch", visible_alias = "start")]
 pub struct Watch {
+    /// Avoid hot-reload
+    #[clap(long)]
+    no_reload: bool,
+
     /// Address port where users send invoke requests
     #[clap(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
@@ -61,17 +65,18 @@ pub struct Watch {
 
 impl Watch {
     pub async fn run(&self) -> Result<()> {
-        if which::which("cargo-watch").is_err() {
+        if !self.no_reload && which::which("cargo-watch").is_err() {
             watch_installer::install().await?;
         }
 
         let port = self.invoke_port;
         let print_traces = self.print_traces;
         let manifest_path = self.manifest_path.clone();
+        let no_reload = self.no_reload;
 
         Toplevel::new()
             .start("Lambda server", move |s| {
-                start_server(s, port, print_traces, manifest_path)
+                start_server(s, port, print_traces, manifest_path, no_reload)
             })
             .catch_signals()
             .handle_shutdown_requests(Duration::from_millis(1000))
@@ -85,6 +90,7 @@ async fn start_server(
     invoke_port: u16,
     print_traces: bool,
     manifest_path: PathBuf,
+    no_reload: bool,
 ) -> Result<(), axum::Error> {
     init_tracing(print_traces);
 
@@ -92,7 +98,7 @@ async fn start_server(
     let server_addr = format!("http://{addr}");
 
     let req_cache = RequestCache::new(server_addr);
-    let req_tx = init_scheduler(&subsys, req_cache.clone(), manifest_path).await;
+    let req_tx = init_scheduler(&subsys, req_cache.clone(), manifest_path, no_reload).await;
     let resp_cache = ResponseCache::new();
     let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
 

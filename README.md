@@ -84,7 +84,7 @@ to compile the code for the right architecture. If Zig is not installed in your 
 
 :warning: This subcommand used to be called `start`. Both names still work, as `start` is an alias for `watch`.
 
-The watch subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions.
+The watch subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions. Use flag `--no-reload` to avoid hot compilation.
 
 :warning: This command works best with the **[Lambda Runtime version 0.5.1](https://crates.io/crates/lambda_runtime/0.5.1)**. Previous versions of the rumtime are likely to crash with serialization errors.
 
@@ -182,8 +182,7 @@ cargo lambda invoke http-lambda --data-example apigw-request
 
 After the first download, these examples are cached in your home directory, under `.cargo/lambda/invoke-fixtures`.
 
-[//]: # (badges)
-
+[//]: # 'badges'
 [crate-image]: https://img.shields.io/crates/v/cargo-lambda.svg
 [crate-link]: https://crates.io/crates/cargo-lambda
 [build-image]: https://github.com/calavera/cargo-lambda/workflows/Build/badge.svg
