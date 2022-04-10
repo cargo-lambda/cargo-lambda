@@ -1,8 +1,13 @@
 [package]
 name = "cargo-lambda-build"
-version = "0.1.0"
+description = "Cargo subcommand to work with AWS Lambda"
+version = "0.6.0"
 edition = "2021"
-publish = false
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/cargo-lambda/cargo-lambda"
+repository = "https://github.com/cargo-lambda/cargo-lambda"
+keywords = ["cargo", "subcommand", "aws", "lambda"]
 
 # Use cargo-edit(https://github.com/killercup/cargo-edit#installation)
 # to manage dependencies.
@@ -10,8 +15,8 @@ publish = false
 # add the latest version of a dependency to the list,
 # and it will keep the alphabetic ordering for you.
 [dependencies]
-cargo-lambda-interactive = { path = "../cargo-lambda-interactive" }
-cargo-lambda-metadata = { path = "../cargo-lambda-metadata" }
+cargo-lambda-interactive = { version = "0.6.0", path = "../cargo-lambda-interactive" }
+cargo-lambda-metadata = { version = "0.6.0", path = "../cargo-lambda-metadata" }
 cargo-zigbuild = "0.8.1"
 clap = { version = "3.1.8", features = ["cargo", "derive"] }
 home = "0.5.3"
