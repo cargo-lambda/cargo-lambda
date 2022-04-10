@@ -2,6 +2,7 @@ use std::boxed::Box;
 
 use cargo_lambda_build::{Build, Zig};
 use cargo_lambda_invoke::Invoke;
+use cargo_lambda_new::New;
 use cargo_lambda_watch::Watch;
 use clap::{Parser, Subcommand};
 use miette::{miette, Result};
@@ -25,6 +26,8 @@ pub enum Lambda {
     Build(Box<Build>),
     /// Send requests to Lambda functions running on the emulator
     Invoke(Invoke),
+    /// Create a new package with a Lambda function from our Lambda Template
+    New(New),
     /// Start a Lambda Runtime emulator to test and debug functions locally
     Watch(Watch),
 }
@@ -36,6 +39,7 @@ async fn main() -> Result<()> {
         App::Lambda(lambda) => match *lambda {
             Lambda::Build(mut b) => b.run().await,
             Lambda::Invoke(i) => i.run().await,
+            Lambda::New(mut n) => n.run().await,
             Lambda::Watch(w) => w.run().await,
         },
         App::Zig(zig) => zig.execute().map_err(|e| miette!(e)),
