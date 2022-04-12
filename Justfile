@@ -1,8 +1,8 @@
 publish-all:
-    cargo publish --package crates/cargo-lambda-interactive
-    cargo publish --package crates/cargo-lambda-metadata
-    cargo publish --package crates/cargo-lambda-build
-    cargo publish --package crates/cargo-lambda-invoke
-    cargo publish --package crates/cargo-lambda-new
-    cargo publish --package crates/cargo-lambda-watch
-    cargo publish --package crates/cargo-lambda-cli
+    cargo publish --package cargo-lambda-interactive
+    cargo publish --package cargo-lambda-metadata
+    cargo publish --package cargo-lambda-build
+    cargo publish --package cargo-lambda-invoke
+    cargo publish --package cargo-lambda-new
+    cargo publish --package cargo-lambda-watch
+    cargo publish --package cargo-lambda-cli
