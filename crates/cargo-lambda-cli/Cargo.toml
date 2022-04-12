@@ -17,9 +17,10 @@ rust-version = "1.59.0"
 # and it will keep the alphabetic ordering for you.
 [dependencies]
 cargo-lambda-build = { version = "0.6", path = "../cargo-lambda-build" }
+cargo-lambda-deploy = { version = "0.6", path = "../cargo-lambda-deploy" }
 cargo-lambda-invoke = { version = "0.6", path = "../cargo-lambda-invoke" }
 cargo-lambda-new = { version = "0.6", path = "../cargo-lambda-new" }
 cargo-lambda-watch = { version = "0.6", path = "../cargo-lambda-watch" }
-clap = { version = "3.1.8", features = ["cargo", "derive"] }
+clap = { version = "3.1.8", features = ["derive", "suggestions"] }
 miette = { version = "4.3.0", features = ["fancy"] }
 tokio = { version = "1.17.0", features = ["macros", "rt-multi-thread"] }

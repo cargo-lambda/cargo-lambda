@@ -21,5 +21,4 @@ pub fn choose_option<T: Display>(message: &str, options: Vec<T>) -> InquireResul
         .prompt()
 }
 
-pub use inquire::Confirm;
-pub use inquire::Text;
+pub use inquire::*;

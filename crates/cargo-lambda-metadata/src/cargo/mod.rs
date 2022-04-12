@@ -1,9 +1,9 @@
-use cargo_metadata::Metadata as CargoMetadata;
+use cargo_metadata::{Metadata as CargoMetadata, Package};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 #[derive(Default, Deserialize)]
@@ -30,7 +30,7 @@ pub struct PackageMetadata {
 }
 
 /// Extract all the binary target names from a Cargo.toml file
-pub fn binary_targets(manifest_path: PathBuf) -> Result<HashSet<String>> {
+pub fn binary_targets<P: AsRef<Path>>(manifest_path: P) -> Result<HashSet<String>> {
     let metadata = load_metadata(manifest_path)?;
 
     let bins = metadata
@@ -66,15 +66,15 @@ pub fn function_metadata(manifest_path: PathBuf, name: &str) -> Result<Option<Pa
 }
 
 /// Create metadata about the root package in the Cargo manifest, without any dependencies.
-fn load_metadata(manifest_path: PathBuf) -> Result<CargoMetadata> {
+fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
-    metadata_cmd.manifest_path(manifest_path);
+    metadata_cmd.manifest_path(manifest_path.as_ref());
     metadata_cmd.exec().into_diagnostic()
 }
 
 // Find the package in the Cargo manifest that contains a binary `name`.
-fn package_metadata(manifest_path: PathBuf, name: &str) -> Result<Option<Metadata>> {
+fn package_metadata<P: AsRef<Path>>(manifest_path: P, name: &str) -> Result<Option<Metadata>> {
     let metadata = load_metadata(manifest_path)?;
     for pkg in metadata.packages {
         for target in &pkg.targets {
@@ -87,6 +87,27 @@ fn package_metadata(manifest_path: PathBuf, name: &str) -> Result<Option<Metadat
         }
     }
     Ok(None)
+}
+
+/// Load the main package in the project.
+/// It returns an error if the project includes from than one package.
+/// Use this function when the user didn't provide any funcion name
+/// assuming that there is only one package in the project
+pub fn root_package<P: AsRef<Path>>(manifest_path: P) -> Result<Package> {
+    let metadata = load_metadata(manifest_path)?;
+    if metadata.packages.len() > 1 {
+        Err(miette::miette!(
+            "there are more than one package in the project, you must specify a function name"
+        ))
+    } else if metadata.packages.is_empty() {
+        Err(miette::miette!("there are no packages in this project"))
+    } else {
+        Ok(metadata
+            .packages
+            .into_iter()
+            .next()
+            .expect("failed to extract the root package from the metadata"))
+    }
 }
 
 #[cfg(test)]

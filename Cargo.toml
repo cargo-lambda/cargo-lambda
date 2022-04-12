@@ -2,10 +2,12 @@
 members = [
     "crates/cargo-lambda-build",
     "crates/cargo-lambda-cli",
+    "crates/cargo-lambda-deploy",
     "crates/cargo-lambda-interactive",
     "crates/cargo-lambda-invoke",
     "crates/cargo-lambda-metadata",
     "crates/cargo-lambda-new",
+    "crates/cargo-lambda-remote",
     "crates/cargo-lambda-watch"
 ]
 

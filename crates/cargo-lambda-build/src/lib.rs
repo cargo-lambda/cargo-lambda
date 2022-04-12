@@ -2,6 +2,8 @@ use cargo_lambda_metadata::{cargo::binary_targets, fs::rename};
 use cargo_zigbuild::Build as ZigBuild;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
+use object::{read::File as ObjectFile, Architecture, Object};
+use sha2::{Digest, Sha256};
 use std::{
     fs::{create_dir_all, read, File},
     io::Write,
@@ -113,7 +115,7 @@ impl Build {
             .manifest_path
             .as_deref()
             .unwrap_or_else(|| Path::new("Cargo.toml"));
-        let binaries = binary_targets(manifest_path.to_path_buf())?;
+        let binaries = binary_targets(manifest_path)?;
 
         if !self.build.bin.is_empty() {
             for name in &self.build.bin {
@@ -169,14 +171,7 @@ impl Build {
                         rename(binary, bootstrap_dir.join("bootstrap")).into_diagnostic()?;
                     }
                     OutputFormat::Zip => {
-                        let zipped_binary =
-                            File::create(bootstrap_dir.join("bootstrap.zip")).into_diagnostic()?;
-                        let mut zip = zip::ZipWriter::new(zipped_binary);
-                        zip.start_file("bootstrap", Default::default())
-                            .into_diagnostic()?;
-                        zip.write_all(&read(binary).into_diagnostic()?)
-                            .into_diagnostic()?;
-                        zip.finish().into_diagnostic()?;
+                        zip_binary(binary, bootstrap_dir)?;
                     }
                 }
             }
@@ -203,4 +198,68 @@ fn check_build_target(target: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub struct BinaryArchive {
+    pub architecture: String,
+    pub sha256: String,
+    pub path: PathBuf,
+}
+
+/// Search for the bootstrap file for a function inside the target directory.
+/// If the binary file exists, it creates the zip archive and extracts its architectury by reading the binary.
+pub fn find_function_archive<P: AsRef<Path>>(
+    name: &str,
+    base_dir: &Option<P>,
+) -> Result<BinaryArchive> {
+    let target_dir = Path::new("target");
+    let bootstrap_dir = if let Some(dir) = base_dir {
+        dir.as_ref().join(name)
+    } else {
+        target_dir.join("lambda").join(name)
+    };
+
+    let binary_path = bootstrap_dir.join("bootstrap");
+    if !binary_path.exists() {
+        return Err(miette::miette!(
+            "bootstrap file for {name} not found, use `cargo lambda build` to create it"
+        ));
+    }
+
+    zip_binary(binary_path, bootstrap_dir)
+}
+
+/// Create a zip file from a function binary.
+/// The binary inside the zip file is always called `bootstrap`.
+fn zip_binary<P: AsRef<Path>>(binary_path: P, destination_directory: P) -> Result<BinaryArchive> {
+    let path = binary_path.as_ref();
+    let dir = destination_directory.as_ref();
+    let zipped = dir.join("bootstrap.zip");
+
+    let zipped_binary = File::create(&zipped).into_diagnostic()?;
+    let binary_data = read(path).into_diagnostic()?;
+    let binary_data = &*binary_data;
+    let object = ObjectFile::parse(binary_data).into_diagnostic()?;
+
+    let arch = match object.architecture() {
+        Architecture::Aarch64 => "arm64",
+        Architecture::X86_64 => "x86_64",
+        other => return Err(miette::miette!("invalid binary architecture: {:?}", other)),
+    };
+
+    let mut hasher = Sha256::new();
+    hasher.update(binary_data);
+    let sha256 = format!("{:X}", hasher.finalize());
+
+    let mut zip = zip::ZipWriter::new(zipped_binary);
+    zip.start_file("bootstrap", Default::default())
+        .into_diagnostic()?;
+    zip.write_all(binary_data).into_diagnostic()?;
+    zip.finish().into_diagnostic()?;
+
+    Ok(BinaryArchive {
+        architecture: arch.into(),
+        path: zipped,
+        sha256,
+    })
 }
