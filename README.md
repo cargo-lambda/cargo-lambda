@@ -194,6 +194,10 @@ cargo lambda invoke http-lambda --data-example apigw-request
 
 After the first download, these examples are cached in your home directory, under `.cargo/lambda/invoke-fixtures`.
 
+## Rust version
+
+This project works with Rust 1.59 and above.
+
 [//]: # 'badges'
 [crate-image]: https://img.shields.io/crates/v/cargo-lambda.svg
 [crate-link]: https://crates.io/crates/cargo-lambda

@@ -23,11 +23,12 @@ jobs:
           command: check
 
   test:
-    name: Test Suite
+    name: Test Suite -- ${{ matrix.rust_version }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
+        rust_version: ["1.59.0", "stable"]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
@@ -36,8 +37,9 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: ${{ matrix.rust_version }}
           override: true
+      - uses: Swatinem/rust-cache@v1
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1

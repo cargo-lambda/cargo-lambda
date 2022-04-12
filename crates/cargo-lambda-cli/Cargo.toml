@@ -1,13 +1,14 @@
 [package]
 name = "cargo-lambda"
 description = "Cargo subcommand to work with AWS Lambda"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 license = "MIT"
 readme = "../../README.md"
 homepage = "https://github.com/cargo-lambda/cargo-lambda"
 repository = "https://github.com/cargo-lambda/cargo-lambda"
 keywords = ["cargo", "subcommand", "aws", "lambda"]
+rust-version = "1.59.0"
 
 # Use cargo-edit(https://github.com/killercup/cargo-edit#installation)
 # to manage dependencies.
