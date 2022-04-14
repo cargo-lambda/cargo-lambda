@@ -17,14 +17,23 @@ pub struct Build {
     /// The format to produce the compile Lambda into, acceptable values are [Binary, Zip].
     #[clap(long, default_value_t = OutputFormat::Binary)]
     output_format: OutputFormat,
+
     /// Directory where the final lambda binaries will be located
     #[clap(short, long, value_hint = ValueHint::DirPath)]
     lambda_dir: Option<PathBuf>,
+
+    /// Shortcut for --target aarch64-unknown-linux-gnu
+    #[clap(long)]
+    arm: bool,
+
     #[clap(flatten)]
     build: ZigBuild,
 }
 
 pub use cargo_zigbuild::Zig;
+
+const TARGET_ARM: &str = "aarch64-unknown-linux-gnu";
+const TARGET_X86_64: &str = "x86_64-unknown-linux-gnu";
 
 #[derive(Clone, Debug, strum_macros::Display, EnumString)]
 #[strum(ascii_case_insensitive)]
@@ -38,6 +47,16 @@ impl Build {
         let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
         let host_target = &rustc_meta.host;
         let release_channel = &rustc_meta.channel;
+
+        if self.arm && !self.build.target.is_empty() {
+            return Err(miette::miette!(
+                "invalid options: --arm and --target cannot be specified at the same time"
+            ));
+        }
+
+        if self.arm {
+            self.build.target = vec![TARGET_ARM.into()];
+        }
 
         let build_target = self.build.target.get(0);
         match build_target {
@@ -53,16 +72,14 @@ impl Build {
                 }
             }
             // No explicit target, but build host same as target host
-            None if host_target == "aarch64-unknown-linux-gnu"
-                || host_target == "x86_64-unknown-linux-gnu" =>
-            {
+            None if host_target == TARGET_ARM || host_target == TARGET_X86_64 => {
                 self.build.disable_zig_linker = true;
                 // Set the target explicitly, so it's easier to find the binaries later
                 self.build.target = vec![host_target.into()];
             }
             // No explicit target, and build host not compatible with Lambda hosts
             None => {
-                self.build.target = vec!["x86_64-unknown-linux-gnu".into()];
+                self.build.target = vec![TARGET_X86_64.into()];
             }
         };
 
@@ -71,7 +88,8 @@ impl Build {
             .target
             .get(0)
             .map(|x| x.split_once('.').map(|(t, _)| t).unwrap_or(x.as_str()))
-            .unwrap_or("x86_64-unknown-linux-gnu");
+            .unwrap_or(TARGET_X86_64);
+
         let profile = match self.build.profile.as_deref() {
             Some("dev" | "test") => "debug",
             Some("release" | "bench") => "release",
