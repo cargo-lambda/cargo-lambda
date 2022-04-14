@@ -77,6 +77,12 @@ By default, cargo-lambda compiles the code for Linux X86-64 architectures, you c
 cargo lambda build --target aarch64-unknown-linux-gnu
 ```
 
+ℹ️ Starting in version 0.7.0, you can use the shortcut `--arm` to compile your functions for Linux ARM architectures:
+
+```
+cargo lambda build --arm
+```
+
 #### Build - Compilation Profiles
 
 By default, cargo-lambda compiles the code in `debug` mode. If you want to change the profile to compile in `release` mode, you can provide the right flag.
@@ -94,11 +100,11 @@ to compile the code for the right architecture. If Zig is not installed in your 
 
 ### Watch
 
-:warning: This subcommand used to be called `start`. Both names still work, as `start` is an alias for `watch`.
+⚠️ This subcommand used to be called `start`. Both names still work, as `start` is an alias for `watch`.
 
 The watch subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions. Use flag `--no-reload` to avoid hot compilation.
 
-:warning: This command works best with the **[Lambda Runtime version 0.5.1](https://crates.io/crates/lambda_runtime/0.5.1)**. Previous versions of the rumtime are likely to crash with serialization errors.
+⚠️ This command works best with the **[Lambda Runtime version 0.5.1](https://crates.io/crates/lambda_runtime/0.5.1)**. Previous versions of the rumtime are likely to crash with serialization errors.
 
 ```
 cargo lambda watch
