@@ -41,6 +41,7 @@ const LAMBDA_RUNTIME_CLIENT_CONTEXT: &str = "lambda-runtime-client-context";
 const LAMBDA_RUNTIME_AWS_REQUEST_ID: &str = "lambda-runtime-aws-request-id";
 const LAMBDA_RUNTIME_DEADLINE_MS: &str = "lambda-runtime-deadline-ms";
 const LAMBDA_RUNTIME_FUNCTION_ARN: &str = "lambda-runtime-invoked-function-arn";
+const RUNTIME_EMULATOR_PATH: &str = "/.rt";
 
 #[derive(Args, Clone, Debug)]
 #[clap(name = "watch", visible_alias = "start")]
@@ -95,9 +96,9 @@ async fn start_server(
     init_tracing(print_traces);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], invoke_port));
-    let server_addr = format!("http://{addr}");
+    let runtime_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
 
-    let req_cache = RequestCache::new(server_addr);
+    let req_cache = RequestCache::new(runtime_addr);
     let req_tx = init_scheduler(&subsys, req_cache.clone(), manifest_path, no_reload).await;
     let resp_cache = ResponseCache::new();
     let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
@@ -107,18 +108,7 @@ async fn start_server(
             "/2015-03-31/functions/:function_name/invocations",
             post(invoke_handler),
         )
-        .route(
-            "/:function_name/2018-06-01/runtime/invocation/next",
-            get(next_request),
-        )
-        .route(
-            "/:function_name/2018-06-01/runtime/invocation/:req_id/response",
-            post(next_invocation_response),
-        )
-        .route(
-            "/:function_name/2018-06-01/runtime/invocation/:req_id/error",
-            post(next_invocation_error),
-        )
+        .nest(RUNTIME_EMULATOR_PATH, runtime_routes())
         .layer(SetRequestIdLayer::new(
             x_request_id.clone(),
             RequestUuidService,
@@ -136,6 +126,22 @@ async fn start_server(
         .with_graceful_shutdown(subsys.on_shutdown_requested())
         .await
         .map_err(axum::Error::new)
+}
+
+fn runtime_routes() -> Router {
+    Router::new()
+        .route(
+            "/:function_name/2018-06-01/runtime/invocation/next",
+            get(next_request),
+        )
+        .route(
+            "/:function_name/2018-06-01/runtime/invocation/:req_id/response",
+            post(next_invocation_response),
+        )
+        .route(
+            "/:function_name/2018-06-01/runtime/invocation/:req_id/error",
+            post(next_invocation_error),
+        )
 }
 
 async fn invoke_handler(
