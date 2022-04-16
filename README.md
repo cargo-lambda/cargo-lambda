@@ -151,6 +151,15 @@ name = "add-product"
 path = "src/bin/add-product.rs"
 ```
 
+#### Watch - Function URLs
+
+The emulator server includes support for [Lambda function URLs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html) out of the box. Since we're working locally, these URLs are under the `/lambda-url` path instead of under a subdomain. The function that you're trying to access through a URL must respond to Request events using [lambda_http](https://crates.io/crates/lambda_http/), or raw `ApiGatewayV2httpRequest` events.
+
+You can create functions compatible with this feature by running `cargo lambda new --http FUNCTION_NAME`.
+
+To access a function via its HTTP endpoint, start the watch subcommand `cargo lambda watch`, then send requests to the endpoint `http://localhost:9000/lambda-url/FUNCTION_NAME`. You can add any additional path after the function name, or any query parameters.
+
+
 ### Invoke
 
 The invoke subcomand helps you send requests to the control plane emulator.

@@ -1,46 +1,26 @@
-use axum::{
-    body::Body,
-    extract::{Extension, Path},
-    http::{header::HeaderName, Request, StatusCode},
-    response::Response,
-    routing::{get, post},
-    Router,
-};
+use axum::{extract::Extension, http::header::HeaderName, Router};
 use clap::{Args, ValueHint};
 use miette::Result;
-use opentelemetry::{
-    global,
-    trace::{TraceContextExt, Tracer},
-    Context, KeyValue,
-};
-use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
-use tokio::{
-    sync::{mpsc::Sender, oneshot},
-    time::Duration,
-};
+use std::{net::SocketAddr, path::PathBuf};
+use tokio::time::Duration;
 use tokio_graceful_shutdown::{SubsystemHandle, Toplevel};
 use tower_http::{
     catch_panic::CatchPanicLayer,
     request_id::{PropagateRequestIdLayer, SetRequestIdLayer},
     trace::TraceLayer,
 };
-use tracing::{debug, info};
+use tracing::info;
 
 mod requests;
-use requests::*;
+mod runtime_router;
+
 mod scheduler;
 use scheduler::*;
 mod trace;
 use trace::*;
+mod trigger_router;
 mod watch_installer;
 
-const AWS_XRAY_TRACE_HEADER: &str = "x-amzn-trace-id";
-const LAMBDA_RUNTIME_XRAY_TRACE_HEADER: &str = "lambda-runtime-trace-id";
-const LAMBDA_RUNTIME_COGNITO_IDENTITY: &str = "lambda-runtime-cognito-identity";
-const LAMBDA_RUNTIME_CLIENT_CONTEXT: &str = "lambda-runtime-client-context";
-const LAMBDA_RUNTIME_AWS_REQUEST_ID: &str = "lambda-runtime-aws-request-id";
-const LAMBDA_RUNTIME_DEADLINE_MS: &str = "lambda-runtime-deadline-ms";
-const LAMBDA_RUNTIME_FUNCTION_ARN: &str = "lambda-runtime-invoked-function-arn";
 const RUNTIME_EMULATOR_PATH: &str = "/.rt";
 
 #[derive(Args, Clone, Debug)]
@@ -104,11 +84,8 @@ async fn start_server(
     let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
 
     let app = Router::new()
-        .route(
-            "/2015-03-31/functions/:function_name/invocations",
-            post(invoke_handler),
-        )
-        .nest(RUNTIME_EMULATOR_PATH, runtime_routes())
+        .merge(trigger_router::routes())
+        .nest(RUNTIME_EMULATOR_PATH, runtime_router::routes())
         .layer(SetRequestIdLayer::new(
             x_request_id.clone(),
             RequestUuidService,
@@ -126,152 +103,4 @@ async fn start_server(
         .with_graceful_shutdown(subsys.on_shutdown_requested())
         .await
         .map_err(axum::Error::new)
-}
-
-fn runtime_routes() -> Router {
-    Router::new()
-        .route(
-            "/:function_name/2018-06-01/runtime/invocation/next",
-            get(next_request),
-        )
-        .route(
-            "/:function_name/2018-06-01/runtime/invocation/:req_id/response",
-            post(next_invocation_response),
-        )
-        .route(
-            "/:function_name/2018-06-01/runtime/invocation/:req_id/error",
-            post(next_invocation_error),
-        )
-}
-
-async fn invoke_handler(
-    Extension(cmd_tx): Extension<Sender<InvokeRequest>>,
-    Path(function_name): Path<String>,
-    req: Request<Body>,
-) -> Result<Response<Body>, ServerError> {
-    let mut req = req;
-    let headers = req.headers_mut();
-
-    let span = global::tracer("cargo-lambda/emulator").start("invoke request");
-    let cx = Context::current_with_span(span);
-
-    let mut injector = HashMap::new();
-    global::get_text_map_propagator(|propagator| {
-        propagator.inject_context(&cx, &mut injector);
-    });
-    let xray_header = injector
-        .get(AWS_XRAY_TRACE_HEADER)
-        .expect("x-amzn-trace-id header not injected by the propagator") // this is Infaliable
-        .parse()
-        .expect("x-amzn-trace-id header is not in the expected format"); // this is Infaliable
-    headers.insert(LAMBDA_RUNTIME_XRAY_TRACE_HEADER, xray_header);
-
-    let (resp_tx, resp_rx) = oneshot::channel::<Response<Body>>();
-
-    let req = InvokeRequest {
-        function_name,
-        req,
-        resp_tx,
-    };
-
-    cmd_tx
-        .send(req)
-        .await
-        .map_err(|e| ServerError::SendInvokeMessage(Box::new(e)))?;
-
-    let resp = resp_rx.await.map_err(ServerError::ReceiveFunctionMessage)?;
-
-    cx.span().add_event(
-        "function call completed",
-        vec![KeyValue::new("status", resp.status().to_string())],
-    );
-
-    Ok(resp)
-}
-
-async fn next_request(
-    Extension(req_cache): Extension<RequestCache>,
-    Extension(resp_cache): Extension<ResponseCache>,
-    Path(function_name): Path<String>,
-    req: Request<Body>,
-) -> Result<Response<Body>, ServerError> {
-    let req_id = req
-        .headers()
-        .get(LAMBDA_RUNTIME_AWS_REQUEST_ID)
-        .expect("missing request id");
-
-    let mut builder = Response::builder()
-        .header(LAMBDA_RUNTIME_AWS_REQUEST_ID, req_id)
-        .header(LAMBDA_RUNTIME_DEADLINE_MS, 600_000_u32)
-        .header(LAMBDA_RUNTIME_FUNCTION_ARN, "function-arn");
-
-    let resp = match req_cache.pop(&function_name).await {
-        None => builder.status(StatusCode::NO_CONTENT).body(Body::empty()),
-        Some(invoke) => {
-            let req_id = req_id
-                .to_str()
-                .map_err(ServerError::InvalidRequestIdHeader)?;
-
-            debug!(req_id = ?req_id, "processing request");
-
-            let (parts, body) = invoke.req.into_parts();
-
-            let resp_tx = invoke.resp_tx;
-            resp_cache.push(req_id, resp_tx).await;
-
-            let headers = parts.headers;
-            if let Some(h) = headers.get(LAMBDA_RUNTIME_CLIENT_CONTEXT) {
-                builder = builder.header(LAMBDA_RUNTIME_CLIENT_CONTEXT, h);
-            }
-            if let Some(h) = headers.get(LAMBDA_RUNTIME_COGNITO_IDENTITY) {
-                builder = builder.header(LAMBDA_RUNTIME_COGNITO_IDENTITY, h);
-            }
-            if let Some(h) = headers.get(LAMBDA_RUNTIME_XRAY_TRACE_HEADER) {
-                builder = builder.header(LAMBDA_RUNTIME_XRAY_TRACE_HEADER, h);
-            }
-
-            builder.status(StatusCode::OK).body(body)
-        }
-    };
-
-    resp.map_err(ServerError::ResponseBuild)
-}
-
-async fn next_invocation_response(
-    Extension(cache): Extension<ResponseCache>,
-    Path((_function_name, req_id)): Path<(String, String)>,
-    req: Request<Body>,
-) -> Result<Response<Body>, ServerError> {
-    respond_to_next_invocation(&cache, &req_id, req, StatusCode::OK).await
-}
-
-async fn next_invocation_error(
-    Extension(cache): Extension<ResponseCache>,
-    Path((_function_name, req_id)): Path<(String, String)>,
-    req: Request<Body>,
-) -> Result<Response<Body>, ServerError> {
-    respond_to_next_invocation(&cache, &req_id, req, StatusCode::INTERNAL_SERVER_ERROR).await
-}
-
-async fn respond_to_next_invocation(
-    cache: &ResponseCache,
-    req_id: &str,
-    req: Request<Body>,
-    response_status: StatusCode,
-) -> Result<Response<Body>, ServerError> {
-    if let Some(resp_tx) = cache.pop(req_id).await {
-        let (_, body) = req.into_parts();
-
-        let resp = Response::builder()
-            .status(response_status)
-            .header("lambda-runtime-aws-request-id", req_id)
-            .body(body)
-            .map_err(ServerError::ResponseBuild)?;
-
-        resp_tx
-            .send(resp)
-            .map_err(|_| ServerError::SendFunctionMessage)?;
-    }
-
-    Ok(Response::new(Body::empty()))
 }
