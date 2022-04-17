@@ -2,7 +2,7 @@ use crate::requests::{InvokeRequest, ServerError};
 use axum::{body::Body, response::Response};
 use cargo_lambda_interactive::command::new_command;
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
-use cargo_lambda_metadata::{function_metadata, PackageMetadata};
+use cargo_lambda_metadata::cargo::{function_metadata, PackageMetadata};
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     path::PathBuf,

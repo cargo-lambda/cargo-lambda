@@ -1,10 +1,11 @@
 use cargo_lambda_interactive::{command::silent_command, progress::Progress};
+use cargo_lambda_metadata::fs::rename;
 use home::cargo_home;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use platforms::platform::{self, Platform};
 use reqwest::{get, StatusCode};
 use std::{
-    fs::{rename, File},
+    fs::File,
     io::{copy, Cursor},
     path::Path,
 };

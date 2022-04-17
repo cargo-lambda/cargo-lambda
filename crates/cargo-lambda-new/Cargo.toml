@@ -17,6 +17,7 @@ rust-version = "1.59.0"
 # and it will keep the alphabetic ordering for you.
 [dependencies]
 cargo-lambda-interactive = { version = "0.6", path = "../cargo-lambda-interactive" }
+cargo-lambda-metadata = { version = "0.6", path = "../cargo-lambda-metadata" }
 clap = { version = "3.1.8", features = ["cargo", "derive"] }
 liquid = "0.26.0"
 miette = { version = "4.3.0", features = ["fancy"] }

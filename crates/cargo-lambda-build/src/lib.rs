@@ -1,8 +1,9 @@
-use cargo_lambda_metadata::binary_targets;
+use cargo_lambda_metadata::{cargo::binary_targets, fs::rename};
 use cargo_zigbuild::Build as ZigBuild;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use std::{
+    fs::{create_dir_all, read, File},
     io::Write,
     path::{Path, PathBuf},
 };
@@ -162,20 +163,18 @@ impl Build {
             let binary = base.join(name);
             if binary.exists() {
                 let bootstrap_dir = lambda_dir.join(name);
-                std::fs::create_dir_all(&bootstrap_dir).into_diagnostic()?;
+                create_dir_all(&bootstrap_dir).into_diagnostic()?;
                 match self.output_format {
                     OutputFormat::Binary => {
-                        std::fs::rename(binary, bootstrap_dir.join("bootstrap"))
-                            .into_diagnostic()?;
+                        rename(binary, bootstrap_dir.join("bootstrap")).into_diagnostic()?;
                     }
                     OutputFormat::Zip => {
                         let zipped_binary =
-                            std::fs::File::create(bootstrap_dir.join("bootstrap.zip"))
-                                .into_diagnostic()?;
+                            File::create(bootstrap_dir.join("bootstrap.zip")).into_diagnostic()?;
                         let mut zip = zip::ZipWriter::new(zipped_binary);
                         zip.start_file("bootstrap", Default::default())
                             .into_diagnostic()?;
-                        zip.write_all(&std::fs::read(binary).into_diagnostic()?)
+                        zip.write_all(&read(binary).into_diagnostic()?)
                             .into_diagnostic()?;
                         zip.finish().into_diagnostic()?;
                     }

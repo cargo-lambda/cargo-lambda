@@ -1,10 +1,11 @@
 use cargo_lambda_interactive::{is_stdin_tty, Confirm, Text};
+use cargo_lambda_metadata::fs::rename;
 use clap::Args;
 use liquid::{model::Value, ParserBuilder};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use regex::Regex;
 use std::{
-    fs::{copy as copy_file, create_dir_all, read_dir, rename, File},
+    fs::{copy as copy_file, create_dir_all, read_dir, File},
     io::{copy, Cursor},
     path::{Path, PathBuf},
 };
