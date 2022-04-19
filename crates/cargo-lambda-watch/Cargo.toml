@@ -1,7 +1,7 @@
 [package]
 name = "cargo-lambda-watch"
 description = "Cargo subcommand to work with AWS Lambda"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2021"
 license = "MIT"
 readme = "README.md"
