@@ -25,7 +25,7 @@ pub struct Build {
 
     /// Shortcut for --target aarch64-unknown-linux-gnu
     #[clap(long)]
-    arm: bool,
+    arm64: bool,
 
     #[clap(flatten)]
     build: ZigBuild,
@@ -49,13 +49,13 @@ impl Build {
         let host_target = &rustc_meta.host;
         let release_channel = &rustc_meta.channel;
 
-        if self.arm && !self.build.target.is_empty() {
+        if self.arm64 && !self.build.target.is_empty() {
             return Err(miette::miette!(
                 "invalid options: --arm and --target cannot be specified at the same time"
             ));
         }
 
-        if self.arm {
+        if self.arm64 {
             self.build.target = vec![TARGET_ARM.into()];
         }
 
