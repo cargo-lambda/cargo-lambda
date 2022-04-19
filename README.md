@@ -77,10 +77,10 @@ By default, cargo-lambda compiles the code for Linux X86-64 architectures, you c
 cargo lambda build --target aarch64-unknown-linux-gnu
 ```
 
-ℹ️ Starting in version 0.7.0, you can use the shortcut `--arm` to compile your functions for Linux ARM architectures:
+ℹ️ Starting in version 0.6.2, you can use the shortcut `--arm64` to compile your functions for Linux ARM architectures:
 
 ```
-cargo lambda build --arm
+cargo lambda build --arm64
 ```
 
 #### Build - Compilation Profiles
