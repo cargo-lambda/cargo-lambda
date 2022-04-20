@@ -40,6 +40,18 @@ pub enum ServerError {
     #[error("invalid request id header")]
     #[diagnostic()]
     InvalidRequestIdHeader(#[from] axum::http::header::ToStrError),
+
+    #[error("failed to deserialize the request body")]
+    #[diagnostic()]
+    BodyDeserialization(#[from] hyper::Error),
+
+    #[error("failed to deserialize the request body")]
+    #[diagnostic()]
+    StringBody(#[from] std::string::FromUtf8Error),
+
+    #[error("failed to serialize lambda-url event")]
+    #[diagnostic()]
+    SerializationError(#[from] serde_json::Error),
 }
 
 impl IntoResponse for ServerError {
