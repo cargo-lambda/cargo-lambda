@@ -1,10 +1,11 @@
-use cargo_lambda_interactive::{is_stdin_tty, Confirm, Text};
+use cargo_lambda_interactive::{command::silent_command, is_stdin_tty, Confirm, Text};
 use cargo_lambda_metadata::fs::rename;
 use clap::Args;
 use liquid::{model::Value, ParserBuilder};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use regex::Regex;
 use std::{
+    env,
     fs::{copy as copy_file, create_dir_all, read_dir, File},
     io::{copy, Cursor},
     path::{Path, PathBuf},
@@ -24,6 +25,10 @@ pub struct New {
     #[clap(flatten)]
     template_options: TemplateOptions,
 
+    /// Open the project in a code editor defined by the environment variable EDITOR
+    #[clap(short, long)]
+    open: bool,
+
     /// Name of the Rust package to create
     #[clap()]
     package_name: String,
@@ -37,7 +42,7 @@ pub struct TemplateOptions {
 
     /// Whether the function is going to be an HTTP endpoint or not
     #[clap(long)]
-    http: Option<bool>, // this is optional because we want to know whether the option is set or not
+    http: bool,
 
     /// Name of function's binary, independent of the package's name
     #[clap(long)]
@@ -69,7 +74,8 @@ impl New {
             ));
         }
 
-        self.create_package().await
+        self.create_package().await?;
+        self.open_code_editor().await
     }
 
     fn ask_template_options(&mut self) -> Result<()> {
@@ -77,18 +83,16 @@ impl New {
             validate_name(fn_name)?;
         }
 
-        if self.template_options.http.is_none() {
+        if !self.template_options.http {
             let is_http = Confirm::new("Is this function an HTTP function?")
                 .with_help_message("type `yes` if the Lambda function is triggered by an API Gateway, Amazon Load Balancer(ALB), or a Lambda URL")
                 .with_default(false)
                 .prompt()
                 .into_diagnostic()?;
-            if is_http {
-                self.template_options.http = Some(is_http);
-            }
+            self.template_options.http = is_http;
         }
 
-        if self.template_options.http.is_none() {
+        if !self.template_options.http {
             let event_type = Text::new("AWS Event type that this function receives")
             .with_suggester(&suggest_event_type)
             .with_validator(&validate_event_type)
@@ -106,7 +110,7 @@ impl New {
     }
 
     fn is_http_function(&self) -> bool {
-        matches!(self.template_options.http, Some(true))
+        self.template_options.http
     }
 
     fn has_event_type(&self) -> bool {
@@ -243,6 +247,22 @@ impl New {
 
         Ok(())
     }
+
+    async fn open_code_editor(&self) -> Result<()> {
+        if !self.open {
+            return Ok(());
+        }
+        let editor = env::var("EDITOR").unwrap_or_default();
+        let editor = editor.trim();
+        if editor.is_empty() {
+            Err(miette::miette!(
+                "project created in {}, but the EDITOR variable is missing",
+                &self.package_name
+            ))
+        } else {
+            silent_command(editor.trim(), &[&self.package_name]).await
+        }
+    }
 }
 
 async fn download_template(url: &str, path: &Path) -> Result<()> {
@@ -268,7 +288,7 @@ async fn download_template(url: &str, path: &Path) -> Result<()> {
 
 impl TemplateOptions {
     fn missing_options(&self) -> bool {
-        self.http.is_none() && self.event_type.is_none()
+        !self.http && self.event_type.is_none()
     }
 }
 
