@@ -82,6 +82,10 @@ pub struct Deploy {
     #[clap(long, default_value_t = Tracing::Active)]
     pub tracing: Tracing,
 
+    /// IAM Role associated with the function
+    #[clap(long)]
+    pub iam_role: Option<String>,
+
     /// Name of the binary to deploy
     #[clap(value_name = "FUNCTION_NAME")]
     function_name: Option<String>,
@@ -166,29 +170,6 @@ impl Deploy {
         Ok(())
     }
 
-    // async fn init_client(&self) -> Client {
-    //     let region_provider = RegionProviderChain::first_try(self.region.clone().map(Region::new))
-    //         .or_default_provider()
-    //         .or_else(Region::new(DEFAULT_REGION));
-    //     let region = region_provider.region().await;
-
-    //     let mut config_loader = aws_config::from_env()
-    //         .region(region_provider)
-    //         .retry_config(RetryConfig::disabled());
-
-    //     if let Some(profile) = &self.profile {
-    //         let conf = ProviderConfig::without_region().with_region(region);
-    //         let creds_provider = ProfileFileCredentialsProvider::builder()
-    //             .profile_name(profile)
-    //             .configure(&conf)
-    //             .build();
-    //         config_loader = config_loader.credentials_provider(creds_provider);
-    //     }
-
-    //     let config = config_loader.load().await;
-    //     Client::new(&config)
-    // }
-
     async fn upsert_function(
         &self,
         client: &Client,
@@ -216,7 +197,7 @@ impl Deploy {
             .mode(self.tracing.to_string().as_str().into())
             .build();
 
-        let iam_role = self.config.iam_role.clone();
+        let iam_role = self.iam_role.clone();
 
         let version = match action {
             FunctionAction::Create => {

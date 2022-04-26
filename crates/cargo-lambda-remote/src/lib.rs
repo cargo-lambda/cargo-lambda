@@ -17,10 +17,6 @@ pub struct RemoteConfig {
     #[clap(short, long)]
     pub region: Option<String>,
 
-    /// IAM Role associated with the function
-    #[clap(long)]
-    pub iam_role: Option<String>,
-
     /// AWS Lambda alias to associate the function to
     #[clap(short, long)]
     pub alias: Option<String>,

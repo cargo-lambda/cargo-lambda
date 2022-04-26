@@ -635,10 +635,14 @@ dependencies = [
 name = "cargo-lambda-invoke"
 version = "0.6.2"
 dependencies = [
+ "cargo-lambda-remote",
  "clap",
  "home",
  "miette",
  "reqwest",
+ "serde_json",
+ "strum",
+ "strum_macros",
 ]
 
 [[package]]
