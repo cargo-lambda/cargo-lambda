@@ -21,7 +21,7 @@ pub struct RemoteConfig {
     #[clap(short, long)]
     pub alias: Option<String>,
 
-    /// Number of attempts to try failed operations, default 1
+    /// Number of attempts to try failed operations
     #[clap(long, default_value = "1")]
     retry_attempts: u32,
 }

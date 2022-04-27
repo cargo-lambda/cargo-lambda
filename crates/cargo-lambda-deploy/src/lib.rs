@@ -133,7 +133,7 @@ impl Deploy {
         if let Some(alias) = &self.config.alias {
             progress.set_message("updating alias version");
 
-            if let Err(err) = upsert_alias(&client, &name, &alias, &version).await {
+            if let Err(err) = upsert_alias(&client, &name, alias, &version).await {
                 progress.finish_and_clear();
                 return Err(err);
             }
