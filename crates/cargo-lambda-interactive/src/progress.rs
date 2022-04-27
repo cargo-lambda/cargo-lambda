@@ -23,6 +23,20 @@ impl Progress {
             println!("▪▪▪▪▪ {}", msg);
         }
     }
+
+    pub fn set_message(&self, msg: &str) {
+        if let Some(bar) = &self.bar {
+            bar.set_message(msg.to_string());
+        } else {
+            println!("▹▹▹▹▹ {}", msg);
+        }
+    }
+
+    pub fn finish_and_clear(&self) {
+        if let Some(bar) = &self.bar {
+            bar.finish_and_clear();
+        }
+    }
 }
 
 fn show_progress(msg: impl ToString) -> ProgressBar {

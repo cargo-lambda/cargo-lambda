@@ -1,6 +1,7 @@
 use std::boxed::Box;
 
 use cargo_lambda_build::{Build, Zig};
+use cargo_lambda_deploy::Deploy;
 use cargo_lambda_invoke::Invoke;
 use cargo_lambda_new::New;
 use cargo_lambda_watch::Watch;
@@ -22,8 +23,10 @@ enum App {
 #[derive(Clone, Debug, Subcommand)]
 #[clap(version)]
 pub enum Lambda {
-    /// Build AWS Lambda functions compiled with zig as the linker
+    /// Build Lambda functions compiled with zig as the linker
     Build(Box<Build>),
+    /// Deploy Lambda functions to AWS
+    Deploy(Deploy),
     /// Send requests to Lambda functions running on the emulator
     Invoke(Invoke),
     /// Create a new package with a Lambda function from our Lambda Template
@@ -38,6 +41,7 @@ async fn main() -> Result<()> {
     match app {
         App::Lambda(lambda) => match *lambda {
             Lambda::Build(mut b) => b.run().await,
+            Lambda::Deploy(d) => d.run().await,
             Lambda::Invoke(i) => i.run().await,
             Lambda::New(mut n) => n.run().await,
             Lambda::Watch(w) => w.run().await,

@@ -1,13 +1,16 @@
+use cargo_lambda_remote::{aws_sdk_lambda::types::Blob, init_client, RemoteConfig};
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use reqwest::{Client, StatusCode};
+use serde_json::{from_str, to_string_pretty, value::Value};
 use std::{
     fs::{create_dir_all, read_to_string, File},
     io::copy,
     net::IpAddr,
     path::{Path, PathBuf},
-    str::FromStr,
+    str::{from_utf8, FromStr},
 };
+use strum_macros::{Display, EnumString};
 
 /// Name for the function when no name is provided.
 /// This will make the watch command to compile
@@ -19,24 +22,46 @@ pub const DEFAULT_PACKAGE_FUNCTION: &str = "@package-bootstrap@";
 #[derive(Args, Clone, Debug)]
 #[clap(name = "invoke")]
 pub struct Invoke {
-    /// Address host (IPV4) where users send invoke requests
+    /// Local address host (IPv4 or IPv6) to send invoke requests
     #[clap(short = 'a', long, default_value = "127.0.0.1")]
     invoke_address: String,
-    /// Address port where users send invoke requests
+
+    /// Local port to send invoke requests
     #[clap(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
+
     /// File to read the invoke payload from
     #[clap(long, parse(from_os_str), value_hint = ValueHint::FilePath)]
     data_file: Option<PathBuf>,
+
     /// Invoke payload as a string
     #[clap(long)]
     data_ascii: Option<String>,
+
     /// Example payload from LegNeato/aws-lambda-events
     #[clap(long)]
     data_example: Option<String>,
+
+    /// Invoke the function already deployed on AWS Lambda
+    #[clap(long)]
+    remote: bool,
+
+    #[clap(flatten)]
+    remote_config: RemoteConfig,
+
+    #[clap(long, default_value_t = OutputFormat::Text)]
+    output_format: OutputFormat,
+
     /// Name of the function to invoke
     #[clap(default_value = DEFAULT_PACKAGE_FUNCTION)]
     function_name: String,
+}
+
+#[derive(Clone, Debug, Display, EnumString)]
+#[strum(ascii_case_insensitive)]
+enum OutputFormat {
+    Text,
+    Json,
 }
 
 impl Invoke {
@@ -67,6 +92,69 @@ impl Invoke {
             return Err(miette::miette!("no data payload provided, use one of the data flags: `--data-file`, `--data-ascii`, `--data-example`"));
         };
 
+        let text = if self.remote {
+            self.invoke_remote(&data).await?
+        } else {
+            self.invoke_local(&data).await?
+        };
+
+        let text = match &self.output_format {
+            OutputFormat::Text => text,
+            OutputFormat::Json => {
+                let obj: Value = from_str(&text)
+                    .into_diagnostic()
+                    .wrap_err("failed to serialize response into json")?;
+
+                to_string_pretty(&obj)
+                    .into_diagnostic()
+                    .wrap_err("failed to format json output")?
+            }
+        };
+
+        println!("{text}");
+
+        Ok(())
+    }
+
+    async fn invoke_remote(&self, data: &str) -> Result<String> {
+        if self.function_name == DEFAULT_PACKAGE_FUNCTION {
+            return Err(miette::miette!("invalid function name, it must match the name you used to create the function remotely"));
+        }
+        let client = init_client(&self.remote_config).await;
+
+        let resp = client
+            .invoke()
+            .function_name(&self.function_name)
+            .set_qualifier(self.remote_config.alias.clone())
+            .payload(Blob::new(data.as_bytes()))
+            .send()
+            .await
+            .into_diagnostic()
+            .wrap_err("failed to invoke remote function")?;
+
+        if let Some(fail) = resp.function_error {
+            let blob = resp
+                .payload
+                .expect("function error is not in the payload")
+                .into_inner();
+            let text = from_utf8(&blob)
+                .into_diagnostic()
+                .wrap_err("failed to read response payload")?;
+            return Err(miette::miette!("{}: {}", fail, text));
+        }
+
+        if let Some(payload) = resp.payload {
+            let blob = payload.into_inner();
+            from_utf8(&blob)
+                .map(String::from)
+                .into_diagnostic()
+                .wrap_err("failed to read response payload")
+        } else {
+            Ok("OK".into())
+        }
+    }
+
+    async fn invoke_local(&self, data: &str) -> Result<String> {
         let host = parse_invoke_ip_address(&self.invoke_address)?;
 
         let url = format!(
@@ -77,21 +165,16 @@ impl Invoke {
         let client = Client::new();
         let resp = client
             .post(url)
-            .body(data)
+            .body(data.to_string())
             .send()
             .await
             .into_diagnostic()
             .wrap_err("error sending request to the runtime emulator")?;
 
-        let text = resp
-            .text()
+        resp.text()
             .await
             .into_diagnostic()
-            .wrap_err("error reading response body")?;
-
-        println!("{text}");
-
-        Ok(())
+            .wrap_err("error reading response body")
     }
 }
 

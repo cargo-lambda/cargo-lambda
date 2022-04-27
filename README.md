@@ -7,11 +7,13 @@ cargo-lambda is a [Cargo](https://doc.rust-lang.org/cargo/) subcommand to help y
 
 The [new](#new) subcommand creates a basic Rust package from a well defined template to help you start writing AWS Lambda functions in Rust.
 
-The [build](#build) subcommand compiles AWS Lambda functions natively and produces artifacts which you can then upload to AWS Lambda or use with other echosystem tools, like [SAM Cli](https://github.com/aws/aws-sam-cli) or the [AWS CDK](https://github.com/aws/aws-cdk).
+The [build](#build) subcommand compiles AWS Lambda functions natively and produces artifacts which you can then [upload to AWS Lambda](#deploy) or use with other echosystem tools, like [SAM Cli](https://github.com/aws/aws-sam-cli) or the [AWS CDK](https://github.com/aws/aws-cdk).
 
 The [watch](#watch) subcommand boots a development server that emulates interations with the AWS Lambda control plane. This subcommand also reloads your Rust code as you work on it.
 
-The [invoke](#invoke) subcommand sends request to the control plane emulator to test and debug interactions with your Lambda functions.
+The [invoke](#invoke) subcommand sends requests to the control plane emulator to test and debug interactions with your Lambda functions. This command can also be used to send requests to remote functions once deployed on AWS Lambda.
+
+The [deploy](#deploy) subcommand uploads functions to AWS Lambda. You can use the same command to create new functions as well as update existent functions code.
 
 ## Installation
 
@@ -162,7 +164,7 @@ To access a function via its HTTP endpoint, start the watch subcommand `cargo la
 
 ### Invoke
 
-The invoke subcomand helps you send requests to the control plane emulator.
+The invoke subcomand helps you send requests to the control plane emulator, as well as remote functions.
 
 If your Rust project only includes one function, in the package's main.rs file, you can invoke it by sending the data that you want to process, without extra arguments. For example:
 
@@ -208,6 +210,78 @@ cargo lambda invoke http-lambda --data-example apigw-request
 ```
 
 After the first download, these examples are cached in your home directory, under `.cargo/lambda/invoke-fixtures`.
+
+#### Invoke - Remote
+
+The `--remote` flag allows you to send requests to a remote function deployed on AWS Lambda. This flag assumes that your AWS account has permission to call the `lambda:invokeFunction` operation. You can specify the region where the function is deployed, as well as any credentials profile that the command should use to authenticate you:
+
+```
+cargo lambda invoke --remote --data-example apigw-request http-lambda
+```
+
+#### Invoke - Output format
+
+The `--output-format` flag allows you to change the output formatting between plain text and pretty-printed JSON formatting. By default, all function outputs are printed as text.
+
+```
+cargo lambda invoke --remote --data-example apigw-request --output-format json http-lambda
+```
+
+### Deploy
+
+This subcommand uploads functions to AWS Lambda. You can use the same command to create new functions as well as update existent functions code. This command assumes that your AWS account has permissions to call several lambda operations, like `lambda:getFunction`, `lambda:createFunction`, and `lambda:updateFunctionCode`. This subcommand also requires an IAM role with privileges in AWS Lambda.
+
+When you call this subcommand, the function binary must have been created with the [Build](#build) subcommand ahead of time. The command will fail if it cannot find the binary file.
+
+This command automatically detects the architecture that the binary was compiled for, so you don't have to specify it.
+
+The example below deploys a function that has already been compiled with the default flags:
+
+```
+cargo lambda deploy --iam-role FULL_ROLE_ARN http-lambda
+```
+
+### Deploy - Function URLs
+
+This subcommand can enable Lambda function URLs for your lambda. Use the flag `--enable-function-url` when you deploy your function, and when the operation completes, the command will print the function URL in the terminal.
+
+⚠️ This flag always configures the function URL without any kind of authorization. Don't use it if you'd like to keep the URL secure.
+
+The example below shows how to enable the function URL for a function during deployment:
+
+```
+cargo lambda deploy --iam-role FULL_ROLE_ARN --enable-function-url http-lambda
+```
+
+You can use the flag `--disable-function-url` if you want to disable the function URL.
+
+### Deploy - Environment variables
+
+You can add environment variables to a function during deployment with the flags `--env-var` and `--env-file`.
+
+The flag `--env-var` allows you to pass several variables in the command like with the format `KEY=VALUE`:
+
+```
+cargo lambda deploy --iam-role FULL_ROLE_ARN \
+  --env-var FOO=BAR --env-var BAZ=QUX \
+  http-lambda
+```
+
+The flag `--env-file` will read the variables from a file and add them to the function during the deploy. Each variable in the file must be in a new line with the same `KEY=VALUE` format:
+
+```
+cargo lambda deploy --iam-role FULL_ROLE_ARN --env-file .env http-lambda
+```
+
+### Deploy - Other options
+
+Use the `--help` flag to see other options to configure the function's deployment.
+
+### Deploy - State management
+
+⚠️ The deploy command doesn't use any kind of state management. If you require state management, you should use tools like [SAM Cli](https://github.com/aws/aws-sam-cli) or the [AWS CDK](https://github.com/aws/aws-cdk).
+
+If you modify a flag and run the deploy command twice for the same function, the change will be updated in the function's configuration in AWS Lambda.
 
 ## Rust version
 

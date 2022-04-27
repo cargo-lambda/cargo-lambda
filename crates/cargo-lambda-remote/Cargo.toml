@@ -1,0 +1,18 @@
+[package]
+name = "cargo-lambda-remote"
+description = "Cargo subcommand to work with AWS Lambda"
+version = "0.6.2"
+edition = "2021"
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/cargo-lambda/cargo-lambda"
+repository = "https://github.com/cargo-lambda/cargo-lambda"
+keywords = ["cargo", "subcommand", "aws", "lambda"]
+rust-version = "1.59.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aws-config = "0.10.1"
+aws-sdk-lambda = "0.10.1"
+clap = { version = "3.1.8", features = ["derive"] }
