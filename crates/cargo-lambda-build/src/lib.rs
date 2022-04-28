@@ -66,17 +66,9 @@ impl Build {
             Some(target) => {
                 // Validate that the build target is supported in AWS Lambda
                 check_build_target(target)?;
-                // Same explicit target as host target
-                //
-                // Note: check with *starts with* instead of equality, as
-                // the `--target` might have a trailing glibc version.
-                if target.starts_with(host_target) {
-                    self.build.disable_zig_linker = true
-                }
             }
             // No explicit target, but build host same as target host
             None if host_target == TARGET_ARM || host_target == TARGET_X86_64 => {
-                self.build.disable_zig_linker = true;
                 // Set the target explicitly, so it's easier to find the binaries later
                 self.build.target = vec![host_target.into()];
             }
