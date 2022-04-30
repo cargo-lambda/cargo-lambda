@@ -216,7 +216,6 @@ impl Deploy {
                     .publish(true)
                     .set_memory_size(self.memory_size)
                     .timeout(self.timeout)
-                    .tags("binary-sha256", &archive.sha256)
                     .tracing_config(tracing_config)
                     .environment(self.function_environment()?)
                     .send()
@@ -227,18 +226,7 @@ impl Deploy {
                 output.version
             }
             FunctionAction::Update(fun) => {
-                let mut update_code = true;
-                let mut version = None;
-
-                if let Some(tags) = fun.tags {
-                    if let Some(sha256) = tags.get("binary-sha256") {
-                        update_code = *sha256 != archive.sha256;
-                    }
-                }
-
                 if let Some(conf) = fun.configuration {
-                    version = conf.version;
-
                     let mut builder = client
                         .update_function_configuration()
                         .function_name(name)
@@ -308,21 +296,17 @@ impl Deploy {
                     }
                 }
 
-                if update_code {
-                    let output = client
-                        .update_function_code()
-                        .function_name(name)
-                        .zip_file(blob)
-                        .publish(true)
-                        .send()
-                        .await
-                        .into_diagnostic()
-                        .wrap_err("failed to update function code")?;
+                let output = client
+                    .update_function_code()
+                    .function_name(name)
+                    .zip_file(blob)
+                    .publish(true)
+                    .send()
+                    .await
+                    .into_diagnostic()
+                    .wrap_err("failed to update function code")?;
 
-                    version = output.version;
-                }
-
-                version
+                output.version
             }
         };
 
