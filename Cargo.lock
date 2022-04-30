@@ -618,6 +618,7 @@ dependencies = [
  "miette",
  "strum",
  "strum_macros",
+ "tokio",
 ]
 
 [[package]]

@@ -8,7 +8,8 @@ use cargo_lambda_remote::{
             GetFunctionUrlConfigError,
         },
         model::{
-            Architecture, Environment, FunctionCode, FunctionUrlAuthType, Runtime, TracingConfig,
+            Architecture, Environment, FunctionCode, FunctionUrlAuthType, Runtime, State,
+            TracingConfig,
         },
         output::GetFunctionOutput,
         types::{Blob, SdkError},
@@ -24,6 +25,7 @@ use std::{
     path::PathBuf,
 };
 use strum_macros::{Display, EnumString};
+use tokio::time::{sleep, Duration};
 
 enum FunctionAction {
     Create,
@@ -242,29 +244,68 @@ impl Deploy {
                         .function_name(name)
                         .set_role(iam_role);
 
+                    let mut update_config = false;
                     if self.memory_size.is_some() && conf.memory_size != self.memory_size {
+                        update_config = true;
                         builder = builder.set_memory_size(self.memory_size);
                     }
                     if conf.timeout.unwrap_or_default() != self.timeout {
+                        update_config = true;
                         builder = builder.timeout(self.timeout);
                     }
 
                     let env = self.function_environment()?;
                     if env.variables != conf.environment.map(|e| e.variables).unwrap_or_default() {
+                        update_config = true;
                         builder = builder.environment(env);
                     }
 
                     if tracing_config.mode
                         != conf.tracing_config.map(|t| t.mode).unwrap_or_default()
                     {
+                        update_config = true;
                         builder = builder.tracing_config(tracing_config);
                     }
 
-                    builder
-                        .send()
-                        .await
-                        .into_diagnostic()
-                        .wrap_err("failed to update function configuration")?;
+                    if update_config {
+                        builder
+                            .send()
+                            .await
+                            .into_diagnostic()
+                            .wrap_err("failed to update function configuration")?;
+
+                        // wait until the update has been conpletely propagated
+                        for attempt in 1..4 {
+                            let conf = client
+                                .get_function_configuration()
+                                .function_name(name)
+                                .set_qualifier(self.config.alias.clone())
+                                .send()
+                                .await
+                                .into_diagnostic()
+                                .wrap_err("failed to fetch the function configuration")?;
+
+                            match &conf.state {
+                                Some(state) => match state {
+                                    State::Active => break,
+                                    State::Pending => {
+                                        sleep(Duration::from_secs(attempt * attempt)).await;
+                                    }
+                                    other => {
+                                        return Err(miette::miette!(
+                                            "unexpected function state: {:?}",
+                                            other
+                                        ))
+                                    }
+                                },
+                                None => return Err(miette::miette!("unknown function state")),
+                            }
+
+                            if attempt == 3 {
+                                return Err(miette::miette!("configuration update didn't finish in time, wait a few minutes and try again"));
+                            }
+                        }
+                    }
                 }
 
                 if update_code {
