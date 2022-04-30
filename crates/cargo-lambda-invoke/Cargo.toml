@@ -21,6 +21,6 @@ clap = { version = "3.1.8", features = ["derive"] }
 home = "0.5.3"
 miette = "4.5.0"
 reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls"] }
-serde_json = "1.0.79"
+serde_json = "1.0.80"
 strum = "0.24.0"
 strum_macros = "0.24.0"

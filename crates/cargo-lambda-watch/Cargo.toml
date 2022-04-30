@@ -33,7 +33,7 @@ opentelemetry-aws = "0.5.0"
 platforms = "2.0.0"
 query_map = { version = "0.4.0", features = ["url-query"] }
 reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls"] }
-serde_json = "1.0.79"
+serde_json = "1.0.80"
 tempfile = "3.3.0"
 thiserror = "1.0.30"
 tokio = { version = "1.17.0", features = ["sync", "time"] }
