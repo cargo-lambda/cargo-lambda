@@ -21,6 +21,6 @@ cargo-lambda-deploy = { version = "0.7.1", path = "../cargo-lambda-deploy" }
 cargo-lambda-invoke = { version = "0.7.0", path = "../cargo-lambda-invoke" }
 cargo-lambda-new = { version = "0.7.0", path = "../cargo-lambda-new" }
 cargo-lambda-watch = { version = "0.7.0", path = "../cargo-lambda-watch" }
-clap = { version = "3.1.8", features = ["derive", "suggestions"] }
+clap = { version = "3.1.13", features = ["derive", "suggestions"] }
 miette = { version = "4.3.0", features = ["fancy"] }
 tokio = { version = "1.17.0", features = ["macros", "rt-multi-thread"] }
