@@ -23,7 +23,7 @@ cargo-lambda-interactive = { version = "0.7.0", path = "../cargo-lambda-interact
 cargo-lambda-invoke = { version = "0.7.0", path = "../cargo-lambda-invoke" }
 cargo-lambda-metadata = { version = "0.7.0", path = "../cargo-lambda-metadata" }
 chrono = "0.4.19"
-clap = { version = "3.1.13", features = ["derive"] }
+clap = { version = "3.1.14", features = ["derive"] }
 home = "0.5.3"
 http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
 hyper = "0.14.18"
