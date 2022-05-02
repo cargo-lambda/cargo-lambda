@@ -18,7 +18,7 @@ rust-version = "1.59.0"
 [dependencies]
 cargo-lambda-interactive = { version = "0.7.0", path = "../cargo-lambda-interactive" }
 cargo-lambda-metadata = { version = "0.7.0", path = "../cargo-lambda-metadata" }
-clap = { version = "3.1.14", features = ["derive"] }
+clap = { version = "3.1.15", features = ["derive"] }
 liquid = "0.26.0"
 miette = "4.6.0"
 regex = "1.5.5"
