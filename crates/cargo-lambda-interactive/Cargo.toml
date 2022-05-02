@@ -20,4 +20,4 @@ atty = "0.2.14"
 indicatif = "0.16.2"
 inquire = "0.2.1"
 miette = "4.6.0"
-tokio = { version = "1.18.0", features = ["process"] }
+tokio = { version = "1.18.1", features = ["process"] }
