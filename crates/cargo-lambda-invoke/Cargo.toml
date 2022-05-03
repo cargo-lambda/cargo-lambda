@@ -17,7 +17,7 @@ rust-version = "1.59.0"
 # and it will keep the alphabetic ordering for you.
 [dependencies]
 cargo-lambda-remote = { version = "0.7.0", path = "../cargo-lambda-remote" }
-clap = { version = "3.1.14", features = ["derive"] }
+clap = { version = "3.1.15", features = ["derive"] }
 home = "0.5.3"
 miette = "4.6.0"
 reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls"] }

@@ -15,4 +15,4 @@ rust-version = "1.59.0"
 [dependencies]
 aws-config = "0.10.1"
 aws-sdk-lambda = "0.10.1"
-clap = { version = "3.1.14", features = ["derive"] }
+clap = { version = "3.1.15", features = ["derive"] }
