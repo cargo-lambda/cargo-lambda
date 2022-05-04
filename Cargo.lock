@@ -392,7 +392,7 @@ dependencies = [
  "http",
  "http-body",
  "http-serde",
- "query_map",
+ "query_map 0.4.0",
  "serde",
  "serde_derive",
  "serde_json",
@@ -702,7 +702,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-aws",
  "platforms",
- "query_map",
+ "query_map 0.5.0",
  "reqwest",
  "serde_json",
  "tar",
@@ -2115,9 +2115,17 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af9b3184a42d995e58fefd23c04d277a2b4d51efb5df7ad4efbe0a43d77b5923"
 dependencies = [
- "form_urlencoded",
  "serde",
  "serde_derive",
+]
+
+[[package]]
+name = "query_map"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe3212d819cbdcce67f786cdaf3fe0c2e9d09a6dcd9c9367a1bd344135b8c809"
+dependencies = [
+ "form_urlencoded",
 ]
 
 [[package]]
