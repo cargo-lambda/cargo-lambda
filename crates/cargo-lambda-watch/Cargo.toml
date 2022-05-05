@@ -31,7 +31,7 @@ miette = "4.6.0"
 opentelemetry = "0.17.0"
 opentelemetry-aws = "0.5.0"
 platforms = "2.0.0"
-query_map = { version = "^0.5", features = ["url-query"] }
+query_map = { version = "^0.6", features = ["url-query"] }
 reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls"] }
 serde_json = "1.0.81"
 tempfile = "3.3.0"
