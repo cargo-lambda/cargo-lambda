@@ -1,7 +1,7 @@
 [package]
 name = "cargo-lambda-watch"
 description = "Cargo subcommand to work with AWS Lambda"
-version = "0.7.0"
+version = "0.7.3"
 edition = "2021"
 license = "MIT"
 readme = "README.md"
@@ -19,9 +19,9 @@ rust-version = "1.59.0"
 aws_lambda_events = { version = "0.6.3", features = ["apigw"] }
 axum = "0.5.4"
 base64 = "0.13.0"
-cargo-lambda-interactive = { version = "0.7.0", path = "../cargo-lambda-interactive" }
-cargo-lambda-invoke = { version = "0.7.0", path = "../cargo-lambda-invoke" }
-cargo-lambda-metadata = { version = "0.7.0", path = "../cargo-lambda-metadata" }
+cargo-lambda-interactive = { version = "0.7.3", path = "../cargo-lambda-interactive" }
+cargo-lambda-invoke = { version = "0.7.3", path = "../cargo-lambda-invoke" }
+cargo-lambda-metadata = { version = "0.7.3", path = "../cargo-lambda-metadata" }
 chrono = "0.4.19"
 clap = { version = "3.1.15", features = ["derive"] }
 home = "0.5.3"
@@ -31,7 +31,7 @@ miette = "4.6.0"
 opentelemetry = "0.17.0"
 opentelemetry-aws = "0.5.0"
 platforms = "2.0.0"
-query_map = { version = "0.5.0", features = ["url-query"] }
+query_map = { version = "^0.5", features = ["url-query"] }
 reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls"] }
 serde_json = "1.0.81"
 tempfile = "3.3.0"
