@@ -17,7 +17,7 @@ cargo-lambda-interactive = { version = "0.7.3", path = "../cargo-lambda-interact
 cargo-lambda-metadata = { version = "0.7.3", path = "../cargo-lambda-metadata" }
 cargo-lambda-remote = { version = "0.7.3", path = "../cargo-lambda-remote" }
 clap = { version = "3.1.15", features = ["derive"] }
-miette = "4.6.0"
+miette = "4.7.0"
 strum = "0.24.0"
 strum_macros = "0.24.0"
 tokio = { version = "1.18.1", default-features = false, features = ["time"]}
