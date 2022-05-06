@@ -129,7 +129,7 @@ In PowerShell, you can export these variables with the following commands:
 ```
 $env:AWS_LAMBDA_FUNCTION_VERSION="1"
 $env:AWS_LAMBDA_FUNCTION_MEMORY_SIZE="4096"
-$env:AWS_LAMBDA_RUNTIME_API="http://127.0.0.1:9000/.rt/_"
+$env:AWS_LAMBDA_RUNTIME_API="http://127.0.0.1:9000/.rt"
 $env:AWS_LAMBDA_FUNCTION_NAME="_"
 ```
 </template>
@@ -140,7 +140,7 @@ In your terminal, you can export these variables with the following commands:
 ```
 export AWS_LAMBDA_FUNCTION_VERSION=1
 export AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096
-export AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt/_
+export AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt
 export AWS_LAMBDA_FUNCTION_NAME=_
 ```
 </template>
@@ -151,7 +151,7 @@ In your terminal, you can export these variables with the following commands:
 ```
 export AWS_LAMBDA_FUNCTION_VERSION=1
 export AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096
-export AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt/_
+export AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt
 export AWS_LAMBDA_FUNCTION_NAME=_
 ```
 </template>

@@ -1,6 +1,7 @@
 use crate::{
+    error::ServerError,
     requests::*,
-    runtime_router::{LAMBDA_RUNTIME_AWS_REQUEST_ID, LAMBDA_RUNTIME_XRAY_TRACE_HEADER},
+    runtime::{LAMBDA_RUNTIME_AWS_REQUEST_ID, LAMBDA_RUNTIME_XRAY_TRACE_HEADER},
 };
 use aws_lambda_events::{
     apigw::{
@@ -29,8 +30,6 @@ use opentelemetry::{
 use query_map::QueryMap;
 use std::collections::HashMap;
 use tokio::sync::{mpsc::Sender, oneshot};
-
-const AWS_XRAY_TRACE_HEADER: &str = "x-amzn-trace-id";
 
 pub(crate) fn routes() -> Router {
     Router::new()
