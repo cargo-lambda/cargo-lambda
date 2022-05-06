@@ -8,8 +8,8 @@ use cargo_lambda_remote::{
             GetFunctionUrlConfigError,
         },
         model::{
-            Architecture, Environment, FunctionCode, FunctionUrlAuthType, Runtime, State,
-            TracingConfig,
+            Architecture, Environment, FunctionCode, FunctionConfiguration, FunctionUrlAuthType,
+            Runtime, State, TracingConfig,
         },
         output::GetFunctionOutput,
         types::{Blob, SdkError},
@@ -87,6 +87,10 @@ pub struct Deploy {
     /// IAM Role associated with the function
     #[clap(long)]
     pub iam_role: Option<String>,
+
+    /// Lambda Layer ARN to associate the deployed function with
+    #[clap(long)]
+    pub layer_arn: Option<Vec<String>>,
 
     /// Name of the binary to deploy
     #[clap(value_name = "FUNCTION_NAME")]
@@ -218,6 +222,7 @@ impl Deploy {
                     .timeout(self.timeout)
                     .tracing_config(tracing_config)
                     .environment(self.function_environment()?)
+                    .set_layers(self.layer_arn.clone())
                     .send()
                     .await
                     .into_diagnostic()
@@ -240,6 +245,11 @@ impl Deploy {
                     if conf.timeout.unwrap_or_default() != self.timeout {
                         update_config = true;
                         builder = builder.timeout(self.timeout);
+                    }
+
+                    if self.update_layers(&conf) {
+                        update_config = true;
+                        builder = builder.set_layers(self.layer_arn.clone());
                     }
 
                     let env = self.function_environment()?;
@@ -415,6 +425,26 @@ impl Deploy {
         }
 
         Ok(env.build())
+    }
+
+    fn update_layers(&self, conf: &FunctionConfiguration) -> bool {
+        match (conf.layers(), &self.layer_arn) {
+            (None, None) => false,
+            (Some(_), None) => true,
+            (None, Some(_)) => true,
+            (Some(cl), Some(nl)) => {
+                let mut c = cl
+                    .iter()
+                    .cloned()
+                    .map(|l| l.arn.unwrap_or_default())
+                    .collect::<Vec<_>>();
+                c.sort();
+
+                let mut n = nl.to_vec();
+                n.sort();
+                c != n
+            }
+        }
     }
 }
 
