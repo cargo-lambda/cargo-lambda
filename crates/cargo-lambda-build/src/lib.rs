@@ -10,6 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use strum_macros::EnumString;
+use zip::{write::FileOptions, ZipWriter};
 
 mod toolchain;
 mod zig;
@@ -17,7 +18,7 @@ mod zig;
 #[derive(Args, Clone, Debug)]
 #[clap(name = "build")]
 pub struct Build {
-    /// The format to produce the compile Lambda into, acceptable values are [Binary, Zip].
+    /// The format to produce the compile Lambda into, acceptable values are [Binary, Zip]
     #[clap(long, default_value_t = OutputFormat::Binary)]
     output_format: OutputFormat,
 
@@ -28,6 +29,10 @@ pub struct Build {
     /// Shortcut for --target aarch64-unknown-linux-gnu
     #[clap(long)]
     arm64: bool,
+
+    /// Whether the code that you're building is a Lambda Extension
+    #[clap(long)]
+    extension: bool,
 
     #[clap(flatten)]
     build: ZigBuild,
@@ -156,14 +161,30 @@ impl Build {
         for name in &binaries {
             let binary = base.join(name);
             if binary.exists() {
-                let bootstrap_dir = lambda_dir.join(name);
+                let bootstrap_dir = if self.extension {
+                    lambda_dir.join("extensions")
+                } else {
+                    lambda_dir.join(name)
+                };
                 create_dir_all(&bootstrap_dir).into_diagnostic()?;
+
+                let bin_name = if self.extension {
+                    name.as_str()
+                } else {
+                    "bootstrap"
+                };
+
                 match self.output_format {
                     OutputFormat::Binary => {
-                        rename(binary, bootstrap_dir.join("bootstrap")).into_diagnostic()?;
+                        rename(binary, bootstrap_dir.join(bin_name)).into_diagnostic()?;
                     }
                     OutputFormat::Zip => {
-                        zip_binary(binary, bootstrap_dir)?;
+                        let parent = if self.extension {
+                            Some("extensions")
+                        } else {
+                            None
+                        };
+                        zip_binary(bin_name, binary, bootstrap_dir, parent)?;
                     }
                 }
             }
@@ -218,15 +239,20 @@ pub fn find_function_archive<P: AsRef<Path>>(
         ));
     }
 
-    zip_binary(binary_path, bootstrap_dir)
+    zip_binary("bootstrap", binary_path, bootstrap_dir, None)
 }
 
 /// Create a zip file from a function binary.
 /// The binary inside the zip file is always called `bootstrap`.
-fn zip_binary<P: AsRef<Path>>(binary_path: P, destination_directory: P) -> Result<BinaryArchive> {
+fn zip_binary<P: AsRef<Path>>(
+    name: &str,
+    binary_path: P,
+    destination_directory: P,
+    parent: Option<&str>,
+) -> Result<BinaryArchive> {
     let path = binary_path.as_ref();
     let dir = destination_directory.as_ref();
-    let zipped = dir.join("bootstrap.zip");
+    let zipped = dir.join(format!("{}.zip", name));
 
     let zipped_binary = File::create(&zipped).into_diagnostic()?;
     let binary_data = read(path).into_diagnostic()?;
@@ -243,9 +269,20 @@ fn zip_binary<P: AsRef<Path>>(binary_path: P, destination_directory: P) -> Resul
     hasher.update(binary_data);
     let sha256 = format!("{:X}", hasher.finalize());
 
-    let mut zip = zip::ZipWriter::new(zipped_binary);
-    zip.start_file("bootstrap", Default::default())
-        .into_diagnostic()?;
+    let mut zip = ZipWriter::new(zipped_binary);
+    let file_name = if let Some(parent) = parent {
+        zip.add_directory(parent, FileOptions::default())
+            .into_diagnostic()?;
+        Path::new(parent).join(name)
+    } else {
+        PathBuf::from(name)
+    };
+
+    zip.start_file(
+        file_name.to_str().expect("failed to convert file path"),
+        Default::default(),
+    )
+    .into_diagnostic()?;
     zip.write_all(binary_data).into_diagnostic()?;
     zip.finish().into_diagnostic()?;
 

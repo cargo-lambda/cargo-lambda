@@ -95,6 +95,20 @@ cargo lambda build --release
 
 When you compile your code in release mode, cargo-lambda will strip the binaries from all debug symbols to reduce the binary size.
 
+#### Build - Extensions
+
+cargo-lambda can also build Lambda Extensions written in Rust. If you want to build a extension, use the flag `--extension` to put the output under `target/lambda/extensions`, so you don't mix extensions and functions.
+
+```
+cargo lambda build --release --extension
+```
+
+If you want to create a zip file with the structure that AWS Lambda expects to find extensions in, add the `--output-format` flag to the previous command, and cargo-lambda will zip the extensions directory with your extension inside.
+
+```
+cargo lambda build --release --extension --output-format zip
+```
+
 #### Build - How does it work?
 
 cargo-lambda uses [Zig](https://ziglang.org) and [cargo-zigbuild](https://crates.io/crates/cargo-zigbuild)
