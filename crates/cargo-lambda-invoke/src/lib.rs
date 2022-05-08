@@ -1,4 +1,7 @@
-use cargo_lambda_remote::{aws_sdk_lambda::types::Blob, init_client, RemoteConfig};
+use cargo_lambda_remote::{
+    aws_sdk_lambda::{types::Blob, Client as LambdaClient},
+    RemoteConfig,
+};
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use reqwest::{Client, StatusCode};
@@ -49,6 +52,7 @@ pub struct Invoke {
     #[clap(flatten)]
     remote_config: RemoteConfig,
 
+    /// Format to render the output (text, or json)
     #[clap(long, default_value_t = OutputFormat::Text)]
     output_format: OutputFormat,
 
@@ -120,7 +124,8 @@ impl Invoke {
         if self.function_name == DEFAULT_PACKAGE_FUNCTION {
             return Err(miette::miette!("invalid function name, it must match the name you used to create the function remotely"));
         }
-        let client = init_client(&self.remote_config).await;
+        let sdk_config = self.remote_config.to_sdk_config().await;
+        let client = LambdaClient::new(&sdk_config);
 
         let resp = client
             .invoke()
