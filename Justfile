@@ -15,5 +15,4 @@ publish-all:
     sleep 5
     cargo publish --package cargo-lambda-watch
     sleep 5
-    cd crates/cargo-lambda-cli
-    cargo publish
+    cd crates/cargo-lambda-cli && cargo publish
