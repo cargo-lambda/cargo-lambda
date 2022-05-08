@@ -221,25 +221,39 @@ pub struct BinaryArchive {
 
 /// Search for the bootstrap file for a function inside the target directory.
 /// If the binary file exists, it creates the zip archive and extracts its architectury by reading the binary.
-pub fn find_function_archive<P: AsRef<Path>>(
+pub fn find_binary_archive<P: AsRef<Path>>(
     name: &str,
     base_dir: &Option<P>,
+    is_extension: bool,
 ) -> Result<BinaryArchive> {
     let target_dir = Path::new("target");
-    let bootstrap_dir = if let Some(dir) = base_dir {
-        dir.as_ref().join(name)
+    let (dir_name, binary_name, parent) = if is_extension {
+        ("extensions", name, Some("extensions"))
     } else {
-        target_dir.join("lambda").join(name)
+        (name, "bootstrap", None)
     };
 
-    let binary_path = bootstrap_dir.join("bootstrap");
+    let bootstrap_dir = if let Some(dir) = base_dir {
+        dir.as_ref().join(dir_name)
+    } else {
+        target_dir.join("lambda").join(dir_name)
+    };
+
+    let binary_path = bootstrap_dir.join(binary_name);
     if !binary_path.exists() {
+        let build_cmd = if is_extension {
+            "build --extension"
+        } else {
+            "build"
+        };
         return Err(miette::miette!(
-            "bootstrap file for {name} not found, use `cargo lambda build` to create it"
+            "binary file for {} not found, use `cargo lambda {}` to create it",
+            name,
+            build_cmd
         ));
     }
 
-    zip_binary("bootstrap", binary_path, bootstrap_dir, None)
+    zip_binary(binary_name, binary_path, bootstrap_dir, parent)
 }
 
 /// Create a zip file from a function binary.

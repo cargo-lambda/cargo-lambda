@@ -255,7 +255,7 @@ The example below deploys a function that has already been compiled with the def
 cargo lambda deploy --iam-role FULL_ROLE_ARN http-lambda
 ```
 
-### Deploy - Function URLs
+#### Deploy - Function URLs
 
 This subcommand can enable Lambda function URLs for your lambda. Use the flag `--enable-function-url` when you deploy your function, and when the operation completes, the command will print the function URL in the terminal.
 
@@ -269,7 +269,7 @@ cargo lambda deploy --iam-role FULL_ROLE_ARN --enable-function-url http-lambda
 
 You can use the flag `--disable-function-url` if you want to disable the function URL.
 
-### Deploy - Environment variables
+#### Deploy - Environment variables
 
 You can add environment variables to a function during deployment with the flags `--env-var` and `--env-file`.
 
@@ -287,11 +287,20 @@ The flag `--env-file` will read the variables from a file and add them to the fu
 cargo lambda deploy --iam-role FULL_ROLE_ARN --env-file .env http-lambda
 ```
 
-### Deploy - Other options
+#### Deploy - Extensions
+
+cargo-lambda can deploy Lambda Extensions built in Rust by adding the `--extension` flag to the `deploy` command. This command requires you to build the extension first with the same `--extension` flag in the `build` command:
+
+```
+cargo lambda build --release --extension
+cargo lambda deploy --extension
+```
+
+#### Deploy - Other options
 
 Use the `--help` flag to see other options to configure the function's deployment.
 
-### Deploy - State management
+#### Deploy - State management
 
 ⚠️ The deploy command doesn't use any kind of state management. If you require state management, you should use tools like [SAM Cli](https://github.com/aws/aws-sam-cli) or the [AWS CDK](https://github.com/aws/aws-cdk).
 

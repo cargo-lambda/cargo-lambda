@@ -12,12 +12,15 @@ keywords = ["cargo", "subcommand", "aws", "lambda"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+aws-sdk-s3 = "0.11.0"
 cargo-lambda-build = { version = "0.7.3", path = "../cargo-lambda-build" }
 cargo-lambda-interactive = { version = "0.7.3", path = "../cargo-lambda-interactive" }
 cargo-lambda-metadata = { version = "0.7.3", path = "../cargo-lambda-metadata" }
 cargo-lambda-remote = { version = "0.7.3", path = "../cargo-lambda-remote" }
 clap = { version = "3.1.17", features = ["derive"] }
 miette = "4.7.0"
+serde = { version = "1.0.137", features = ["derive"] }
+serde_json = "1.0.81"
 strum = "0.24.0"
 strum_macros = "0.24.0"
 tokio = { version = "1.18.1", default-features = false, features = ["time"]}
