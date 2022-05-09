@@ -78,7 +78,10 @@ fn package_metadata<P: AsRef<Path>>(manifest_path: P, name: &str) -> Result<Opti
     let metadata = load_metadata(manifest_path)?;
     for pkg in metadata.packages {
         for target in &pkg.targets {
-            if target.name == name && target.kind.iter().any(|kind| kind == "bin") {
+            if target.name == name
+                && target.kind.iter().any(|kind| kind == "bin")
+                && pkg.metadata.is_object()
+            {
                 let metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
                     .into_diagnostic()
                     .wrap_err("invalid lambda metadata in Cargo.toml file")?;
