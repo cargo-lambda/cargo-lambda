@@ -14,6 +14,6 @@ rust-version = "1.59.0"
 
 [dependencies]
 aws-config = "0.11.0"
-aws-sdk-lambda = "0.11.0"
+aws-sdk-lambda = "0.12.0"
 aws-types = "0.11.0"
 clap = { version = "3.1.18", features = ["derive"] }
