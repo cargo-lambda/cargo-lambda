@@ -12,7 +12,7 @@ keywords = ["cargo", "subcommand", "aws", "lambda"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aws-sdk-s3 = "0.11.0"
+aws-sdk-s3 = "0.12.0"
 cargo-lambda-build = { version = "0.8.0", path = "../cargo-lambda-build" }
 cargo-lambda-interactive = { version = "0.8.0", path = "../cargo-lambda-interactive" }
 cargo-lambda-metadata = { version = "0.8.0", path = "../cargo-lambda-metadata" }
