@@ -17,11 +17,28 @@ The [deploy](#deploy) subcommand uploads functions to AWS Lambda. You can use th
 
 ## Installation
 
-Install this subcommand on your host machine with Cargo itself:
+### With Homebrew
+
+You can use Homebrew on MacOS and Linux to install cargo-lambda. Run the following commands on your terminal to add our tap and install cargo-lambda:
+
+```
+brew tap cargo-lambda/cargo-lambda
+brew install cargo-lambda
+```
+
+### With cargo-install
+
+Install cargo-lambda on your host machine with Cargo itself:
 
 ```
 cargo install cargo-lambda
 ```
+
+⚠️ cargo-install compiles the binary in your system, which usually takes several minutes.
+
+### Downloading a prebuit binary
+
+Go to the [releases](https://github.com/cargo-lambda/cargo-lambda/releases) page, and download a pre-built binary for your specific platform.
 
 ## Usage
 
