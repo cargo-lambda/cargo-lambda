@@ -26,6 +26,16 @@ brew tap cargo-lambda/cargo-lambda
 brew install cargo-lambda
 ```
 
+### With PyPI
+
+:warning: coming soon
+
+You can also use PyPI to install cargo-lambda:
+
+```
+pip install cargo-lambda
+```
+
 ### With cargo-install
 
 Install cargo-lambda on your host machine with Cargo itself:
