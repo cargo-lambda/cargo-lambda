@@ -21,7 +21,7 @@ cargo-lambda-metadata = { version = "0.8.0", path = "../cargo-lambda-metadata" }
 cargo-zigbuild = "0.8.7"
 clap = { version = "3.1.18", features = ["derive"] }
 home = "0.5.3"
-miette = "4.7.0"
+miette = "4.7.1"
 object = "0.28.4"
 rustc_version = "0.4.0"
 sha2 = "0.10.2"
