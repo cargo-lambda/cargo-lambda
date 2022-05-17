@@ -714,7 +714,6 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
- "uuid",
  "which",
  "xz2",
  "zip",

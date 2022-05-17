@@ -6,7 +6,7 @@ use tokio::time::Duration;
 use tokio_graceful_shutdown::{SubsystemHandle, Toplevel};
 use tower_http::{
     catch_panic::CatchPanicLayer,
-    request_id::{PropagateRequestIdLayer, SetRequestIdLayer},
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     trace::TraceLayer,
 };
 use tracing::info;
@@ -88,7 +88,7 @@ async fn start_server(
         .nest(RUNTIME_EMULATOR_PATH, runtime_router::routes())
         .layer(SetRequestIdLayer::new(
             x_request_id.clone(),
-            RequestUuidService,
+            MakeRequestUuid,
         ))
         .layer(PropagateRequestIdLayer::new(x_request_id))
         .layer(Extension(req_tx.clone()))

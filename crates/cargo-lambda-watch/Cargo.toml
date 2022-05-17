@@ -42,7 +42,6 @@ tower-http = { version = "0.3.3", features = ["catch-panic", "request-id", "trac
 tracing = "0.1.34"
 tracing-opentelemetry = "0.17.2"
 tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
-uuid = { version = "1.0.0", features = ["v4"] }
 which = "4.2.5"
 
 [target.'cfg(not(windows))'.dependencies]
