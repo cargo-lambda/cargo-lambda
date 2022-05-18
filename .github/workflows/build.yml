@@ -60,7 +60,7 @@ jobs:
 
       - name: Install Zig
         shell: bash
-        run: npm install -g @ziglang/cli
+        run: sudo npm install -g @ziglang/cli
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
