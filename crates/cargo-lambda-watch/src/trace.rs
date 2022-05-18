@@ -1,4 +1,3 @@
-use axum::http::Request;
 use opentelemetry::{global, sdk::export::trace::stdout, sdk::trace};
 use opentelemetry_aws::trace::XrayPropagator;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
