@@ -1,2 +1,4 @@
 target
 tools
+node_modules
+**/bin/cargo-lambda.exe

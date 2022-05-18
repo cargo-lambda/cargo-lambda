@@ -44,6 +44,16 @@ You can also use PyPI to install cargo-lambda:
 pip install cargo-lambda
 ```
 
+### With NPM
+
+⚠️ Coming soon
+
+Install cargo-lambda with NPM:
+
+```
+npm install -g cargo-lambda
+```
+
 ### Building from source
 
 Install cargo-lambda on your host machine with Cargo itself:

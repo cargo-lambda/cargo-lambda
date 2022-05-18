@@ -1,0 +1,54 @@
+{
+  "name": "cargo-lambda",
+  "version": "0.8.0",
+  "description": "",
+  "type": "module",
+  "exports": "./index.js",
+  "main": "index.js",
+  "bin": {
+    "cargo-lambda": "bin/cargo-lambda",
+    "cargo-lambda-cli": "cargo-lambda.js",
+    "cargo-lambda-install": "install.js",
+    "cargo-lambda-postinstall": "postinstall.js",
+    "cargo-lambda-reinstall": "reinstall.js",
+    "cargo-lambda-uninstall": "uninstall.js"
+  },
+  "files": [
+    "index.js",
+    "install.js",
+    "postinstall.js",
+    "reinstall.js",
+    "uninstall.js",
+    "cargo-lambda.js"
+  ],
+  "scripts": {
+    "postinstall": "node postinstall.js",
+    "preuninstall": "node uninstall.js",
+    "cargo-lambda": "node cargo-lambda.js",
+    "cargo-lambda-install": "node install.js",
+    "cargo-lambda-postinstall": "node postinstall.js",
+    "cargo-lambda-reinstall": "node reinstall.js",
+    "cargo-lambda-uninstall": "node uninstall.js",
+    "prepare": "node prepare.js"
+  },
+  "dependencies": {
+    "download": "^8.0.0",
+    "which": "^2.0.2"
+  },
+  "keywords": [
+    "cargo-lambda",
+    "cli",
+    "aws",
+    "aws-lambda"
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cargo-lambda/cargo-lambda/issues"
+  },
+  "homepage": "https://github.com/cargo-lambda/cargo-lambda#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cargo-lambda/cargo-lambda.git",
+    "directory": "npm"
+  }
+}
