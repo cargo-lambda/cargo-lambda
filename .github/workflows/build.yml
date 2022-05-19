@@ -67,8 +67,6 @@ jobs:
           toolchain: ${{ matrix.rust_version }}
           target: ${{ matrix.rust_target }}
           override: true
-          target:
-            actions-rs/toolchain
       - uses: Swatinem/rust-cache@v1
 
       - name: Run cargo build
