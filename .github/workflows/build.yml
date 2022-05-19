@@ -49,11 +49,21 @@ jobs:
 
   integration-tests:
     name: Integration Test Suite -- ${{ matrix.rust_version }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os.name }}
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os:
+          - name: macos-latest
+            type: macos
+            extension: .tar.xz
+          - name: ubuntu-latest
+            type: linux
+            extension: .tar.xz
+          - name: windows-latest
+            type: windows
+            extension: .zip
         rust_version: ["1.59.0", "stable"]
+        zig_version: "0.0.9"
     env:
       NPM_CONFIG_PREFIX: "~/.npm-global"
       CARGO_ZIGBUILD_ZIG_PATH: "~/.npm-global/bin/zig"
@@ -65,8 +75,10 @@ jobs:
           node-version: 18
       - name: Install Zig
         shell: bash
-        run: npm install -g @ziglang/cli
-
+        run: |
+          mkdir -p ~/ziglang
+          curl -fsSL https://ziglang.org/builds/zig-${{ matrix.os.type }}-x86_64-${{ zig_version }}.${{ extension }} | tar xJ -C ~/ziglang
+          echo "$HOME/ziglang" >> $GITHUB_PATH
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
