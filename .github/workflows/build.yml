@@ -23,7 +23,7 @@ jobs:
           command: check
 
   unit-tests:
-    name: Unit Test Suite -- ${{ matrix.rust_version }}
+    name: Unit Test Suite -- ${{ matrix.os }} -- ${{ matrix.rust_version }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -48,12 +48,13 @@ jobs:
           args: --all-features
 
   integration-tests:
-    name: Integration Test Suite -- ${{ matrix.rust_version }}
+    name: Integration Test Suite -- ${{ matrix.os }} -- ${{ matrix.rust_version }} -- ${{ matrix.rust_target }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         rust_version: ["1.59.0", "stable"]
+        rust_target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -64,7 +65,10 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust_version }}
+          target: ${{ matrix.rust_target }}
           override: true
+          target:
+            actions-rs/toolchain
       - uses: Swatinem/rust-cache@v1
 
       - name: Run cargo build
