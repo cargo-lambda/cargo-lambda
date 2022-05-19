@@ -8,8 +8,10 @@ use std::{
     fs::{create_dir_all, read, File},
     io::Write,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 use strum_macros::EnumString;
+use target_arch::TargetArch;
 use zip::{write::FileOptions, ZipWriter};
 
 mod toolchain;
@@ -40,8 +42,10 @@ pub struct Build {
 
 pub use cargo_zigbuild::Zig;
 
-const TARGET_ARM: &str = "aarch64-unknown-linux-gnu";
-const TARGET_X86_64: &str = "x86_64-unknown-linux-gnu";
+pub const TARGET_ARM: &str = "aarch64-unknown-linux-gnu";
+pub const TARGET_X86_64: &str = "x86_64-unknown-linux-gnu";
+
+mod target_arch;
 
 #[derive(Clone, Debug, strum_macros::Display, EnumString)]
 #[strum(ascii_case_insensitive)]
@@ -62,34 +66,23 @@ impl Build {
             ));
         }
 
-        if self.arm64 {
-            self.build.target = vec![TARGET_ARM.into()];
-        }
-
-        let build_target = self.build.target.get(0);
-        match build_target {
-            Some(target) => {
-                // Validate that the build target is supported in AWS Lambda
-                check_build_target(target)?;
-            }
-            // No explicit target, but build host same as target host
-            None if host_target == TARGET_ARM || host_target == TARGET_X86_64 => {
-                // Set the target explicitly, so it's easier to find the binaries later
-                self.build.target = vec![host_target.into()];
-            }
-            // No explicit target, and build host not compatible with Lambda hosts
-            None => {
-                self.build.target = vec![TARGET_X86_64.into()];
+        let target_arch = if self.arm64 {
+            TargetArch::arm64()
+        } else {
+            let build_target = self.build.target.get(0);
+            match build_target {
+                Some(target) => TargetArch::from_str(target)?,
+                // No explicit target, but build host same as target host
+                None if host_target == TARGET_ARM || host_target == TARGET_X86_64 => {
+                    // Set the target explicitly, so it's easier to find the binaries later
+                    TargetArch::from_str(host_target)?
+                }
+                // No explicit target, and build host not compatible with Lambda hosts
+                None => TargetArch::x86_64(),
             }
         };
-
-        let final_target = self
-            .build
-            .target
-            .get(0)
-            .map(|x| x.split_once('.').map(|(t, _)| t).unwrap_or(x.as_str()))
-            .unwrap_or(TARGET_X86_64);
-
+        self.build.target = vec![target_arch.full_zig_string()];
+        let rustc_target_without_glibc_version = target_arch.rustc_target_without_glibc_version();
         let profile = match self.build.profile.as_deref() {
             Some("dev" | "test") => "debug",
             Some("release" | "bench") => "release",
@@ -101,7 +94,7 @@ impl Build {
         // confirm that target component is included in host toolchain, or add
         // it with `rustup` otherwise.
         toolchain::check_target_component_with_rustc_meta(
-            final_target,
+            &rustc_target_without_glibc_version,
             host_target,
             release_channel,
         )
@@ -134,7 +127,11 @@ impl Build {
             .build_command("build")
             .map_err(|e| miette::miette!("{}", e))?;
         if self.build.release {
-            cmd.env("RUSTFLAGS", "-C strip=symbols");
+            let target_cpu = target_arch.target_cpu();
+            cmd.env(
+                "RUSTFLAGS",
+                format!("-C strip=symbols -C target-cpu={target_cpu}"),
+            );
         }
 
         let mut child = cmd
@@ -156,7 +153,9 @@ impl Build {
             target_dir.join("lambda")
         };
 
-        let base = target_dir.join(final_target).join(profile);
+        let base = target_dir
+            .join(rustc_target_without_glibc_version)
+            .join(profile);
 
         for name in &binaries {
             let binary = base.join(name);
@@ -192,25 +191,6 @@ impl Build {
 
         Ok(())
     }
-}
-
-/// Validate that the build target is supported in AWS Lambda
-///
-/// Here we use *starts with* instead of an exact match because:
-///   - the target could also also be a *musl* variant: `x86_64-unknown-linux-musl`
-///   - the target could also [specify a glibc version], which `cargo-zigbuild` supports
-///
-/// [specify a glibc version]: https://github.com/messense/cargo-zigbuild#specify-glibc-version
-fn check_build_target(target: &str) -> Result<()> {
-    if !target.starts_with("aarch64-unknown-linux") && !target.starts_with("x86_64-unknown-linux") {
-        // Unsupported target for an AWS Lambda environment
-        return Err(miette::miette!(
-            "Invalid or unsupported target for AWS Lambda: {}",
-            target
-        ));
-    }
-
-    Ok(())
 }
 
 pub struct BinaryArchive {
