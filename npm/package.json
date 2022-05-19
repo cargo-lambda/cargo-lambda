@@ -1,6 +1,6 @@
 {
   "name": "cargo-lambda",
-  "version": "0.8.0",
+  "version": "0.8.1-alpha.1",
   "description": "",
   "type": "module",
   "exports": "./index.js",
