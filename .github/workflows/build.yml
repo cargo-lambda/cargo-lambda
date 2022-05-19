@@ -58,8 +58,6 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3
       - uses: actions/setup-python@v3
-        with:
-          cache: 'pip'
       - name: Install Zig
         run: pip install ziglang
       - name: Install stable toolchain
