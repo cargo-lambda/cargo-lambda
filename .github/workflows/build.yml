@@ -22,8 +22,8 @@ jobs:
         with:
           command: check
 
-  test:
-    name: Test Suite -- ${{ matrix.rust_version }}
+  unit-tests:
+    name: Unit Test Suite -- ${{ matrix.os }} -- ${{ matrix.rust_version }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -46,6 +46,40 @@ jobs:
         with:
           command: test
           args: --all-features
+
+  integration-tests:
+    name: Integration Test Suite -- ${{ matrix.os }} -- ${{ matrix.rust_version }} -- ${{ matrix.rust_target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        rust_version: ["1.59.0", "stable"]
+        rust_target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+      - name: Install Zig
+        run: pip install ziglang
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust_version }}
+          target: ${{ matrix.rust_target }}
+          override: true
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+
+      - name: Test simple example
+        shell: bash
+        run: |
+          cd test/fixtures/single-binary-package
+          ../../../target/debug/cargo-lambda lambda build --target-dir ../../../target
+          ../../../target/debug/cargo-lambda lambda build --target-dir ../../../target --arm64
 
   lints:
     name: Lints
