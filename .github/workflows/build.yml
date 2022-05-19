@@ -63,7 +63,6 @@ jobs:
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust_version }}
           override: true
       - uses: Swatinem/rust-cache@v1
