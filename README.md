@@ -17,13 +17,23 @@ The [deploy](#deploy) subcommand uploads functions to AWS Lambda. You can use th
 
 ## Installation
 
-### With Homebrew
+### With Homebrew (MacOS and Linux)
 
 You can use Homebrew on MacOS and Linux to install cargo-lambda. Run the following commands on your terminal to add our tap and install cargo-lambda:
 
 ```
 brew tap cargo-lambda/cargo-lambda
 brew install cargo-lambda
+```
+
+### With Chocolatey (Windows)
+
+⚠️ Coming soon
+
+You can use Chocolatey to install cargo-lambda on Windows. Run the following command on your terminal to install it:
+
+```
+choco install cargo-lambda
 ```
 
 ### With PyPI
