@@ -103,6 +103,12 @@ jobs:
           file: target/${{ matrix.platform.target }}/release/cargo-lambda.zip
           overwrite: true
           tag: ${{ github.ref }}
+      - name: Chocolatey
+        uses: ./.github/actions/choco
+        with:
+          version: ${{ github.ref }}
+          apiKey: ${{ secrets.CHOCO_ACCESS_TOKEN }}
+          push: true
 
   release-linux:
     runs-on: ubuntu-latest
