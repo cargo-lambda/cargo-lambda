@@ -21,7 +21,6 @@ function get_version {
 VERSION=$(get_version)
 echo "Packing version ${VERSION} of cargo-lambda"
 
-rm -f cargo-lambda.*.nupkg
 mkdir -p tools
 cp LICENSE tools/LICENSE.txt
 
@@ -34,7 +33,7 @@ Each release file has a checksum file associated with the same name, but with ex
 EOF
 
 cp target/x86_64-pc-windows-msvc/release/cargo-lambda.exe tools/
-choco pack cargo-lambda.nuspec --version ${VERSION}
+choco pack cargo-lambda.nuspec --version ${VERSION} --out target
 if [[ "$INPUT_PUSH" == "true" ]]; then
-  choco push cargo-lambda.${VERSION}.nupkg --api-key ${INPUT_APIKEY} -s https://push.chocolatey.org/ --timeout 180
+  choco push target/cargo-lambda.${VERSION}.nupkg --api-key ${INPUT_APIKEY} -s https://push.chocolatey.org/ --timeout 180
 fi
