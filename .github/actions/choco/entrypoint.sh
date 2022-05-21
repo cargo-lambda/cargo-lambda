@@ -32,7 +32,7 @@ Checksums: https://github.com/cargo-lambda/cargo-lambda/releases.
 Each release file has a checksum file associated with the same name, but with extension .sha256
 EOF
 
-cp target/x86_64-pc-windows-msvc/release/cargo-lambda.exe tools/
+cp cargo-lambda.exe tools/
 choco pack cargo-lambda.nuspec --version ${VERSION} --out target
 if [[ "$INPUT_PUSH" == "true" ]]; then
   choco push target/cargo-lambda.${VERSION}.nupkg --api-key ${INPUT_APIKEY} -s https://push.chocolatey.org/ --timeout 180
