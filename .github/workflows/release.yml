@@ -37,7 +37,7 @@ jobs:
         id: tag
         uses: dawidd6/action-get-tag@v1
       - name: Archive binary
-        working_directory: target/release
+        working-directory: target/release
         run: |
           tar czvf cargo-lambda-${{ steps.tag.outputs.tag }}.apple-darwin.tar.gz cargo-lambda
           shasum -a 256 cargo-lambda-${{ steps.tag.outputs.tag }}.apple-darwin.tar.gz > cargo-lambda-${{ steps.tag.outputs.tag }}.apple-darwin.tar.gz.sha256
@@ -166,7 +166,7 @@ jobs:
         id: tag
         uses: dawidd6/action-get-tag@v1
       - name: Archive binary
-        working_directory: target/${{ matrix.platform.target }}/release
+        working-directory: target/${{ matrix.platform.target }}/release
         run: |
           tar czvf cargo-lambda-${{ steps.tag.outputs.tag }}.${{ matrix.platform.target }}.tar.gz cargo-lambda
           shasum -a 256 cargo-lambda-${{ steps.tag.outputs.tag }}.${{ matrix.platform.target }}.tar.gz > cargo-lambda-${{ steps.tag.outputs.tag }}.${{ matrix.platform.target }}.tar.gz.sha256
