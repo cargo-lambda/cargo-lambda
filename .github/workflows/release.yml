@@ -37,11 +37,10 @@ jobs:
         id: tag
         uses: dawidd6/action-get-tag@v1
       - name: Archive binary
+        working_directory: target/release
         run: |
-          cd target/release
           tar czvf cargo-lambda-${{ steps.tag.outputs.tag }}.apple-darwin.tar.gz cargo-lambda
           shasum -a 256 cargo-lambda-${{ steps.tag.outputs.tag }}.apple-darwin.tar.gz > cargo-lambda-${{ steps.tag.outputs.tag }}.apple-darwin.tar.gz.sha256
-          cd -
       - name: Upload binary to GitHub Release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -90,21 +89,35 @@ jobs:
       - name: Get tag
         id: tag
         uses: dawidd6/action-get-tag@v1
-      - name: Archive binary
+
+      - name: Archive binary files
+        working-directory: target/${{ matrix.platform.target }}/release
+        shell: powershell
         run: |
-          cd target/${{ matrix.platform.target }}/release
-          7z a cargo-lambda.zip cargo-lambda.exe
-          cd -
-      - name: Upload binary to GitHub Release
+          7z a cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip cargo-lambda.exe
+          (Get-FileHash -Path cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip -Algorithm SHA256).Hash | Out-File cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip.sha256
+          tar czvf cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz cargo-lambda.exe
+          (Get-FileHash -Path cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz -Algorithm SHA256).Hash | Out-File cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz.sha256
+
+      - name: Upload Zip file to GitHub Release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          asset_name: cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip
-          file: target/${{ matrix.platform.target }}/release/cargo-lambda.zip
+          file: target/${{ matrix.platform.target }}/release/cargo-lambda*.zip*
+          file_glob: true
           overwrite: true
           tag: ${{ github.ref }}
-      - name: Chocolatey
+      - name: Upload Tar file to GitHub Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/${{ matrix.platform.target }}/release/cargo-lambda*.tar.gz*
+          file_glob: true
+          overwrite: true
+          tag: ${{ github.ref }}
+      - name: Upload Chocolatey package
         uses: ./.github/actions/choco
+        if: ${{ matrix.platform.target == "x86_64-pc-windows-msvc" }}
         with:
           version: ${{ github.ref }}
           apiKey: ${{ secrets.CHOCO_ACCESS_TOKEN }}
@@ -153,11 +166,10 @@ jobs:
         id: tag
         uses: dawidd6/action-get-tag@v1
       - name: Archive binary
+        working_directory: target/${{ matrix.platform.target }}/release
         run: |
-          cd target/${{ matrix.platform.target }}/release
           tar czvf cargo-lambda-${{ steps.tag.outputs.tag }}.${{ matrix.platform.target }}.tar.gz cargo-lambda
           shasum -a 256 cargo-lambda-${{ steps.tag.outputs.tag }}.${{ matrix.platform.target }}.tar.gz > cargo-lambda-${{ steps.tag.outputs.tag }}.${{ matrix.platform.target }}.tar.gz.sha256
-          cd -
       - name: Upload binary to GitHub Release
         uses: svenstaro/upload-release-action@v2
         with:
