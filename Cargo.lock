@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-build"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "cargo-lambda-interactive",
  "cargo-lambda-metadata",
@@ -648,7 +648,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-deploy"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "aws-sdk-s3",
  "cargo-lambda-build",
