@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
+import { promisify } from 'util';
+import { exec } from 'child_process';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import * as url from 'url';
 import download from 'download';
 import which from 'which';
-import util from 'util';
-import { exec, spawn } from 'child_process';
-const execAsync = util.promisify(exec);
-const spawnAsync = util.promisify(spawn);
+
+const execAsync = promisify(exec);
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
@@ -25,8 +25,8 @@ const platforms = {
 
 const windows = os.type() === 'Windows_NT';
 const installDirectory = path.join(__dirname, 'bin');
-const name = windows ? 'cargo-lambda.exe' : 'cargo-lambda';
-const binaryPath = path.join(installDirectory, name);
+export const name = windows ? 'cargo-lambda.exe' : 'cargo-lambda';
+export const binaryPath = path.join(installDirectory, name);
 
 export async function install({ force = false } = {}) {
   if (!force) {
@@ -58,16 +58,6 @@ export async function install({ force = false } = {}) {
 
   const url = `https://github.com/cargo-lambda/cargo-lambda/releases/download/v${version}/cargo-lambda-v${version}-${platform}`;
   await download(url, installDirectory, { extract: true });
-}
-
-export async function run(...args) {
-  try {
-    await fs.access(binaryPath);
-  } catch (err) {
-    throw new Error(`You must install ${name} before you can run it`);
-  }
-
-  await spawnAsync(binaryPath, args, { stdio: 'inherit' });
 }
 
 export async function uninstall() {
