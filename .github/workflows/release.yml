@@ -95,9 +95,13 @@ jobs:
         shell: powershell
         run: |
           7z a cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip cargo-lambda.exe
-          (Get-FileHash -Path cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip -Algorithm SHA256).Hash | Out-File cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip.sha256
+          Get-FileHash -Path cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip -Algorithm SHA256 `
+            | Format-Table -Property Hash,Path -HideTableHeaders `
+            | Out-File cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip.sha256
           tar czvf cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz cargo-lambda.exe
-          (Get-FileHash -Path cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz -Algorithm SHA256).Hash | Out-File cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz.sha256
+          Get-FileHash -Path cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz -Algorithm SHA256 `
+            | Format-Table -Property Hash,Path -HideTableHeaders `
+            | Out-File cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz.sha256
 
       - name: Upload Zip file to GitHub Release
         uses: svenstaro/upload-release-action@v2
