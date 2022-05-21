@@ -117,7 +117,7 @@ jobs:
           tag: ${{ github.ref }}
       - name: Upload Chocolatey package
         uses: ./.github/actions/choco
-        if: ${{ matrix.platform.target == "x86_64-pc-windows-msvc" }}
+        if: ${{ matrix.platform.target == 'x86_64-pc-windows-msvc' }}
         with:
           version: ${{ github.ref }}
           apiKey: ${{ secrets.CHOCO_ACCESS_TOKEN }}
