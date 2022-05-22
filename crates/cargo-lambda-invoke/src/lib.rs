@@ -10,7 +10,7 @@ use std::{
     fs::{create_dir_all, read_to_string, File},
     io::copy,
     net::IpAddr,
-    path::{Path, PathBuf},
+    path::PathBuf,
     str::{from_utf8, FromStr},
 };
 use strum_macros::{Display, EnumString};
@@ -79,18 +79,14 @@ impl Invoke {
         } else if let Some(example) = &self.data_example {
             let name = format!("example-{example}.json");
 
-            let cache = home::cargo_home()
-                .into_diagnostic()?
-                .join("lambda")
-                .join("invoke-fixtures")
-                .join(&name);
+            let cache = dirs::cache_dir()
+                .map(|p| p.join("cargo-lambda").join("invoke-fixtures").join(&name));
 
-            if cache.exists() {
-                read_to_string(cache)
+            match cache {
+                Some(cache) if cache.exists() => read_to_string(cache)
                     .into_diagnostic()
-                    .wrap_err("error reading data file")?
-            } else {
-                download_example(&name, &cache).await?
+                    .wrap_err("error reading data file")?,
+                _ => download_example(&name, cache).await?,
             }
         } else {
             return Err(miette::miette!("no data payload provided, use one of the data flags: `--data-file`, `--data-ascii`, `--data-example`"));
@@ -183,8 +179,8 @@ impl Invoke {
     }
 }
 
-async fn download_example(name: &str, cache: &Path) -> Result<String> {
-    let target = format!("https://raw.githubusercontent.com/LegNeato/aws-lambda-events/master/aws_lambda_events/src/generated/fixtures/{name}");
+async fn download_example(name: &str, cache: Option<PathBuf>) -> Result<String> {
+    let target = format!("https://github.com/LegNeato/aws-lambda-events/raw/master/aws_lambda_events/src/generated/fixtures/{name}");
 
     let response = reqwest::get(target)
         .await
@@ -204,9 +200,11 @@ async fn download_example(name: &str, cache: &Path) -> Result<String> {
         .into_diagnostic()
         .wrap_err("error reading example data")?;
 
-    create_dir_all(cache.parent().unwrap()).into_diagnostic()?;
-    let mut dest = File::create(cache).into_diagnostic()?;
-    copy(&mut content.as_bytes(), &mut dest).into_diagnostic()?;
+    if let Some(cache) = cache {
+        create_dir_all(cache.parent().unwrap()).into_diagnostic()?;
+        let mut dest = File::create(cache).into_diagnostic()?;
+        copy(&mut content.as_bytes(), &mut dest).into_diagnostic()?;
+    }
     Ok(content)
 }
 
@@ -219,4 +217,17 @@ fn parse_invoke_ip_address(address: &str) -> Result<String> {
     };
 
     Ok(invoke_address)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_download_example() {
+        let data = download_example("example-apigw-request.json", None)
+            .await
+            .expect("failed to download json");
+        assert!(data.contains("\"path\": \"/hello/world\""));
+    }
 }
