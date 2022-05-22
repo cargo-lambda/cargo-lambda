@@ -199,7 +199,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v3
         with:
-          name: windows-x86_64-pc-windows-msvc-bin
+          name: windows-x64-bin
       - name: Publish Chocolatey package
         uses: ./.github/actions/choco
         with:
