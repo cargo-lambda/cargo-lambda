@@ -615,7 +615,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda"
-version = "0.8.0"
+version = "0.8.2"
 dependencies = [
  "cargo-lambda-build",
  "cargo-lambda-deploy",
@@ -677,16 +677,17 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-invoke"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "cargo-lambda-remote",
  "clap",
- "home",
+ "dirs",
  "miette",
  "reqwest",
  "serde_json",
  "strum",
  "strum_macros",
+ "tokio",
 ]
 
 [[package]]
