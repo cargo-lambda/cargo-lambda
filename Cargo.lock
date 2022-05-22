@@ -677,7 +677,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-invoke"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "cargo-lambda-remote",
  "clap",
