@@ -95,12 +95,12 @@ jobs:
         shell: powershell
         run: |
           7z a cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip cargo-lambda.exe
-          Get-FileHash -Path cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip -Algorithm SHA256 `
-            | Format-Table -Property Hash,Path -HideTableHeaders `
+          (Get-FileHash -Path cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip -Algorithm SHA256 `
+            | Format-Table Hash,@{expr={$_.Path | Split-Path -leaf}} -HideTableHeaders | Out-String).trim() `
             | Out-File cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.zip.sha256
           tar czvf cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz cargo-lambda.exe
-          Get-FileHash -Path cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz -Algorithm SHA256 `
-            | Format-Table -Property Hash,Path -HideTableHeaders `
+          (Get-FileHash -Path cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz -Algorithm SHA256 `
+            | Format-Table Hash,@{expr={$_.Path | Split-Path -leaf}} -HideTableHeaders | Out-String).trim() `
             | Out-File cargo-lambda-${{ steps.tag.outputs.tag }}.windows-${{ matrix.platform.arch }}.tar.gz.sha256
 
       - name: Upload Zip file to GitHub Release
@@ -191,19 +191,3 @@ jobs:
         with:
           command: upload
           args: --skip-existing *
-
-  release-choco:
-    name: Release Chocolatey package
-    runs-on: ubuntu-latest
-    needs: [ release-windows ]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: windows-x64-bin
-      - name: Publish Chocolatey package
-        uses: ./.github/actions/choco
-        with:
-          version: ${{ github.ref }}
-          apiKey: ${{ secrets.CHOCO_ACCESS_TOKEN }}
-          push: true
