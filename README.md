@@ -26,7 +26,7 @@ brew tap cargo-lambda/cargo-lambda
 brew install cargo-lambda
 ```
 
-### Wich Scoop (Windows)
+### With Scoop (Windows)
 
 You can use [Scoop](https://scoop.sh/) to install cargo-lambda on Windows. Run the following commands to add our bucket, and install cargo-lambda:
 
