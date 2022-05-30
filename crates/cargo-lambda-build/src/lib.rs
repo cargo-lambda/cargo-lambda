@@ -36,6 +36,11 @@ pub struct Build {
     #[clap(long)]
     extension: bool,
 
+    /// Put a bootstrap file in the root of the lambda directory.
+    /// Use the name of the compiled binary to choose which file to move.
+    #[clap(long)]
+    flatten: Option<String>,
+
     #[clap(flatten)]
     build: ZigBuild,
 }
@@ -163,7 +168,10 @@ impl Build {
                 let bootstrap_dir = if self.extension {
                     lambda_dir.join("extensions")
                 } else {
-                    lambda_dir.join(name)
+                    match self.flatten {
+                        Some(ref n) if n == name => lambda_dir.clone(),
+                        _ => lambda_dir.join(name),
+                    }
                 };
                 create_dir_all(&bootstrap_dir).into_diagnostic()?;
 
