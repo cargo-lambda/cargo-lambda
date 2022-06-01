@@ -282,7 +282,7 @@ fn zip_binary<P: AsRef<Path>>(
 
     zip.start_file(
         file_name.to_str().expect("failed to convert file path"),
-        Default::default(),
+        FileOptions::default().unix_permissions(0o755),
     )
     .into_diagnostic()?;
     zip.write_all(binary_data).into_diagnostic()?;
