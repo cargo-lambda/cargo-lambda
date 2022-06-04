@@ -1,3 +1,6 @@
+fmt:
+    cargo +nightly fmt --all
+
 publish-all:
     cargo publish --package cargo-lambda-interactive
     sleep 5

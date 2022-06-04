@@ -1,5 +1,4 @@
-use crate::requests::*;
-use crate::scheduler::*;
+use crate::{requests::*, scheduler::*};
 use axum::{
     body::Body,
     extract::{Extension, Path},
