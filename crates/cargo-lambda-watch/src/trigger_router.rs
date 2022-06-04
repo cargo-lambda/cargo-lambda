@@ -1,5 +1,7 @@
-use crate::requests::*;
-use crate::runtime_router::{LAMBDA_RUNTIME_AWS_REQUEST_ID, LAMBDA_RUNTIME_XRAY_TRACE_HEADER};
+use crate::{
+    requests::*,
+    runtime_router::{LAMBDA_RUNTIME_AWS_REQUEST_ID, LAMBDA_RUNTIME_XRAY_TRACE_HEADER},
+};
 use aws_lambda_events::{
     apigw::{
         ApiGatewayV2httpRequest, ApiGatewayV2httpRequestContext,
