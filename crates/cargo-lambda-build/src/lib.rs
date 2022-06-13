@@ -5,8 +5,9 @@ use miette::{IntoDiagnostic, Result, WrapErr};
 use object::{read::File as ObjectFile, Architecture, Object};
 use sha2::{Digest, Sha256};
 use std::{
-    fs::{create_dir_all, read, File},
+    fs::{create_dir_all, metadata, read, File},
     io::Write,
+    os::unix::prelude::PermissionsExt,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -258,6 +259,11 @@ fn zip_binary<P: AsRef<Path>>(
 
     let zipped_binary = File::create(&zipped).into_diagnostic()?;
     let binary_data = read(path).into_diagnostic()?;
+    let binary_perm = if cfg!(unix) {
+        metadata(path).into_diagnostic()?.permissions().mode()
+    } else {
+        0o755
+    };
     let binary_data = &*binary_data;
     let object = ObjectFile::parse(binary_data).into_diagnostic()?;
 
@@ -282,7 +288,7 @@ fn zip_binary<P: AsRef<Path>>(
 
     zip.start_file(
         file_name.to_str().expect("failed to convert file path"),
-        FileOptions::default().unix_permissions(0o755),
+        FileOptions::default().unix_permissions(binary_perm),
     )
     .into_diagnostic()?;
     zip.write_all(binary_data).into_diagnostic()?;
