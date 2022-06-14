@@ -615,7 +615,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "cargo-lambda-build",
  "cargo-lambda-deploy",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-build"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "cargo-lambda-interactive",
  "cargo-lambda-metadata",

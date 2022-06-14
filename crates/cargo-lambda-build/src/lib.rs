@@ -258,6 +258,7 @@ fn zip_binary<P: AsRef<Path>>(
 
     let zipped_binary = File::create(&zipped).into_diagnostic()?;
     let binary_data = read(path).into_diagnostic()?;
+    let binary_perm = binary_permissions(path)?;
     let binary_data = &*binary_data;
     let object = ObjectFile::parse(binary_data).into_diagnostic()?;
 
@@ -282,7 +283,7 @@ fn zip_binary<P: AsRef<Path>>(
 
     zip.start_file(
         file_name.to_str().expect("failed to convert file path"),
-        FileOptions::default().unix_permissions(0o755),
+        FileOptions::default().unix_permissions(binary_perm),
     )
     .into_diagnostic()?;
     zip.write_all(binary_data).into_diagnostic()?;
@@ -293,4 +294,16 @@ fn zip_binary<P: AsRef<Path>>(
         path: zipped,
         sha256,
     })
+}
+
+#[cfg(unix)]
+fn binary_permissions(path: &Path) -> Result<u32> {
+    use std::os::unix::prelude::PermissionsExt;
+    let meta = std::fs::metadata(path).into_diagnostic()?;
+    Ok(meta.permissions().mode())
+}
+
+#[cfg(not(unix))]
+fn binary_permissions(_path: &Path) -> Result<u32> {
+    Ok(0o755)
 }
