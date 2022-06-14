@@ -304,6 +304,6 @@ fn binary_permissions(path: &Path) -> Result<u32> {
 }
 
 #[cfg(not(unix))]
-fn binary_permissions(path: &Path) -> Result<u32> {
+fn binary_permissions(_path: &Path) -> Result<u32> {
     Ok(0o755)
 }
