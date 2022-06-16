@@ -5,6 +5,7 @@ use miette::{IntoDiagnostic, Result, WrapErr};
 use object::{read::File as ObjectFile, Architecture, Object};
 use sha2::{Digest, Sha256};
 use std::{
+    env,
     fs::{create_dir_all, read, File},
     io::Write,
     path::{Path, PathBuf},
@@ -131,12 +132,24 @@ impl Build {
             .build
             .build_command("build")
             .map_err(|e| miette::miette!("{}", e))?;
+
         if self.build.release {
-            let target_cpu = target_arch.target_cpu();
-            cmd.env(
-                "RUSTFLAGS",
-                format!("-C strip=symbols -C target-cpu={target_cpu}"),
-            );
+            let mut rust_flags = env::var("RUSTFLAGS").unwrap_or_default();
+            if !rust_flags.contains("-C strip=") {
+                if !rust_flags.is_empty() {
+                    rust_flags += " ";
+                }
+                rust_flags += "-C strip=symbols";
+            }
+            if !rust_flags.contains("-C target-cpu=") {
+                if !rust_flags.is_empty() {
+                    rust_flags += " ";
+                }
+                let target_cpu = target_arch.target_cpu();
+                rust_flags += "-C target-cpu=";
+                rust_flags += target_cpu.as_str();
+            }
+            cmd.env("RUSTFLAGS", rust_flags);
         }
 
         let mut child = cmd
