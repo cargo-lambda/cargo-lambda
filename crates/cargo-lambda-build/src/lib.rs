@@ -130,7 +130,7 @@ impl Build {
 
         let mut cmd = self
             .build
-            .build_command("build")
+            .build_command()
             .map_err(|e| miette::miette!("{}", e))?;
 
         if self.build.release {
