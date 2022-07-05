@@ -30,4 +30,4 @@ strum_macros = "0.24.0"
 zip = { version = "0.6.2", features = ["bzip2", "deflate", "time"] }
 
 [dev-dependencies]
-tokio = { version = "1.18.2", features = ["test-util"] }
+tokio = { version = "1.18.2", features = ["macros", "rt"] }
