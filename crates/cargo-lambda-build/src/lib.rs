@@ -42,14 +42,25 @@ pub struct Build {
     #[clap(long)]
     flatten: Option<String>,
 
+    /// Disable Zig as the linker.
+    /// This option is only allowed when you're building from Linux.
+    /// This option can help you build native libraries when
+    /// the Zig linker is failing because it cannot find them correctly.
+    ///
+    /// If you use this option, the GLIBC version is set to 2.26
+    /// automatically to match the version supported by AWS Lambda.
+    /// https://aws.amazon.com/amazon-linux-2/faqs/
+    ///
+    /// Example:
+    /// cargo lambda build --release --disable-zig-linker
+    #[clap(long)]
+    disable_zig_linker: bool,
+
     #[clap(flatten)]
     build: ZigBuild,
 }
 
 pub use cargo_zigbuild::Zig;
-
-pub const TARGET_ARM: &str = "aarch64-unknown-linux-gnu";
-pub const TARGET_X86_64: &str = "x86_64-unknown-linux-gnu";
 
 mod target_arch;
 
@@ -65,6 +76,7 @@ impl Build {
         let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
         let host_target = &rustc_meta.host;
         let release_channel = &rustc_meta.channel;
+        let compatible_host_linker = TargetArch::compatible_host_linker(host_target);
 
         if self.arm64 && !self.build.target.is_empty() {
             return Err(miette::miette!(
@@ -72,14 +84,14 @@ impl Build {
             ));
         }
 
-        let target_arch = if self.arm64 {
+        let mut target_arch = if self.arm64 {
             TargetArch::arm64()
         } else {
             let build_target = self.build.target.get(0);
             match build_target {
                 Some(target) => TargetArch::from_str(target)?,
                 // No explicit target, but build host same as target host
-                None if host_target == TARGET_ARM || host_target == TARGET_X86_64 => {
+                None if compatible_host_linker => {
                     // Set the target explicitly, so it's easier to find the binaries later
                     TargetArch::from_str(host_target)?
                 }
@@ -87,7 +99,19 @@ impl Build {
                 None => TargetArch::x86_64(),
             }
         };
-        self.build.target = vec![target_arch.full_zig_string()];
+
+        if self.disable_zig_linker {
+            if compatible_host_linker {
+                target_arch.set_al2_glibc_version();
+                self.build.disable_zig_linker = self.disable_zig_linker;
+            } else {
+                return Err(miette::miette!(
+                    "invalid options: --disable-zig-linker is only allowed on Linux"
+                ));
+            }
+        }
+
+        self.build.target = vec![target_arch.to_string()];
         let rustc_target_without_glibc_version = target_arch.rustc_target_without_glibc_version();
         let profile = match self.build.profile.as_deref() {
             Some("dev" | "test") => "debug",

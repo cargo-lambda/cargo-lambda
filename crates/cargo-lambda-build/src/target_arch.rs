@@ -1,8 +1,11 @@
 use miette::Result;
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
-use crate::{TARGET_ARM, TARGET_X86_64};
+const TARGET_ARM: &str = "aarch64-unknown-linux-gnu";
+const TARGET_X86_64: &str = "x86_64-unknown-linux-gnu";
+const AL2_GLIBC: &str = "2.26";
 
+#[derive(Debug, PartialEq)]
 enum Arch {
     ARM64,
     X86_64,
@@ -22,19 +25,13 @@ impl TargetArch {
             arch: Arch::ARM64,
         }
     }
+
     pub fn x86_64() -> Self {
         Self {
             glibc_version: None,
             rustc_target_without_glibc_version: TARGET_X86_64.into(),
             arch: Arch::X86_64,
         }
-    }
-    pub fn full_zig_string(&self) -> String {
-        format!(
-            "{}.{}",
-            self.rustc_target_without_glibc_version,
-            self.glibc_version.as_ref().unwrap_or(&"".to_string())
-        )
     }
 
     pub fn target_cpu(&self) -> String {
@@ -47,7 +44,26 @@ impl TargetArch {
     pub fn rustc_target_without_glibc_version(&self) -> String {
         self.rustc_target_without_glibc_version.to_string()
     }
+
+    pub fn set_al2_glibc_version(&mut self) {
+        self.glibc_version = Some(AL2_GLIBC.to_string());
+    }
+
+    pub fn compatible_host_linker(host_target: &str) -> bool {
+        host_target == TARGET_ARM || host_target == TARGET_X86_64
+    }
 }
+
+impl Display for TargetArch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.rustc_target_without_glibc_version)?;
+        if let Some(glibc_version) = self.glibc_version.as_ref() {
+            write!(f, ".{}", glibc_version)?;
+        }
+        Ok(())
+    }
+}
+
 impl FromStr for TargetArch {
     type Err = miette::Report;
 
@@ -87,5 +103,62 @@ fn check_build_target(target: &str) -> Result<Arch> {
             "Invalid or unsupported target for AWS Lambda: {}",
             target
         ))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_target_arch_from_str() {
+        let t = TargetArch::from_str("x86_64-unknown-linux-gnu").unwrap();
+        assert_eq!("x86_64-unknown-linux-gnu", t.to_string().as_str());
+    }
+
+    #[test]
+    fn test_target_arch_set_al2_glibc_version() {
+        let mut t = TargetArch::from_str("x86_64-unknown-linux-gnu").unwrap();
+        t.set_al2_glibc_version();
+        assert_eq!("x86_64-unknown-linux-gnu.2.26", t.to_string().as_str());
+    }
+
+    #[test]
+    fn test_target_arch_rustc_without_glibc_version() {
+        let t = TargetArch::from_str("x86_64-unknown-linux-gnu.2.27").unwrap();
+        assert_eq!(
+            "x86_64-unknown-linux-gnu",
+            t.rustc_target_without_glibc_version().as_str()
+        );
+        assert_eq!(Some("2.27".to_string()), t.glibc_version);
+    }
+
+    #[test]
+    fn test_target_arch_arch() {
+        let t = TargetArch::from_str("x86_64-unknown-linux-gnu.2.27").unwrap();
+        assert_eq!(Arch::X86_64, t.arch);
+
+        let t = TargetArch::from_str("aarch64-unknown-linux-gnu.2.27").unwrap();
+        assert_eq!(Arch::ARM64, t.arch);
+    }
+
+    #[test]
+    fn test_check_build_target() {
+        let arch = check_build_target("x86_64-unknown-linux-gnu.2.27").unwrap();
+        assert_eq!(Arch::X86_64, arch);
+
+        let arch = check_build_target("aarch64-unknown-linux-gnu.2.27").unwrap();
+        assert_eq!(Arch::ARM64, arch);
+    }
+
+    #[test]
+    fn test_compatible_host_linker() {
+        assert!(TargetArch::compatible_host_linker(
+            "x86_64-unknown-linux-gnu"
+        ));
+        assert!(TargetArch::compatible_host_linker(
+            "aarch64-unknown-linux-gnu"
+        ));
+        assert!(!TargetArch::compatible_host_linker("x86_64-pc-windows-gnu"));
     }
 }
