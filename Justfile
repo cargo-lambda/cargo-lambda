@@ -1,5 +1,13 @@
+build:
+    cargo build
+
 fmt:
     cargo +nightly fmt --all
+
+run-integration: build
+    DEBUG_LAMBDA="${PWD}/target/debug/cargo-lambda" && \
+        cd test/fixtures/single-binary-package && \
+        $DEBUG_LAMBDA lambda build
 
 publish-all:
     cargo publish --package cargo-lambda-interactive
