@@ -282,11 +282,13 @@ pub fn find_binary_archive<P: AsRef<Path>>(
 }
 
 /// Create a zip file from a function binary.
-/// The binary inside the zip file is always called `bootstrap`.
-fn zip_binary<P: AsRef<Path>>(
+/// The binary inside the zip file is called `bootstrap` for function binaries.
+/// The binary inside the zip file is called by its name, and put inside the `extensions`
+/// directory, for extension binaries.
+pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     name: &str,
-    binary_path: P,
-    destination_directory: P,
+    binary_path: BP,
+    destination_directory: DD,
     parent: Option<&str>,
 ) -> Result<BinaryArchive> {
     let path = binary_path.as_ref();
