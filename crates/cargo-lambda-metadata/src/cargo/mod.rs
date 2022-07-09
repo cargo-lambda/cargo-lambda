@@ -148,6 +148,13 @@ mod tests {
     }
 
     #[test]
+    fn test_binary_packages_with_mixed_workspace() {
+        let bins = binary_targets(fixture("mixed-workspace-package")).unwrap();
+        assert_eq!(1, bins.len());
+        assert!(bins.contains("function-crate"), "{:?}", bins);
+    }
+
+    #[test]
     fn test_binary_packages_with_missing_binary_info() {
         let err = binary_targets(fixture("missing-binary-package")).unwrap_err();
         assert!(err
