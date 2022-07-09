@@ -13,6 +13,7 @@ members = [
 
 exclude = [
     "test/fixtures/single-binary-package",
+    "test/fixtures/mixed-workspace-package",
     "test/fixtures/missing-binary-package",
     "test/fixtures/multi-binary-package",
     "test/fixtures/workspace-package"

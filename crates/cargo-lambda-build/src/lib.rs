@@ -13,6 +13,8 @@ use std::{
 };
 use strum_macros::EnumString;
 use target_arch::TargetArch;
+use tracing::{debug, warn};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use zip::{write::FileOptions, ZipWriter};
 
 mod toolchain;
@@ -73,6 +75,8 @@ enum OutputFormat {
 
 impl Build {
     pub async fn run(&mut self) -> Result<()> {
+        init_tracing();
+
         let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
         let host_target = &rustc_meta.host;
         let release_channel = &rustc_meta.channel;
@@ -136,6 +140,7 @@ impl Build {
             .as_deref()
             .unwrap_or_else(|| Path::new("Cargo.toml"));
         let binaries = binary_targets(manifest_path)?;
+        debug!(binaries = ?binaries, "found new target binaries to build");
 
         if !self.build.bin.is_empty() {
             for name in &self.build.bin {
@@ -173,6 +178,8 @@ impl Build {
                 rust_flags += "-C target-cpu=";
                 rust_flags += target_cpu.as_str();
             }
+
+            debug!(rust_flags = ?rust_flags, "release RUSTFLAGS");
             cmd.env("RUSTFLAGS", rust_flags);
         }
 
@@ -199,9 +206,14 @@ impl Build {
             .join(rustc_target_without_glibc_version)
             .join(profile);
 
+        let mut found_binaries = false;
         for name in &binaries {
             let binary = base.join(name);
+            debug!(binary = ?binary, exists = binary.exists(), "checking function binary");
+
             if binary.exists() {
+                found_binaries = true;
+
                 let bootstrap_dir = if self.extension {
                     lambda_dir.join("extensions")
                 } else {
@@ -232,6 +244,9 @@ impl Build {
                     }
                 }
             }
+        }
+        if !found_binaries {
+            warn!("no binaries found in target after build, try using the --bin or --package options to build specific binaries");
         }
 
         Ok(())
@@ -343,4 +358,15 @@ fn binary_permissions(path: &Path) -> Result<u32> {
 #[cfg(not(unix))]
 fn binary_permissions(_path: &Path) -> Result<u32> {
     Ok(0o755)
+}
+
+pub fn init_tracing() {
+    let fmt = tracing_subscriber::fmt::layer().without_time();
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "cargo_lambda=info".into()),
+        ))
+        .with(fmt)
+        .init();
 }

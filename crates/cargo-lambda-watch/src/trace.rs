@@ -20,12 +20,13 @@ pub(crate) fn init_tracing(print_traces: bool) {
     };
     let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
 
+    let fmt = tracing_subscriber::fmt::layer().without_time();
+
     tracing_subscriber::registry()
         .with(telemetry)
         .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG")
-                .unwrap_or_else(|_| "cargo_lambda=info,tower_http=info".into()),
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "cargo_lambda=info".into()),
         ))
-        .with(tracing_subscriber::fmt::layer())
+        .with(fmt)
         .init();
 }
