@@ -1,4 +1,6 @@
-use cargo_lambda_interactive::{command::silent_command, is_stdin_tty, Confirm, Text};
+use cargo_lambda_interactive::{
+    choose_option, command::silent_command, is_stdin_tty, Confirm, Text,
+};
 use cargo_lambda_metadata::fs::rename;
 use clap::Args;
 use liquid::{model::Value, ParserBuilder};
@@ -44,6 +46,10 @@ pub struct TemplateOptions {
     #[clap(long)]
     http: bool,
 
+    /// The specific HTTP feature to enable
+    #[clap(long)]
+    http_feature: Option<HttpFeature>,
+
     /// Name of function's binary, independent of the package's name
     #[clap(long)]
     function_name: Option<String>,
@@ -53,9 +59,66 @@ pub struct TemplateOptions {
     event_type: Option<String>,
 }
 
+#[derive(Clone, Debug, strum_macros::Display, strum_macros::EnumString)]
+#[strum(ascii_case_insensitive, serialize_all = "snake_case")]
+enum HttpFeature {
+    Alb,
+    ApigwRest,
+    ApigwHttp,
+    ApigwWebsockets,
+}
+
+enum HttpEndpoints {
+    Alb,
+    ApigwRest,
+    ApigwHttp,
+    ApigwWebsockets,
+    LambdaUrls,
+    Unknown,
+}
+
+impl std::fmt::Display for HttpEndpoints {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Alb => write!(f, "Amazon Elastic Application Load Balancer (ALB)"),
+            Self::ApigwRest => write!(f, "Amazon Api Gateway REST Api"),
+            Self::ApigwHttp => write!(f, "Amazon Api Gateway HTTP Api"),
+            Self::ApigwWebsockets => write!(f, "Amazon Api Gateway Websockets"),
+            Self::LambdaUrls => write!(f, "AWS Lambda function URLs"),
+            Self::Unknown => write!(f, "I don't know yet"),
+        }
+    }
+}
+
+impl HttpEndpoints {
+    fn to_feature(&self) -> Option<HttpFeature> {
+        match self {
+            Self::Alb => Some(HttpFeature::Alb),
+            Self::ApigwRest => Some(HttpFeature::ApigwRest),
+            Self::ApigwHttp | Self::LambdaUrls => Some(HttpFeature::ApigwHttp),
+            Self::ApigwWebsockets => Some(HttpFeature::ApigwWebsockets),
+            Self::Unknown => None,
+        }
+    }
+
+    fn all() -> Vec<HttpEndpoints> {
+        vec![
+            HttpEndpoints::Alb,
+            HttpEndpoints::ApigwRest,
+            HttpEndpoints::ApigwHttp,
+            HttpEndpoints::ApigwWebsockets,
+            HttpEndpoints::LambdaUrls,
+            HttpEndpoints::Unknown,
+        ]
+    }
+}
+
 impl New {
     pub async fn run(&mut self) -> Result<()> {
         validate_name(&self.package_name)?;
+        if self.template_options.http_feature.is_some() && !self.is_http_function() {
+            self.template_options.http = true;
+        }
 
         if self.missing_options() {
             if !is_stdin_tty() {
@@ -90,6 +153,15 @@ impl New {
                 .prompt()
                 .into_diagnostic()?;
             self.template_options.http = is_http;
+        }
+
+        if self.template_options.http && self.template_options.http_feature.is_none() {
+            let http_endpoint = choose_option(
+                "Which service is this function receiving events from?",
+                HttpEndpoints::all(),
+            )
+            .into_diagnostic()?;
+            self.template_options.http_feature = http_endpoint.to_feature();
         }
 
         if !self.template_options.http {
@@ -169,11 +241,19 @@ impl New {
             .map(|v| Value::scalar(v.to_string()))
             .unwrap_or(Value::Nil);
 
+        let http_feature = self
+            .template_options
+            .http_feature
+            .as_ref()
+            .map(|v| Value::scalar(v.to_string()))
+            .unwrap_or(Value::Nil);
+
         let globals = liquid::object!({
             "project_name": self.package_name,
             "function_name": fn_name,
             "basic_example": use_basic_example,
             "http_function": self.is_http_function(),
+            "http_feature": http_feature,
             "event_type": ev_type,
             "event_type_feature": ev_feat,
             "event_type_import": ev_import,
@@ -381,4 +461,14 @@ fn unzip_template(file: PathBuf, path: &Path) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_http_features_to_string() {
+        assert_eq!("apigw_http", HttpFeature::ApigwHttp.to_string().as_str());
+    }
 }

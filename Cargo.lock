@@ -645,6 +645,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "which",
  "zip",
 ]
 
@@ -715,6 +716,8 @@ dependencies = [
  "miette",
  "regex",
  "reqwest",
+ "strum",
+ "strum_macros",
  "tempfile",
  "walkdir",
  "zip",
