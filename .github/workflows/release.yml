@@ -21,7 +21,7 @@ jobs:
       - name: Build
         uses: messense/maturin-action@v1
         with:
-          args: --no-sdist --release --out dist --strip --universal2 -m crates/cargo-lambda-cli/Cargo.toml
+          args: --release --out dist --strip --universal2 -m crates/cargo-lambda-cli/Cargo.toml
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
@@ -74,7 +74,7 @@ jobs:
         uses: messense/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --no-sdist --strip -m crates/cargo-lambda-cli/Cargo.toml
+          args: --release --out dist --strip -m crates/cargo-lambda-cli/Cargo.toml
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
@@ -147,7 +147,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: auto
           container: off
-          args: --no-sdist --release -o dist --strip -m crates/cargo-lambda-cli/Cargo.toml
+          args: --release -o dist --strip -m crates/cargo-lambda-cli/Cargo.toml
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
