@@ -38,6 +38,7 @@ pub enum Lambda {
 #[tokio::main]
 async fn main() -> Result<()> {
     let app = App::parse();
+
     match app {
         App::Lambda(lambda) => match *lambda {
             Lambda::Build(mut b) => b.run().await,

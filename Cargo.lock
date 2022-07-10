@@ -615,7 +615,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda"
-version = "0.8.3"
+version = "0.9.0"
 dependencies = [
  "cargo-lambda-build",
  "cargo-lambda-deploy",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-build"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "cargo-lambda-interactive",
  "cargo-lambda-metadata",
@@ -651,7 +651,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-deploy"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "aws-sdk-s3",
  "cargo-lambda-build",
@@ -669,7 +669,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-interactive"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "atty",
  "indicatif",
@@ -680,7 +680,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-invoke"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "cargo-lambda-remote",
  "clap",
@@ -695,9 +695,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-metadata"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
- "cargo_metadata",
+ "cargo_metadata 0.14.2",
  "libc",
  "miette",
  "remove_dir_all 0.7.0",
@@ -707,7 +707,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-new"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "cargo-lambda-interactive",
  "cargo-lambda-metadata",
@@ -725,7 +725,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-remote"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "aws-config",
  "aws-sdk-lambda",
@@ -735,7 +735,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-watch"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "aws_lambda_events",
  "axum",
@@ -771,9 +771,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-options"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23ce158e74c4b485a51101125ce308f69a62c13310f4c6e9a082acd862f38995"
+checksum = "05cc50d93e6b63fe87ee694f62a2f85151bed46af13c67fde8544a2bd0034b67"
 dependencies = [
  "clap",
 ]
@@ -789,13 +789,13 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.10.1"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f82d567aa085050598e94d2326132630715fc97506544eef56eea3c1ff7b28f"
+checksum = "fecad547272ad0a06e41c5cebcfec47ab03d02407852affb4a2db7bb1df54574"
 dependencies = [
  "anyhow",
  "cargo-options",
- "cargo_metadata",
+ "cargo_metadata 0.15.0",
  "clap",
  "dirs",
  "fs-err",
@@ -812,6 +812,19 @@ name = "cargo_metadata"
 version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4acbb09d9ee8e23699b9634375c72795d095bf268439da88562cf9b501f181fa"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "cargo_metadata"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3abb7553d5b9b8421c6de7cb02606ff15e0c6eea7d8eadd75ef013fd636bec36"
 dependencies = [
  "camino",
  "cargo-platform",
