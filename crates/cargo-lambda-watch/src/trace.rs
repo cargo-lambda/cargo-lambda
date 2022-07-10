@@ -20,7 +20,9 @@ pub(crate) fn init_tracing(print_traces: bool) {
     };
     let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
 
-    let fmt = tracing_subscriber::fmt::layer().without_time();
+    let fmt = tracing_subscriber::fmt::layer()
+        .with_target(false)
+        .without_time();
 
     tracing_subscriber::registry()
         .with(telemetry)

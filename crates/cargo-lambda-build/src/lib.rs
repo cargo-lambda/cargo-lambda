@@ -117,6 +117,10 @@ impl Build {
 
         self.build.target = vec![target_arch.to_string()];
         let rustc_target_without_glibc_version = target_arch.rustc_target_without_glibc_version();
+
+        #[cfg(windows)]
+        self.force_windows_release_profile();
+
         let profile = match self.build.profile.as_deref() {
             Some("dev" | "test") => "debug",
             Some("release" | "bench") => "release",
@@ -251,6 +255,15 @@ impl Build {
 
         Ok(())
     }
+
+    #[cfg(windows)]
+    fn force_windows_release_profile(&mut self) {
+        if !self.build.release {
+            tracing::info!("Changing profile to release mode. Cargo-lambda doesn't support building on debug mode on Windows");
+            self.build.release = true;
+            self.build.profile = Some("release".to_string());
+        }
+    }
 }
 
 pub struct BinaryArchive {
@@ -363,7 +376,9 @@ fn binary_permissions(_path: &Path) -> Result<u32> {
 }
 
 pub fn init_tracing() {
-    let fmt = tracing_subscriber::fmt::layer().without_time();
+    let fmt = tracing_subscriber::fmt::layer()
+        .with_target(false)
+        .without_time();
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
