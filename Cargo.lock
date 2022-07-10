@@ -716,6 +716,8 @@ dependencies = [
  "miette",
  "regex",
  "reqwest",
+ "strum",
+ "strum_macros",
  "tempfile",
  "walkdir",
  "zip",
