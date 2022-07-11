@@ -1,3 +1,4 @@
 target
 tools
 test/**/Cargo.lock
+dist

@@ -66,11 +66,7 @@ jobs:
 
       - name: Run integration tests
         shell: bash
-        run: |
-          cargo build && \
-          DEBUG_LAMBDA="${PWD}/target/debug/cargo-lambda" && \
-          cd test/fixtures/single-binary-package && \
-          $DEBUG_LAMBDA lambda build
+        run: make run-integration
 
   lints:
     name: Lints
