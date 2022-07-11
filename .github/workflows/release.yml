@@ -132,22 +132,22 @@ jobs:
       - name: Package Windows files
         working-directory: target/github-release
         run: |
-          make -f ../Makefile build-release-zip tag=${{ steps.tag.outputs.tag }} target=windows-x64
-          make -f ../Makefile build-release-zip tag=${{ steps.tag.outputs.tag }} target=windows-x86
+          make -f ../../Makefile build-release-zip tag=${{ steps.tag.outputs.tag }} target=windows-x64
+          make -f ../../Makefile build-release-zip tag=${{ steps.tag.outputs.tag }} target=windows-x86
 
       - name: Package MacOS files
         working-directory: target/github-release
         run: |
-          make -f ../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=apple-darwin
+          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=apple-darwin
 
       - name: Package Linux files
         working-directory: target/github-release
         run: |
-          make -f ../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=x86_64-unknown-linux-musl
-          make -f ../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=i686-unknown-linux-musl
-          make -f ../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=aarch64-unknown-linux-musl
-          make -f ../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=armv7-unknown-linux-musleabihf
-          make -f ../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=armv7-unknown-linux-musleabi
+          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=x86_64-unknown-linux-musl
+          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=i686-unknown-linux-musl
+          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=aarch64-unknown-linux-musl
+          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=armv7-unknown-linux-musleabihf
+          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=armv7-unknown-linux-musleabi
 
       - name: Move release files to upload
         run: |
