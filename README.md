@@ -201,6 +201,21 @@ name = "add-product"
 path = "src/bin/add-product.rs"
 ```
 
+You can also set environment variables on a workspace
+```toml
+[workspace.metadata.lambda.env]
+RUST_LOG = "debug"
+
+[workspace.metadata.lambda.bin.get-product.env]
+GET_PRODUCT_ENV_VARIABLE = "custom value"
+```
+These behave in the same way, package environment variables will override workspace settings, the order of precedence is:
+
+1) Pacakge Binary
+2) Pacakge Global
+3) Workspace Binary
+4) Workspace Global
+
 #### Watch - Function URLs
 
 The emulator server includes support for [Lambda function URLs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html) out of the box. Since we're working locally, these URLs are under the `/lambda-url` path instead of under a subdomain. The function that you're trying to access through a URL must respond to Request events using [lambda_http](https://crates.io/crates/lambda_http/), or raw `ApiGatewayV2httpRequest` events.
