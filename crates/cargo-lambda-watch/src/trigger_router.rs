@@ -94,11 +94,9 @@ async fn furls_handler(
 
     let time = Utc::now();
 
-    if let Some(c) = path.chars().next() {
-        if c != '/' {
-            path = format!("/{}", path);
-        }
-    };
+    if !path.starts_with('/') {
+        path = format!("/{}", path);
+    }
 
     let request_context = ApiGatewayV2httpRequestContext {
         stage: Some("$default".into()),
