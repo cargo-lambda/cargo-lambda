@@ -7,6 +7,7 @@ use cargo_lambda_new::New;
 use cargo_lambda_watch::Watch;
 use clap::{Parser, Subcommand};
 use miette::{miette, Result};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
 #[clap(name = "cargo")]
@@ -35,18 +36,42 @@ pub enum Lambda {
     Watch(Watch),
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    let app = App::parse();
-
-    match app {
-        App::Lambda(lambda) => match *lambda {
+impl Lambda {
+    async fn run(self) -> Result<()> {
+        match self {
             Lambda::Build(mut b) => b.run().await,
             Lambda::Deploy(d) => d.run().await,
             Lambda::Invoke(i) => i.run().await,
             Lambda::New(mut n) => n.run().await,
             Lambda::Watch(w) => w.run().await,
-        },
-        App::Zig(zig) => zig.execute().map_err(|e| miette!(e)),
+        }
     }
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let app = App::parse();
+
+    let command = match app {
+        App::Zig(zig) => return zig.execute().map_err(|e| miette!(e)),
+        App::Lambda(lambda) => *lambda,
+    };
+
+    let fmt = tracing_subscriber::fmt::layer()
+        .with_target(false)
+        .without_time();
+
+    let subscriber = tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "cargo_lambda=info".into()),
+        ))
+        .with(fmt);
+
+    if let Lambda::Watch(w) = &command {
+        subscriber.with(w.xray_layer()).init();
+    } else {
+        subscriber.init();
+    }
+
+    command.run().await
 }

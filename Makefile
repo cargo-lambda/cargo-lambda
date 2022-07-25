@@ -1,4 +1,4 @@
-.PHONY: build build-release-tar build-release-zip fmt publish-all run-integration
+.PHONY: build build-release-tar build-release-zip check fmt publish-all run-integration
 
 build:
 	cargo build
@@ -18,6 +18,10 @@ build-release-zip:
 		zip cargo-lambda-$(tag).$(target).zip cargo-lambda.exe && \
 		shasum -a 256 cargo-lambda-$(tag).$(target).zip > cargo-lambda-$(tag).$(target).zip.sha256 && \
 		mv *.zip* .. && cd ..
+
+check:
+	cargo check
+	cargo +nightly udeps
 
 fmt:
 	cargo +nightly fmt --all
