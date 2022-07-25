@@ -43,7 +43,7 @@ pub(crate) fn routes() -> Router {
 
 async fn furls_handler(
     Extension(cmd_tx): Extension<Sender<InvokeRequest>>,
-    Path((function_name, path)): Path<(String, String)>,
+    Path((function_name, mut path)): Path<(String, String)>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
     let (parts, body) = req.into_parts();
@@ -93,7 +93,10 @@ async fn furls_handler(
         .expect("invalid request id format");
 
     let time = Utc::now();
-    let path = format!("/{}", path);
+
+    if !path.starts_with('/') {
+        path = format!("/{}", path);
+    }
 
     let request_context = ApiGatewayV2httpRequestContext {
         stage: Some("$default".into()),
