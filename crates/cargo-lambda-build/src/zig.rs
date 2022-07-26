@@ -11,12 +11,15 @@ pub async fn check_installation() -> Result<()> {
 
     let options = install_options();
 
-    if !is_stdin_tty() {
-        println!("Zig is not installed in your system.\nYou can use any of the following options to install it:");
-        for option in &options {
-            println!("\t* {}: `{}`", option, option.usage());
+    if !is_stdin_tty() || options.is_empty() {
+        println!("Zig is not installed in your system.");
+        if !options.is_empty() {
+            println!("You can use any of the following options to install it:");
+            for option in &options {
+                println!("\t* {}: `{}`", option, option.usage());
+            }
         }
-        println!("\t* Download a recent version from https://ziglang.org/download/ and add it to your PATH");
+        println!("\t* Download Zig 0.9.1 or newer from https://ziglang.org/download/ and add it to your PATH");
         return Err(miette::miette!("Install Zig and run cargo-lambda again"));
     }
 
