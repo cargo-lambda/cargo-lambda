@@ -77,17 +77,9 @@ impl InstallOption {
 
     async fn install(self) -> Result<()> {
         let pb = Progress::start("Installing Zig...");
-        let result = match self {
-            #[cfg(not(windows))]
-            InstallOption::Brew => silent_command("brew", &["install", "zig"]).await,
-            #[cfg(windows)]
-            InstallOption::Choco => silent_command("choco", &["install", "zig"]).await,
-            #[cfg(not(windows))]
-            InstallOption::Npm => silent_command("npm", &["install", "-g", "@ziglang/cli"]).await,
-            InstallOption::Pip3 => silent_command("pip3", &["install", "ziglang"]).await,
-            #[cfg(windows)]
-            InstallOption::Scoop => silent_command("scoop", &["install", "zig"]).await,
-        };
+        let usage = self.usage().split(' ').collect::<Vec<_>>();
+        let usage = usage.as_slice();
+        let result = silent_command(usage[0], &usage[1..usage.len()]).await;
 
         let finish = if result.is_ok() {
             "Zig installed"
