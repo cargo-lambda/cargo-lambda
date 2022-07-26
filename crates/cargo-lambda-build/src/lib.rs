@@ -73,7 +73,10 @@ enum OutputFormat {
 }
 
 impl Build {
+    #[tracing::instrument(skip(self), target = "cargo_lambda")]
     pub async fn run(&mut self) -> Result<()> {
+        tracing::trace!(options = ?self, "building project");
+
         let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
         let host_target = &rustc_meta.host;
         let release_channel = &rustc_meta.channel;

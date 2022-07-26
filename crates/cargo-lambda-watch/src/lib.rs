@@ -50,7 +50,10 @@ pub struct Watch {
 }
 
 impl Watch {
+    #[tracing::instrument(skip(self), target = "cargo_lambda")]
     pub async fn run(&self) -> Result<()> {
+        tracing::trace!(options = ?self, "watching project");
+
         if !self.no_reload && which::which("cargo-watch").is_err() {
             watch_installer::install().await?;
         }

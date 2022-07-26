@@ -666,6 +666,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -692,6 +693,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -720,6 +722,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tempfile",
+ "tracing",
  "walkdir",
  "zip",
 ]

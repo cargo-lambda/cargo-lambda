@@ -69,7 +69,10 @@ enum OutputFormat {
 }
 
 impl Invoke {
+    #[tracing::instrument(skip(self), target = "cargo_lambda")]
     pub async fn run(&self) -> Result<()> {
+        tracing::trace!(options = ?self, "invoking function");
+
         let data = if let Some(file) = &self.data_file {
             read_to_string(file)
                 .into_diagnostic()
