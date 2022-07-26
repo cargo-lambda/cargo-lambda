@@ -11,12 +11,15 @@ pub async fn check_installation() -> Result<()> {
 
     let options = install_options();
 
-    if !is_stdin_tty() {
-        println!("Zig is not installed in your system.\nYou can use any of the following options to install it:");
-        for option in &options {
-            println!("\t* {}: `{}`", option, option.usage());
+    if !is_stdin_tty() || options.is_empty() {
+        println!("Zig is not installed in your system.");
+        if !options.is_empty() {
+            println!("You can use any of the following options to install it:");
+            for option in &options {
+                println!("\t* {}: `{}`", option, option.usage());
+            }
         }
-        println!("\t* Download a recent version from https://ziglang.org/download/ and add it to your PATH");
+        println!("\t* Download Zig 0.9.1 or newer from https://ziglang.org/download/ and add it to your PATH");
         return Err(miette::miette!("Install Zig and run cargo-lambda again"));
     }
 
@@ -74,17 +77,9 @@ impl InstallOption {
 
     async fn install(self) -> Result<()> {
         let pb = Progress::start("Installing Zig...");
-        let result = match self {
-            #[cfg(not(windows))]
-            InstallOption::Brew => silent_command("brew", &["install", "zig"]).await,
-            #[cfg(windows)]
-            InstallOption::Choco => silent_command("choco", &["install", "zig"]).await,
-            #[cfg(not(windows))]
-            InstallOption::Npm => silent_command("npm", &["install", "-g", "@ziglang/cli"]).await,
-            InstallOption::Pip3 => silent_command("pip3", &["install", "ziglang"]).await,
-            #[cfg(windows)]
-            InstallOption::Scoop => silent_command("scoop", &["install", "zig"]).await,
-        };
+        let usage = self.usage().split(' ').collect::<Vec<_>>();
+        let usage = usage.as_slice();
+        let result = silent_command(usage[0], &usage[1..usage.len()]).await;
 
         let finish = if result.is_ok() {
             "Zig installed"
