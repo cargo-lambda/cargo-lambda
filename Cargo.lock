@@ -625,6 +625,8 @@ dependencies = [
  "clap",
  "miette",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -644,7 +646,6 @@ dependencies = [
  "strum_macros",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "which",
  "zip",
 ]
@@ -665,6 +666,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -691,6 +693,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -719,6 +722,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tempfile",
+ "tracing",
  "walkdir",
  "zip",
 ]

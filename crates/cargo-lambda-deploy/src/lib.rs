@@ -83,7 +83,10 @@ pub struct Deploy {
 }
 
 impl Deploy {
+    #[tracing::instrument(skip(self), target = "cargo_lambda")]
     pub async fn run(&self) -> Result<()> {
+        tracing::trace!(options = ?self, "deploying project");
+
         if self.function_config.enable_function_url && self.function_config.disable_function_url {
             return Err(miette::miette!("invalid options: --enable-function-url and --disable-function-url cannot be set together"));
         }

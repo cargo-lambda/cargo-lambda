@@ -14,7 +14,6 @@ use std::{
 use strum_macros::EnumString;
 use target_arch::TargetArch;
 use tracing::{debug, warn};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use zip::{write::FileOptions, ZipWriter};
 
 mod toolchain;
@@ -74,8 +73,9 @@ enum OutputFormat {
 }
 
 impl Build {
+    #[tracing::instrument(skip(self), target = "cargo_lambda")]
     pub async fn run(&mut self) -> Result<()> {
-        init_tracing();
+        tracing::trace!(options = ?self, "building project");
 
         let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
         let host_target = &rustc_meta.host;
@@ -373,17 +373,4 @@ fn binary_permissions(path: &Path) -> Result<u32> {
 #[cfg(not(unix))]
 fn binary_permissions(_path: &Path) -> Result<u32> {
     Ok(0o755)
-}
-
-pub fn init_tracing() {
-    let fmt = tracing_subscriber::fmt::layer()
-        .with_target(false)
-        .without_time();
-
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "cargo_lambda=info".into()),
-        ))
-        .with(fmt)
-        .init();
 }

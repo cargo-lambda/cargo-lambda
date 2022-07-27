@@ -340,6 +340,10 @@ Use the `--help` flag to see other options to configure the function's deploymen
 
 If you modify a flag and run the deploy command twice for the same function, the change will be updated in the function's configuration in AWS Lambda.
 
+## Debugging
+
+Use the flag `--verbose` with any subcommand to enable tracing instrumentation. You can also enable instrumentation with the following environment variable `RUST_LOG=cargo_lambda=trace`.
+
 ## Rust version
 
 This project works with Rust 1.59 and above.

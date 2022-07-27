@@ -114,7 +114,10 @@ impl HttpEndpoints {
 }
 
 impl New {
+    #[tracing::instrument(skip(self), target = "cargo_lambda")]
     pub async fn run(&mut self) -> Result<()> {
+        tracing::trace!(options = ?self, "creating new project");
+
         validate_name(&self.package_name)?;
         if self.template_options.http_feature.is_some() && !self.is_http_function() {
             self.template_options.http = true;

@@ -1,4 +1,4 @@
-.PHONY: build build-release-tar build-release-zip fmt publish-all run-integration
+.PHONY: build build-release-tar build-release-zip check fmt install-local publish-all run-integration
 
 build:
 	cargo build
@@ -19,8 +19,15 @@ build-release-zip:
 		shasum -a 256 cargo-lambda-$(tag).$(target).zip > cargo-lambda-$(tag).$(target).zip.sha256 && \
 		mv *.zip* .. && cd ..
 
+check:
+	cargo check
+	cargo +nightly udeps
+
 fmt:
 	cargo +nightly fmt --all
+
+install-local:
+	cargo install --path crates/cargo-lambda-cli
 
 publish-all:
 	cargo publish --package cargo-lambda-interactive
