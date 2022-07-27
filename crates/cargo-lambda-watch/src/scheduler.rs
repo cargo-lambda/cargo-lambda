@@ -2,7 +2,7 @@ use crate::requests::{InvokeRequest, ServerError};
 use axum::{body::Body, response::Response};
 use cargo_lambda_interactive::command::new_command;
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
-use cargo_lambda_metadata::cargo::{function_metadata, PackageMetadata};
+use cargo_lambda_metadata::cargo::function_metadata;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     path::PathBuf,
@@ -169,12 +169,12 @@ async fn start_function(
 ) -> Result<(), ServerError> {
     info!(function = ?name, "starting lambda function");
 
-    let meta = match function_metadata(manifest_path, &name) {
+    let env = match function_metadata(manifest_path, &name) {
         Err(e) => {
             warn!(error = %e, "ignoring invalid function metadata");
-            PackageMetadata::default()
+            HashMap::new()
         }
-        Ok(m) => m.unwrap_or_default(),
+        Ok(m) => m,
     };
 
     let mut cmd = new_command("cargo");
@@ -195,7 +195,7 @@ async fn start_function(
         .env("AWS_LAMBDA_FUNCTION_VERSION", "1")
         .env("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", "4096")
         // Variables above the following call can be updated by variables in the metadata
-        .envs(meta.env)
+        .envs(env)
         // Variables below cannot be updated by variables in the metadata
         .env("AWS_LAMBDA_RUNTIME_API", &runtime_api)
         .env("AWS_LAMBDA_FUNCTION_NAME", &name)

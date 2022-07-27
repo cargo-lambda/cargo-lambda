@@ -3,7 +3,7 @@ use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 #[derive(Default, Deserialize)]
@@ -32,7 +32,6 @@ pub struct PackageMetadata {
 /// Extract all the binary target names from a Cargo.toml file
 pub fn binary_targets<P: AsRef<Path>>(manifest_path: P) -> Result<HashSet<String>> {
     let metadata = load_metadata(manifest_path)?;
-
     let bins = metadata
         .packages
         .iter()
@@ -43,26 +42,7 @@ pub fn binary_targets<P: AsRef<Path>>(manifest_path: P) -> Result<HashSet<String
         })
         .map(|target| target.name.clone())
         .collect::<_>();
-
     Ok(bins)
-}
-
-/// Return the lambda metadata section for a function
-/// See the documentation to learn about how we use this metadata:
-/// https://github.com/cargo-lambda/cargo-lambda#start---environment-variables
-pub fn function_metadata(manifest_path: PathBuf, name: &str) -> Result<Option<PackageMetadata>> {
-    let metadata = match package_metadata(manifest_path, name)? {
-        None => return Ok(None),
-        Some(m) => m,
-    };
-
-    let mut env = HashMap::new();
-    env.extend(metadata.lambda.env);
-    if let Some(bin) = metadata.lambda.bin.get(name) {
-        env.extend(bin.env.clone());
-    }
-
-    Ok(Some(PackageMetadata { env }))
 }
 
 /// Create metadata about the root package in the Cargo manifest, without any dependencies.
@@ -73,23 +53,45 @@ fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
     metadata_cmd.exec().into_diagnostic()
 }
 
-// Find the package in the Cargo manifest that contains a binary `name`.
-fn package_metadata<P: AsRef<Path>>(manifest_path: P, name: &str) -> Result<Option<Metadata>> {
+/// Create a HashMap of environment varibales from the package and workspace manifest
+/// See the documentation to learn about how we use this metadata:
+/// https://github.com/cargo-lambda/cargo-lambda#start---environment-variables
+pub fn function_metadata<P: AsRef<Path>>(
+    manifest_path: P,
+    name: &str,
+) -> Result<HashMap<String, String>> {
     let metadata = load_metadata(manifest_path)?;
-    for pkg in metadata.packages {
+    let mut env = HashMap::new();
+    let ws_metadata: LambdaMetadata =
+        serde_json::from_value(metadata.workspace_metadata).unwrap_or_default();
+    env.extend(ws_metadata.env);
+
+    if let Some(res) = ws_metadata.bin.get(name) {
+        env.extend(res.env.clone());
+    }
+
+    for pkg in &metadata.packages {
         for target in &pkg.targets {
             if target.name == name
                 && target.kind.iter().any(|kind| kind == "bin")
                 && pkg.metadata.is_object()
             {
-                let metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
+                let package_metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
                     .into_diagnostic()
                     .wrap_err("invalid lambda metadata in Cargo.toml file")?;
-                return Ok(Some(metadata));
+
+                env.extend(package_metadata.lambda.env);
+                if let Some(res) = package_metadata.lambda.bin.get(name) {
+                    env.extend(res.env.clone());
+                }
             }
         }
     }
-    Ok(None)
+    if !env.is_empty() {
+        tracing::debug!("using {} environment variables from metadata", env.len());
+        tracing::debug!("{env:#?}");
+    }
+    Ok(env)
 }
 
 /// Load the main package in the project.
@@ -116,6 +118,7 @@ pub fn root_package<P: AsRef<Path>>(manifest_path: P) -> Result<Package> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     fn fixture(name: &str) -> PathBuf {
         format!("../../test/fixtures/{name}/Cargo.toml").into()
@@ -164,40 +167,30 @@ mod tests {
 
     #[test]
     fn test_metadata_packages() {
-        let meta = function_metadata(fixture("single-binary-package"), "basic-lambda")
-            .unwrap()
-            .unwrap();
+        let env = function_metadata(fixture("single-binary-package"), "basic-lambda").unwrap();
 
-        assert_eq!("BAR", meta.env["FOO"]);
+        assert_eq!(env.get("FOO").unwrap(), "BAR");
     }
 
     #[test]
     fn test_metadata_multi_packages() {
-        let meta = function_metadata(fixture("multi-binary-package"), "get-product")
-            .unwrap()
-            .unwrap();
+        let env = function_metadata(fixture("multi-binary-package"), "get-product").unwrap();
 
-        assert_eq!("BAR", meta.env["FOO"]);
+        assert_eq!(env.get("FOO").unwrap(), "BAR");
 
-        let meta = function_metadata(fixture("multi-binary-package"), "delete-product")
-            .unwrap()
-            .unwrap();
+        let env = function_metadata(fixture("multi-binary-package"), "delete-product").unwrap();
 
-        assert_eq!("QUX", meta.env["BAZ"]);
+        assert_eq!(env.get("BAZ").unwrap(), "QUX");
     }
 
     #[test]
     fn test_metadata_workspace_packages() {
-        let meta = function_metadata(fixture("workspace-package"), "basic-lambda-1")
-            .unwrap()
-            .unwrap();
+        let env = function_metadata(fixture("workspace-package"), "basic-lambda-1").unwrap();
 
-        assert_eq!("BAR", meta.env["FOO"]);
+        assert_eq!(env.get("FOO").unwrap(), "BAR");
 
-        let meta = function_metadata(fixture("workspace-package"), "basic-lambda-2")
-            .unwrap()
-            .unwrap();
+        let env = function_metadata(fixture("workspace-package"), "basic-lambda-2").unwrap();
 
-        assert_eq!("BAR", meta.env["FOO"]);
+        assert_eq!(env.get("FOO").unwrap(), "BAR");
     }
 }
