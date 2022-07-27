@@ -46,11 +46,15 @@ pub struct Watch {
     /// Path to Cargo.toml
     #[clap(long, value_name = "PATH", parse(from_os_str), value_hint = ValueHint::FilePath)]
     #[clap(default_value = "Cargo.toml")]
-    pub manifest_path: PathBuf,
+    manifest_path: PathBuf,
+
+    /// Features to pass to `cargo run`, separated by comma
+    #[clap(long)]
+    features: Option<String>,
 
     /// Arguments and flags to pass to `cargo watch`
     #[clap(value_hint = ValueHint::CommandWithArguments)]
-    pub watch_args: Vec<String>,
+    watch_args: Vec<String>,
 }
 
 impl Watch {
@@ -66,10 +70,11 @@ impl Watch {
         let manifest_path = self.manifest_path.clone();
         let no_reload = self.no_reload;
         let watch_args = self.watch_args.clone();
+        let features = self.features.clone();
 
         Toplevel::new()
             .start("Lambda server", move |s| {
-                start_server(s, port, manifest_path, watch_args, no_reload)
+                start_server(s, port, manifest_path, watch_args, features, no_reload)
             })
             .catch_signals()
             .handle_shutdown_requests(Duration::from_millis(1000))
@@ -102,6 +107,7 @@ async fn start_server(
     invoke_port: u16,
     manifest_path: PathBuf,
     watch_args: Vec<String>,
+    features: Option<String>,
     no_reload: bool,
 ) -> Result<(), axum::Error> {
     let addr = SocketAddr::from(([127, 0, 0, 1], invoke_port));
@@ -113,6 +119,7 @@ async fn start_server(
         req_cache.clone(),
         manifest_path,
         watch_args,
+        features,
         no_reload,
     )
     .await;

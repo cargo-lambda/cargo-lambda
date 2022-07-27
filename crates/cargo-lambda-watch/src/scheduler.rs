@@ -118,12 +118,22 @@ pub(crate) async fn init_scheduler(
     req_cache: RequestCache,
     manifest_path: PathBuf,
     watch_args: Vec<String>,
+    features: Option<String>,
     no_reload: bool,
 ) -> Sender<InvokeRequest> {
     let (req_tx, req_rx) = mpsc::channel::<InvokeRequest>(100);
 
     subsys.start("lambda scheduler", move |s| async move {
-        start_scheduler(s, req_cache, manifest_path, watch_args, no_reload, req_rx).await;
+        start_scheduler(
+            s,
+            req_cache,
+            manifest_path,
+            watch_args,
+            features,
+            no_reload,
+            req_rx,
+        )
+        .await;
         Ok::<_, std::convert::Infallible>(())
     });
 
@@ -135,6 +145,7 @@ async fn start_scheduler(
     req_cache: RequestCache,
     manifest_path: PathBuf,
     watch_args: Vec<String>,
+    features: Option<String>,
     no_reload: bool,
     mut req_rx: Receiver<InvokeRequest>,
 ) {
@@ -147,7 +158,8 @@ async fn start_scheduler(
                     let gc_tx = gc_tx.clone();
                     let pb = manifest_path.clone();
                     let watch_args = watch_args.clone();
-                    subsys.start("lambda runtime", move |s| start_function(s, name, api, pb, watch_args, no_reload, gc_tx));
+                    let features = features.clone();
+                    subsys.start("lambda runtime", move |s| start_function(s, name, api, pb, watch_args, features, no_reload, gc_tx));
                 }
             },
             Some(gc) = gc_rx.recv() => {
@@ -162,12 +174,14 @@ async fn start_scheduler(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn start_function(
     subsys: SubsystemHandle,
     name: String,
     runtime_api: String,
     manifest_path: PathBuf,
     watch_args: Vec<String>,
+    features: Option<String>,
     no_reload: bool,
     gc_tx: Sender<String>,
 ) -> Result<(), ServerError> {
@@ -184,14 +198,18 @@ async fn start_function(
     let mut cmd = new_command("cargo");
 
     if !no_reload {
-        cmd.args(["watch", "-x"]);
+        cmd.arg("watch");
+        cmd.args(watch_args);
+        cmd.args(["--", "cargo"]);
     }
     cmd.arg("run");
-    cmd.args(watch_args);
+
+    if let Some(features) = features.as_deref() {
+        cmd.args(["--features", features]);
+    }
 
     if name != DEFAULT_PACKAGE_FUNCTION {
-        cmd.arg("--bin");
-        cmd.arg(&name);
+        cmd.args(["--bin", &name]);
     }
 
     tracing::debug!(command = ?cmd, "spawning watch command");
