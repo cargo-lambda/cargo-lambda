@@ -29,7 +29,7 @@ mod watch_installer;
 const RUNTIME_EMULATOR_PATH: &str = "/.rt";
 
 #[derive(Args, Clone, Debug)]
-#[clap(name = "watch", visible_alias = "start")]
+#[clap(name = "watch", visible_alias = "start", trailing_var_arg = true)]
 pub struct Watch {
     /// Avoid hot-reload
     #[clap(long)]
@@ -47,6 +47,10 @@ pub struct Watch {
     #[clap(long, value_name = "PATH", parse(from_os_str), value_hint = ValueHint::FilePath)]
     #[clap(default_value = "Cargo.toml")]
     pub manifest_path: PathBuf,
+
+    /// Arguments and flags to pass to `cargo watch`
+    #[clap(value_hint = ValueHint::CommandWithArguments)]
+    pub watch_args: Vec<String>,
 }
 
 impl Watch {
@@ -61,10 +65,11 @@ impl Watch {
         let port = self.invoke_port;
         let manifest_path = self.manifest_path.clone();
         let no_reload = self.no_reload;
+        let watch_args = self.watch_args.clone();
 
         Toplevel::new()
             .start("Lambda server", move |s| {
-                start_server(s, port, manifest_path, no_reload)
+                start_server(s, port, manifest_path, watch_args, no_reload)
             })
             .catch_signals()
             .handle_shutdown_requests(Duration::from_millis(1000))
@@ -96,13 +101,21 @@ async fn start_server(
     subsys: SubsystemHandle,
     invoke_port: u16,
     manifest_path: PathBuf,
+    watch_args: Vec<String>,
     no_reload: bool,
 ) -> Result<(), axum::Error> {
     let addr = SocketAddr::from(([127, 0, 0, 1], invoke_port));
     let runtime_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
 
     let req_cache = RequestCache::new(runtime_addr);
-    let req_tx = init_scheduler(&subsys, req_cache.clone(), manifest_path, no_reload).await;
+    let req_tx = init_scheduler(
+        &subsys,
+        req_cache.clone(),
+        manifest_path,
+        watch_args,
+        no_reload,
+    )
+    .await;
     let resp_cache = ResponseCache::new();
     let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
 

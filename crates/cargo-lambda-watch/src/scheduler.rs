@@ -117,12 +117,13 @@ pub(crate) async fn init_scheduler(
     subsys: &SubsystemHandle,
     req_cache: RequestCache,
     manifest_path: PathBuf,
+    watch_args: Vec<String>,
     no_reload: bool,
 ) -> Sender<InvokeRequest> {
     let (req_tx, req_rx) = mpsc::channel::<InvokeRequest>(100);
 
     subsys.start("lambda scheduler", move |s| async move {
-        start_scheduler(s, req_cache, manifest_path, no_reload, req_rx).await;
+        start_scheduler(s, req_cache, manifest_path, watch_args, no_reload, req_rx).await;
         Ok::<_, std::convert::Infallible>(())
     });
 
@@ -133,6 +134,7 @@ async fn start_scheduler(
     subsys: SubsystemHandle,
     req_cache: RequestCache,
     manifest_path: PathBuf,
+    watch_args: Vec<String>,
     no_reload: bool,
     mut req_rx: Receiver<InvokeRequest>,
 ) {
@@ -144,7 +146,8 @@ async fn start_scheduler(
                 if let Some((name, api)) = req_cache.upsert(req).await {
                     let gc_tx = gc_tx.clone();
                     let pb = manifest_path.clone();
-                    subsys.start("lambda runtime", move |s| start_function(s, name, api, pb, no_reload, gc_tx));
+                    let watch_args = watch_args.clone();
+                    subsys.start("lambda runtime", move |s| start_function(s, name, api, pb, watch_args, no_reload, gc_tx));
                 }
             },
             Some(gc) = gc_rx.recv() => {
@@ -164,6 +167,7 @@ async fn start_function(
     name: String,
     runtime_api: String,
     manifest_path: PathBuf,
+    watch_args: Vec<String>,
     no_reload: bool,
     gc_tx: Sender<String>,
 ) -> Result<(), ServerError> {
@@ -180,15 +184,17 @@ async fn start_function(
     let mut cmd = new_command("cargo");
 
     if !no_reload {
-        cmd.args(["watch", "--", "cargo"]);
+        cmd.args(["watch", "-x"]);
     }
-
     cmd.arg("run");
+    cmd.args(watch_args);
 
     if name != DEFAULT_PACKAGE_FUNCTION {
         cmd.arg("--bin");
         cmd.arg(&name);
     }
+
+    tracing::debug!(command = ?cmd, "spawning watch command");
 
     let mut child = cmd
         .env("RUST_LOG", std::env::var("RUST_LOG").unwrap_or_default())
