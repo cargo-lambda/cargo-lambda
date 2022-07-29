@@ -26,3 +26,6 @@ miette = { version = "4.7.1", features = ["fancy"] }
 tokio = { version = "1.18.2", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1.34"
 tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
+
+[build-dependencies]
+build-data = "0.1"
