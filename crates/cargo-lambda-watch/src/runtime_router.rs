@@ -55,7 +55,7 @@ async fn next_request(
                 .to_str()
                 .map_err(ServerError::InvalidRequestIdHeader)?;
 
-            debug!(req_id = ?req_id, "processing request");
+            debug!(req_id = ?req_id, function = ?function_name, "processing request");
 
             let (parts, body) = invoke.req.into_parts();
 

@@ -264,6 +264,7 @@ impl New {
             "lambda_runtime_version": lrv,
             "aws_lambda_events_version": lev,
         });
+        tracing::debug!(variables = ?globals, "rendering templates");
 
         let render_dir = tempfile::tempdir().into_diagnostic()?;
         let render_path = render_dir.path();
@@ -348,7 +349,10 @@ impl New {
     }
 }
 
+#[tracing::instrument(level = "debug")]
 async fn download_template(url: &str, path: &Path) -> Result<()> {
+    tracing::debug!("downloading template");
+
     let response = reqwest::get(url).await.into_diagnostic()?;
     if response.status() != reqwest::StatusCode::OK {
         return Err(miette::miette!(
@@ -420,10 +424,13 @@ fn is_local_zip_file(path: &str) -> bool {
     path.exists() && path.is_file() && path.extension().unwrap_or_default() == "zip"
 }
 
+#[tracing::instrument(level = "debug")]
 fn unzip_template(file: PathBuf, path: &Path) -> Result<()> {
+    tracing::debug!("extracting template from ZIP file");
+
     let reader = File::open(&file)
         .into_diagnostic()
-        .wrap_err_with(|| format!("unable to open file: {:?}", file))?;
+        .wrap_err_with(|| format!("unable to open ZIP file: {:?}", file))?;
 
     let mut archive = ZipArchive::new(reader).into_diagnostic()?;
     archive.extract(path).into_diagnostic()?;
