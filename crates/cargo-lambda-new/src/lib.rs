@@ -349,7 +349,7 @@ impl New {
     }
 }
 
-#[tracing::instrument(level = "debug")]
+#[tracing::instrument(level = "debug", target = "cargo_lambda")]
 async fn download_template(url: &str, path: &Path) -> Result<()> {
     tracing::debug!("downloading template");
 
@@ -424,7 +424,7 @@ fn is_local_zip_file(path: &str) -> bool {
     path.exists() && path.is_file() && path.extension().unwrap_or_default() == "zip"
 }
 
-#[tracing::instrument(level = "debug")]
+#[tracing::instrument(level = "debug", target = "cargo_lambda")]
 fn unzip_template(file: PathBuf, path: &Path) -> Result<()> {
     tracing::debug!("extracting template from ZIP file");
 
