@@ -127,7 +127,9 @@ jobs:
         id: tag
         uses: dawidd6/action-get-tag@v1
       - name: Create upload directory
-        run: 
+        run: |
+          mkdir -p target/github-release
+          mkdir -p target/upload
 
       - name: Package Windows files
         working-directory: target/github-release
