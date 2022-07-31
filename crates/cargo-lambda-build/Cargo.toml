@@ -1,7 +1,7 @@
 [package]
 name = "cargo-lambda-build"
 description = "Cargo subcommand to work with AWS Lambda"
-version = "0.10.0-pre1"
+version = "0.10.0"
 edition = "2021"
 license = "MIT"
 readme = "README.md"
@@ -16,8 +16,8 @@ rust-version = "1.59.0"
 # add the latest version of a dependency to the list,
 # and it will keep the alphabetic ordering for you.
 [dependencies]
-cargo-lambda-interactive = { version = "0.10.0-pre1", path = "../cargo-lambda-interactive" }
-cargo-lambda-metadata = { version = "0.10.0-pre1", path = "../cargo-lambda-metadata" }
+cargo-lambda-interactive = { version = "0.10.0", path = "../cargo-lambda-interactive" }
+cargo-lambda-metadata = { version = "0.10.0", path = "../cargo-lambda-metadata" }
 cargo-zigbuild = "0.11.1"
 clap = { version = "3.1.18", features = ["derive"] }
 home = "0.5.3"
