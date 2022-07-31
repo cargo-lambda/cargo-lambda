@@ -127,7 +127,9 @@ jobs:
         id: tag
         uses: dawidd6/action-get-tag@v1
       - name: Create upload directory
-        run: 
+        run: |
+          mkdir -p target/github-release
+          mkdir -p target/upload
 
       - name: Package Windows files
         working-directory: target/github-release
@@ -154,7 +156,7 @@ jobs:
           mkdir -p target/upload
           mv target/github-release/*.tar.gz* target/upload
           mv target/github-release/*.zip* target/upload
-          mv target/github-release/*.whl target/upload
+          mv target/github-release/**/*.whl target/upload
 
       - name: Upload binaries to GitHub Release
         uses: svenstaro/upload-release-action@v2
