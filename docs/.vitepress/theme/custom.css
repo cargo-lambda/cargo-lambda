@@ -16,6 +16,6 @@
     background-color: var(--vp-c-bg) !important;
 }
 
-.dark .VPNavBar.no-sidebar .content {
+.dark .VPNav.no-sidebar {
     background-color: var(--vp-c-bg) !important;
 }
