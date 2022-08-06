@@ -1,0 +1,46 @@
+# Simple workflow for deploying static content to GitHub Pages
+name: Deploy documentation
+
+on:
+  push:
+    branches: ["main", "new_docs_site"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Pages
+        uses: actions/configure-pages@v1
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 6.32.9
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: 'pnpm'
+      - name: Build docs
+        working-directory: docs
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run docs:build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: 'docs/.vitepress/dist'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@main
