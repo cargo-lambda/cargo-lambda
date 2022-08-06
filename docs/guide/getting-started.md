@@ -1,8 +1,5 @@
 <script setup>
-const platform = (navigator.platform || '').toLowerCase();
-const win = platform.includes('win');
-const mac = platform.includes('mac');
-const linux = platform.includes('linux');
+import PlatformInstallation from '../components/PlatformInstallation.vue'
 </script>
 
 # Getting Started
@@ -11,31 +8,33 @@ This section will help you build a Rust function for AWS Lambda from scratch. If
 
 ## Step 1: Install Cargo Lambda
 
-<div v-if="win">
+<ClientOnly>
+<PlatformInstallation>
+<template v-slot:win>
 You can use <a href="https://scoop.sh/">Scoop</a> to install Cargo Lambda on Windows. Run the following commands to add our bucket, and install it:
 
 ```sh
 scoop bucket add cargo-lambda https://github.com/cargo-lambda/scoop-cargo-lambda
 scoop install cargo-lambda/cargo-lambda
 ```
-</div>
-
-<div v-if="mac">
+</template>
+<template v-slot:mac>
 You can use <a href="https://brew.sh/">Homebrew</a> to install Cargo Lambda on MacOS and Linux. Run the following commands on your terminal to add our tap, and install it:
 
 ```sh
 brew tap cargo-lambda/cargo-lambda
 brew install cargo-lambda
 ```
-</div>
-
-<div v-if="linux">
+</template>
+<template v-slot:linux>
 You can use <a href="https://pypi.org/">PyPI</a> to install Cargo Lambda on Linux:
 
 ```sh
 pip3 install cargo-lambda
 ```
-</div>
+</template>
+</PlatformInstallation>
+</ClientOnly>
 
 See all the ways that you can use to [install Cargo Lambda](/guide/installation) in your system.
 
