@@ -4,3 +4,5 @@ test/**/Cargo.lock
 dist
 .vscode
 build
+node_modules
+.pnpm-debug.log
