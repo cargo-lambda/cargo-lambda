@@ -5,7 +5,7 @@
 
 cargo-lambda is a [Cargo](https://doc.rust-lang.org/cargo/) subcommand to help you work with AWS Lambda.
 
-Get started by looking at **[the documentation](https://cargo-lambda.github.io/guides/getting-started)**.
+Get started by looking at **[the documentation](https://www.cargo-lambda.info/guides/getting-started)**.
 
 ## Rust version
 

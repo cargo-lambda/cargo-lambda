@@ -3,7 +3,7 @@ name: Deploy documentation
 
 on:
   push:
-    branches: ["main", "new_docs_site"]
+    branches: ["main"]
 
 permissions:
   contents: read
