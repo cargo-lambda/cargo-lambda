@@ -166,3 +166,4 @@ jobs:
           file_glob: true
           overwrite: true
           tag: ${{ github.ref }}
+          prerelease: true
