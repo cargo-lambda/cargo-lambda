@@ -27,12 +27,6 @@ export default {
         footer: {
             message: 'Released under the MIT License.',
             copyright: 'Copyright © 2022-present David Calavera'
-        },
-
-        algolia: {
-            appId: 'S628O8PP90',
-            apiKey: '3c2cf3b90e0a87841c77c9cf47382873',
-            indexName: 'cargo-lambda'
         }
     }
 }
