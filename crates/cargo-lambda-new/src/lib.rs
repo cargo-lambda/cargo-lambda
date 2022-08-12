@@ -8,18 +8,14 @@ use miette::{IntoDiagnostic, Result, WrapErr};
 use regex::Regex;
 use std::{
     env,
-    fs::{copy as copy_file, create_dir_all, read_dir, File},
-    io::{copy, Cursor},
-    path::{Path, PathBuf},
+    fs::{copy as copy_file, create_dir_all, File},
 };
-use tempfile::tempdir;
 use walkdir::WalkDir;
-use zip::ZipArchive;
+
+use crate::template::TemplateSource;
 
 mod events;
-
-const DEFAULT_TEMPLATE_URL: &str =
-    "https://github.com/cargo-lambda/default-template/archive/refs/heads/main.zip";
+mod template;
 
 #[derive(Args, Clone, Debug)]
 #[clap(name = "new")]
@@ -210,16 +206,8 @@ impl New {
     }
 
     async fn create_package(&self) -> Result<()> {
-        let tmp_dir = tempdir().into_diagnostic()?;
-        let mut template_path = tmp_dir.path().to_path_buf();
-
-        match &self.template_options.template {
-            None => download_template(DEFAULT_TEMPLATE_URL, &template_path).await?,
-            Some(s) if is_remote_zip_file(s) => download_template(s, &template_path).await?,
-            Some(s) if is_local_zip_file(s) => unzip_template(PathBuf::from(s), &template_path)?,
-            Some(s) if is_local_directory(s) => template_path = PathBuf::from(s),
-            Some(other) => return Err(miette::miette!("invalid template: {}", other)),
-        };
+        let template_source = TemplateSource::try_from(self.template_options.template.as_deref())?;
+        let template_path = template_source.expand().await?;
 
         let parser = ParserBuilder::with_stdlib().build().into_diagnostic()?;
 
@@ -349,30 +337,6 @@ impl New {
     }
 }
 
-#[tracing::instrument(level = "debug", target = "cargo_lambda")]
-async fn download_template(url: &str, path: &Path) -> Result<()> {
-    tracing::debug!("downloading template");
-
-    let response = reqwest::get(url).await.into_diagnostic()?;
-    if response.status() != reqwest::StatusCode::OK {
-        return Err(miette::miette!(
-            "error downloading template from {} - {}",
-            url,
-            response.text().await.into_diagnostic()?
-        ));
-    }
-
-    let mut bytes = Cursor::new(response.bytes().await.into_diagnostic()?);
-
-    let tmp_file = path.join("cargo-lambda-template.zip");
-    let mut writer = File::create(&tmp_file)
-        .into_diagnostic()
-        .wrap_err_with(|| format!("unable to create file: {:?}", &tmp_file))?;
-    copy(&mut bytes, &mut writer).into_diagnostic()?;
-
-    unzip_template(tmp_file, path)
-}
-
 impl TemplateOptions {
     fn missing_options(&self) -> bool {
         !self.http && self.event_type.is_none()
@@ -408,69 +372,6 @@ fn suggest_event_type(text: &str) -> Vec<String> {
             }
         })
         .collect()
-}
-
-fn is_local_directory(path: &str) -> bool {
-    let path = Path::new(path);
-    path.exists() && path.is_dir()
-}
-
-fn is_remote_zip_file(path: &str) -> bool {
-    path.starts_with("https://") && path.ends_with(".zip")
-}
-
-fn is_local_zip_file(path: &str) -> bool {
-    let path = Path::new(path);
-    path.exists() && path.is_file() && path.extension().unwrap_or_default() == "zip"
-}
-
-#[tracing::instrument(level = "debug", target = "cargo_lambda")]
-fn unzip_template(file: PathBuf, path: &Path) -> Result<()> {
-    tracing::debug!("extracting template from ZIP file");
-
-    let reader = File::open(&file)
-        .into_diagnostic()
-        .wrap_err_with(|| format!("unable to open ZIP file: {:?}", file))?;
-
-    let mut archive = ZipArchive::new(reader).into_diagnostic()?;
-    archive.extract(path).into_diagnostic()?;
-
-    if !path.join("Cargo.toml").exists() {
-        // Try to find the template files in a subdirectory.
-        // GitHub puts all the files inside a subdirectory
-        // named after the repository and the branch that you're downloading.
-        let mut base_path = None;
-        let walk_dir = WalkDir::new(path).follow_links(false);
-        for entry in walk_dir {
-            let entry = entry.into_diagnostic()?;
-            let entry_path = entry.path();
-            if entry_path.is_dir() && entry_path.join("Cargo.toml").exists() {
-                base_path = Some(entry_path.to_path_buf());
-                break;
-            }
-        }
-
-        if let Some(base_path) = base_path {
-            for entry in read_dir(base_path).into_diagnostic()? {
-                let entry = entry.into_diagnostic()?;
-                let entry_path = entry.path();
-                let entry_name = entry_path
-                    .file_name()
-                    .ok_or_else(|| miette::miette!("invalid entry: {:?}", &entry_path))?;
-                let new_path = path.join(entry_name);
-                rename(&entry_path, &new_path)
-                    .into_diagnostic()
-                    .wrap_err_with(|| {
-                        format!(
-                            "failed to move template file: from {:?} to {:?}",
-                            &entry_path, &new_path
-                        )
-                    })?;
-            }
-        }
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]
