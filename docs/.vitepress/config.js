@@ -27,6 +27,12 @@ export default {
         footer: {
             message: 'Released under the MIT License.',
             copyright: 'Copyright © 2022-present David Calavera'
+        },
+
+        algolia: {
+            appId: '6B32TYXFEW',
+            apiKey: '93a40dfb46259ad78cd8eec93ee93421',
+            indexName: 'cargo-lambda'
         }
     }
 }
@@ -55,7 +61,8 @@ function sidebarGuide() {
             items: [
                 { text: 'What is Cargo Lambda?', link: '/guide/what-is-cargo-lambda' },
                 { text: 'Getting Started', link: '/guide/getting-started' },
-                { text: 'Installation', link: '/guide/installation' }
+                { text: 'Installation', link: '/guide/installation' },
+                { text: 'Screencasts', link: '/guide/screencasts' }
             ]
         }
     ]
