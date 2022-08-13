@@ -1,3 +1,4 @@
+use aws_smithy_types::retry::{RetryConfig, RetryMode};
 use cargo_lambda_build::{find_binary_archive, zip_binary, BinaryArchive};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::root_package;
@@ -6,7 +7,7 @@ use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
 use serde_json::ser::to_string_pretty;
-use std::{fs::read, path::PathBuf};
+use std::{fs::read, path::PathBuf, time::Duration};
 use strum_macros::{Display, EnumString};
 
 mod extensions;
@@ -100,7 +101,12 @@ impl Deploy {
             }
         };
 
-        let sdk_config = self.remote_config.to_sdk_config().await;
+        let retry = RetryConfig::default()
+            .with_retry_mode(RetryMode::Adaptive)
+            .with_max_attempts(3)
+            .with_initial_backoff(Duration::from_secs(5));
+
+        let sdk_config = self.remote_config.sdk_config(Some(retry)).await;
         let architecture = Architecture::from(archive.architecture.as_str());
 
         let binary_data = read(&archive.path)

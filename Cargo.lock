@@ -716,6 +716,7 @@ version = "0.10.0"
 dependencies = [
  "aws-sdk-iam",
  "aws-sdk-s3",
+ "aws-smithy-types",
  "cargo-lambda-build",
  "cargo-lambda-interactive",
  "cargo-lambda-metadata",

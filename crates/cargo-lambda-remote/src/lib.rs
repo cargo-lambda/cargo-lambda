@@ -28,15 +28,17 @@ pub struct RemoteConfig {
 }
 
 impl RemoteConfig {
-    pub async fn to_sdk_config(&self) -> SdkConfig {
+    pub async fn sdk_config(&self, retry: Option<RetryConfig>) -> SdkConfig {
         let region_provider = RegionProviderChain::first_try(self.region.clone().map(Region::new))
             .or_default_provider()
             .or_else(Region::new(DEFAULT_REGION));
         let region = region_provider.region().await;
 
+        let retry =
+            retry.unwrap_or_else(|| RetryConfig::default().with_max_attempts(self.retry_attempts));
         let mut config_loader = aws_config::from_env()
             .region(region_provider)
-            .retry_config(RetryConfig::default().with_max_attempts(self.retry_attempts));
+            .retry_config(retry);
 
         if let Some(profile) = &self.profile {
             let conf = ProviderConfig::without_region().with_region(region);

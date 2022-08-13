@@ -6,7 +6,7 @@ use cargo_lambda_remote::{
     aws_sdk_config::SdkConfig,
     aws_sdk_lambda::{
         error::{
-            DeleteFunctionUrlConfigError, GetAliasError, GetFunctionError,
+            CreateFunctionError, DeleteFunctionUrlConfigError, GetAliasError, GetFunctionError,
             GetFunctionUrlConfigError,
         },
         model::{
@@ -29,6 +29,21 @@ use std::{
 };
 use strum_macros::{Display, EnumString};
 use tokio::time::{sleep, Duration};
+
+const BASIC_LAMBDA_EXECUTION_POLICY: &str =
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole";
+const ASSUME_ROLE_TRUST_POLICY: &str = r#"{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}"#;
 
 enum FunctionAction {
     Create,
@@ -80,6 +95,9 @@ pub struct FunctionDeployConfig {
     /// Lambda Layer ARN to associate the deployed function with
     #[clap(long)]
     pub layer_arn: Option<Vec<String>>,
+
+    #[clap(long, hide = true, default_value = "10")]
+    wait_role: u64,
 }
 
 #[derive(Serialize)]
@@ -111,8 +129,6 @@ pub(crate) async fn deploy(
 ) -> Result<DeployResult> {
     let client = LambdaClient::new(sdk_config);
 
-    progress.set_message("deploying function code");
-
     let (function_arn, version) = upsert_function(
         name,
         &client,
@@ -122,6 +138,7 @@ pub(crate) async fn deploy(
         s3_bucket,
         binary_data,
         architecture,
+        progress,
     )
     .await?;
 
@@ -161,6 +178,7 @@ async fn upsert_function(
     s3_bucket: &Option<String>,
     binary_data: Vec<u8>,
     architecture: Architecture,
+    progress: &Progress,
 ) -> Result<(String, String)> {
     let current_function = client.get_function().function_name(name).send().await;
 
@@ -178,13 +196,21 @@ async fn upsert_function(
         .mode(function_config.tracing.to_string().as_str().into())
         .build();
 
-    let iam_role = match &function_config.iam_role {
-        None => Some(create_lambda_role(name, sdk_config).await?),
-        some => some.clone(),
-    };
-
     let (arn, version) = match action {
         FunctionAction::Create => {
+            let wait_role = Duration::from_secs(function_config.wait_role);
+
+            let (iam_role, is_new_role) = match &function_config.iam_role {
+                None => (
+                    create_lambda_role(sdk_config, wait_role, progress).await?,
+                    true,
+                ),
+                Some(role) => (role.clone(), false),
+            };
+
+            tracing::debug!(role_arn = ?iam_role, "using iam role");
+            progress.set_message("deploying function");
+
             let code = match &s3_bucket {
                 None => {
                     let blob = Blob::new(binary_data);
@@ -208,44 +234,74 @@ async fn upsert_function(
                 }
             };
 
-            let output = client
-                .create_function()
-                .runtime(Runtime::Providedal2)
-                .handler("bootstrap")
-                .function_name(name)
-                .set_role(iam_role)
-                .architectures(architecture)
-                .code(code)
-                .publish(true)
-                .set_memory_size(function_config.memory_size)
-                .timeout(function_config.timeout)
-                .tracing_config(tracing_config)
-                .environment(function_environment(
-                    &function_config.env_file,
-                    &function_config.env_var,
-                )?)
-                .set_layers(function_config.layer_arn.clone())
-                .send()
-                .await
-                .into_diagnostic()
-                .wrap_err("failed to create new lambda function")?;
+            let mut output = None;
+            for attempt in 2..5 {
+                let result = client
+                    .create_function()
+                    .runtime(Runtime::Providedal2)
+                    .handler("bootstrap")
+                    .function_name(name)
+                    .role(iam_role.clone())
+                    .architectures(architecture.clone())
+                    .code(code.clone())
+                    .publish(true)
+                    .set_memory_size(function_config.memory_size)
+                    .timeout(function_config.timeout)
+                    .tracing_config(tracing_config.clone())
+                    .environment(function_environment(
+                        &function_config.env_file,
+                        &function_config.env_var,
+                    )?)
+                    .set_layers(function_config.layer_arn.clone())
+                    .send()
+                    .await;
 
-            (output.function_arn, output.version)
+                match result {
+                    Ok(o) => {
+                        output = Some(o);
+                        break;
+                    }
+                    Err(err)
+                        if is_role_cannot_be_assumed_error(&err) && is_new_role && attempt < 5 =>
+                    {
+                        let backoff = attempt * 5;
+                        progress.set_message(&format!(
+                            "new role not full propagated, waiting {} seconds before retrying",
+                            backoff
+                        ));
+                        sleep(Duration::from_secs(backoff)).await;
+                        progress.set_message("trying to deploy function again");
+                    }
+                    Err(err) => {
+                        return Err(err)
+                            .into_diagnostic()
+                            .wrap_err("failed to create new lambda function");
+                    }
+                };
+            }
+
+            output
+                .map(|o| (o.function_arn, o.version))
+                .ok_or_else(|| miette::miette!("failed to create new lambda function"))?
         }
         FunctionAction::Update(fun) => {
-            if let Some(conf) = fun.configuration {
-                let mut builder = client
-                    .update_function_configuration()
-                    .function_name(name)
-                    .set_role(iam_role);
+            progress.set_message("deploying function");
 
+            if let Some(conf) = fun.configuration {
                 let mut update_config = false;
+                let mut builder = client.update_function_configuration().function_name(name);
+
+                if let Some(iam_role) = &function_config.iam_role {
+                    builder = builder.role(iam_role);
+                }
+
                 if function_config.memory_size.is_some()
                     && conf.memory_size != function_config.memory_size
                 {
                     update_config = true;
                     builder = builder.set_memory_size(function_config.memory_size);
                 }
+
                 if conf.timeout.unwrap_or_default() != function_config.timeout {
                     update_config = true;
                     builder = builder.timeout(function_config.timeout);
@@ -561,25 +617,50 @@ pub(crate) fn alias_doesnt_exist_error(err: &SdkError<GetAliasError>) -> bool {
     }
 }
 
-async fn create_lambda_role(name: &str, config: &SdkConfig) -> Result<String> {
-    let role_name = format!("lambda-function-role-{}-{}", name, uuid::Uuid::new_v4());
+// There is specific error type for this failure case, so
+// we need to compare error messages and hope for the best :(
+fn is_role_cannot_be_assumed_error(err: &SdkError<CreateFunctionError>) -> bool {
+    err.to_string() == "InvalidParameterValueException: The role defined for the function cannot be assumed by Lambda."
+}
+
+async fn create_lambda_role(
+    config: &SdkConfig,
+    wait_role: Duration,
+    progress: &Progress,
+) -> Result<String> {
+    progress.set_message("creating execution role");
+
+    let role_name = format!("cargo-lambda-role-{}", uuid::Uuid::new_v4());
     let client = IamClient::new(config);
-    client
+    let role = client
         .create_role()
         .role_name(&role_name)
+        .assume_role_policy_document(ASSUME_ROLE_TRUST_POLICY)
         .send()
         .await
         .into_diagnostic()
-        .wrap_err("failed to create function role")?;
+        .wrap_err("failed to create function role")?
+        .role
+        .expect("missing role information");
 
     client
         .attach_role_policy()
         .role_name(&role_name)
-        .policy_arn("arn:aws:iam::aws:policy/AWSLambdaBasicExecutionRole")
+        .policy_arn(BASIC_LAMBDA_EXECUTION_POLICY)
         .send()
         .await
         .into_diagnostic()
         .wrap_err("failed to attach policy AWSLambdaBasicExecutionRole to function role")?;
 
-    Ok(role_name)
+    progress.set_message(&format!(
+        "waiting {} seconds until the role propagates",
+        wait_role.as_secs()
+    ));
+    sleep(wait_role).await;
+
+    tracing::debug!(role = ?role, "function role created");
+
+    role.arn()
+        .map(String::from)
+        .ok_or_else(|| miette::miette!("missing role arn"))
 }
