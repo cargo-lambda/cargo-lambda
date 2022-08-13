@@ -1,4 +1,5 @@
 use super::DeployResult;
+use aws_sdk_iam::Client as IamClient;
 use aws_sdk_s3::{types::ByteStream, Client as S3Client};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_remote::{
@@ -177,7 +178,10 @@ async fn upsert_function(
         .mode(function_config.tracing.to_string().as_str().into())
         .build();
 
-    let iam_role = function_config.iam_role.clone();
+    let iam_role = match &function_config.iam_role {
+        None => Some(create_lambda_role(name, sdk_config).await?),
+        some => some.clone(),
+    };
 
     let (arn, version) = match action {
         FunctionAction::Create => {
@@ -555,4 +559,27 @@ pub(crate) fn alias_doesnt_exist_error(err: &SdkError<GetAliasError>) -> bool {
         SdkError::ServiceError { err, .. } => err.is_resource_not_found_exception(),
         _ => false,
     }
+}
+
+async fn create_lambda_role(name: &str, config: &SdkConfig) -> Result<String> {
+    let role_name = format!("lambda-function-role-{}-{}", name, uuid::Uuid::new_v4());
+    let client = IamClient::new(config);
+    client
+        .create_role()
+        .role_name(&role_name)
+        .send()
+        .await
+        .into_diagnostic()
+        .wrap_err("failed to create function role")?;
+
+    client
+        .attach_role_policy()
+        .role_name(&role_name)
+        .policy_arn("arn:aws:iam::aws:policy/AWSLambdaBasicExecutionRole")
+        .send()
+        .await
+        .into_diagnostic()
+        .wrap_err("failed to attach policy AWSLambdaBasicExecutionRole to function role")?;
+
+    Ok(role_name)
 }
