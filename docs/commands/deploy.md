@@ -9,8 +9,20 @@ This command automatically detects the architecture that the binary was compiled
 The example below deploys a function that has already been compiled with the default flags:
 
 ```
+cargo lambda deploy
+```
+
+## IAM Roles
+
+If you run this command without any flags, Cargo Lambda will try to create an execution role with Lambda's default service role policy `AWSLambdaBasicExecutionRole`.
+
+Use the flag `--iam-role` to provide a specific execution role for your function:
+
+```
 cargo lambda deploy --iam-role FULL_ROLE_ARN http-lambda
 ```
+
+If you're updating the code in a function, you don't need to pass this flag again, unless you want to update the execution role for the function.
 
 ## Function URLs
 
@@ -35,7 +47,7 @@ You can add environment variables to a function during deployment with the flags
 The flag `--env-var` allows you to pass several variables in the command like with the format `KEY=VALUE`:
 
 ```
-cargo lambda deploy --iam-role FULL_ROLE_ARN \
+cargo lambda deploy \
   --env-var FOO=BAR --env-var BAZ=QUX \
   http-lambda
 ```
@@ -43,7 +55,7 @@ cargo lambda deploy --iam-role FULL_ROLE_ARN \
 The flag `--env-file` will read the variables from a file and add them to the function during the deploy. Each variable in the file must be in a new line with the same `KEY=VALUE` format:
 
 ```
-cargo lambda deploy --iam-role FULL_ROLE_ARN --env-file .env http-lambda
+cargo lambda deploy --env-file .env http-lambda
 ```
 
 ## Extensions

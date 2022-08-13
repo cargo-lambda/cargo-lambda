@@ -123,7 +123,7 @@ impl Invoke {
         if self.function_name == DEFAULT_PACKAGE_FUNCTION {
             return Err(miette::miette!("invalid function name, it must match the name you used to create the function remotely"));
         }
-        let sdk_config = self.remote_config.to_sdk_config().await;
+        let sdk_config = self.remote_config.sdk_config(None).await;
         let client = LambdaClient::new(&sdk_config);
 
         let resp = client

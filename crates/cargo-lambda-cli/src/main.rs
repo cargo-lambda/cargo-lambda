@@ -1,3 +1,4 @@
+#![warn(rust_2018_idioms, unused_lifetimes, clippy::multiple_crate_versions)]
 use std::boxed::Box;
 
 use cargo_lambda_build::{Build, Zig};

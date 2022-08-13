@@ -12,7 +12,9 @@ keywords = ["cargo", "subcommand", "aws", "lambda"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aws-sdk-s3 = "0.11.0"
+aws-sdk-iam = "0.17.0"
+aws-sdk-s3 = "0.17.0"
+aws-smithy-types = "0.47.0"
 cargo-lambda-build = { version = "0.10.0", path = "../cargo-lambda-build" }
 cargo-lambda-interactive = { version = "0.10.0", path = "../cargo-lambda-interactive" }
 cargo-lambda-metadata = { version = "0.10.0", path = "../cargo-lambda-metadata" }
@@ -25,3 +27,4 @@ strum = "0.24.0"
 strum_macros = "0.24.0"
 tokio = { version = "1.18.2", default-features = false, features = ["time"]}
 tracing = { version = "0.1.35", features = ["log"] }
+uuid = { version = "1.1.2", features = ["v4"] }

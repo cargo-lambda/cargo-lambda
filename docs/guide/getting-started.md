@@ -83,11 +83,15 @@ Add the flag `--arm64` if you want to use Gravitron processors on AWS Lambda
 
 ## Step 6: Deploy the function on AWS Lambda
 
-Use the [deploy](/commands/deploy) subcommand to upload your function to AWS Lambda. This subcommand requires AWS credentials in your system, and an IAM role with basic Lambda privileges:
+Use the [deploy](/commands/deploy) subcommand to upload your function to AWS Lambda. This subcommand requires AWS credentials in your system.
 
 ```sh
-cargo lambda deploy --iam-role FULL_ROLE_ARN
+cargo lambda deploy
 ```
+
+::: info
+A default execution role for this function will be created when you execute this command. Use the flag `--iam-role` if you want to use a predefined IAM role.
+:::
 
 ## Debugging
 
