@@ -53,7 +53,7 @@ fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
     metadata_cmd.exec().into_diagnostic()
 }
 
-/// Create a HashMap of environment varibales from the package and workspace manifest
+/// Create a HashMap of environment variables from the package and workspace manifest
 /// See the documentation to learn about how we use this metadata:
 /// https://github.com/cargo-lambda/cargo-lambda#start---environment-variables
 pub fn function_metadata<P: AsRef<Path>>(

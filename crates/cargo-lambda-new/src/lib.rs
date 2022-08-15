@@ -32,7 +32,7 @@ pub struct New {
     package_name: String,
 }
 
-#[derive(Args, Clone, Debug, Default)]
+#[derive(Args, Clone, Debug)]
 pub struct TemplateOptions {
     /// Where to find the project template. It can be a local directory, a local zip file, or a URL to a remote zip file
     #[clap(long)]
@@ -50,9 +50,22 @@ pub struct TemplateOptions {
     #[clap(long)]
     function_name: Option<String>,
 
+    /// The type of Lambda component - a function, extension or logs extension.  If not provided we default to
+    /// creating a function.
+    #[clap(long = "type", value_enum, default_value_t = Type::Function)]
+    component_type: Type,
+
     /// Type of AWS event that this function is going to receive, from the aws_lambda_events crate, for example s3::S3Event
     #[clap(long)]
     event_type: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, clap::ValueEnum, strum_macros::Display, strum_macros::EnumString)]
+#[strum(ascii_case_insensitive, serialize_all = "snake_case")]
+enum Type {
+    Function,
+    Extension,
+    LogsExtension,
 }
 
 #[derive(Clone, Debug, strum_macros::Display, strum_macros::EnumString)]
@@ -115,9 +128,11 @@ impl New {
         tracing::trace!(options = ?self, "creating new project");
 
         validate_name(&self.package_name)?;
-        if self.template_options.http_feature.is_some() && !self.is_http_function() {
-            self.template_options.http = true;
-        }
+
+        self.validate_options()?;
+
+        // if the caller set the HTTP feature then assume they're going to create an HTTP function
+        self.template_options.http = self.template_options.http || self.template_options.http_feature.is_some();
 
         if self.missing_options() {
             if !is_stdin_tty() {
@@ -176,6 +191,10 @@ impl New {
         Ok(())
     }
 
+    fn validate_options(&self) -> Result<()> {
+        self.template_options.validate_options()
+    }
+
     fn missing_options(&self) -> bool {
         self.template_options.missing_options()
     }
@@ -220,6 +239,8 @@ impl New {
             _ => Value::Nil,
         };
 
+        let component_type = Value::scalar(self.template_options.component_type.to_string());
+
         let lhv = option_env!("CARGO_LAMBDA_LAMBDA_HTTP_VERSION")
             .map(|v| Value::scalar(v.to_string()))
             .unwrap_or(Value::Nil);
@@ -242,6 +263,7 @@ impl New {
         let globals = liquid::object!({
             "project_name": self.package_name,
             "function_name": fn_name,
+            "type": component_type,
             "basic_example": use_basic_example,
             "http_function": self.is_http_function(),
             "http_feature": http_feature,
@@ -338,8 +360,16 @@ impl New {
 }
 
 impl TemplateOptions {
+    fn validate_options(&self) -> Result<()> {
+        if self.component_type != Type::Function && (self.http || self.http_feature.is_some() || self.event_type.is_some()) {
+            Err(miette::miette!("cannot specify HTTP or event arguments with a non-function type"))
+        } else {
+            Ok(())
+        }
+    }
+
     fn missing_options(&self) -> bool {
-        !self.http && self.event_type.is_none()
+        self.component_type == Type::Function && !self.http && self.event_type.is_none()
     }
 }
 
