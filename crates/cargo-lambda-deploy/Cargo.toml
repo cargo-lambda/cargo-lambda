@@ -14,6 +14,7 @@ keywords = ["cargo", "subcommand", "aws", "lambda"]
 [dependencies]
 aws-sdk-iam = "0.17.0"
 aws-sdk-s3 = "0.17.0"
+aws-sdk-sts = "0.17.0"
 aws-smithy-types = "0.47.0"
 cargo-lambda-build = { version = "0.10.0", path = "../cargo-lambda-build" }
 cargo-lambda-interactive = { version = "0.10.0", path = "../cargo-lambda-interactive" }

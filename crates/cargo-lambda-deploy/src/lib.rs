@@ -12,6 +12,7 @@ use strum_macros::{Display, EnumString};
 
 mod extensions;
 mod functions;
+mod roles;
 
 #[derive(Clone, Debug, Display, EnumString)]
 #[strum(ascii_case_insensitive)]
