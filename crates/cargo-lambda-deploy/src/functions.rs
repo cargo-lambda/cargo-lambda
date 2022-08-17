@@ -1,5 +1,5 @@
 use super::DeployResult;
-use aws_sdk_iam::Client as IamClient;
+use crate::roles;
 use aws_sdk_s3::{types::ByteStream, Client as S3Client};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_remote::{
@@ -29,21 +29,6 @@ use std::{
 };
 use strum_macros::{Display, EnumString};
 use tokio::time::{sleep, Duration};
-
-const BASIC_LAMBDA_EXECUTION_POLICY: &str =
-    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole";
-const ASSUME_ROLE_TRUST_POLICY: &str = r#"{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "lambda.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}"#;
 
 enum FunctionAction {
     Create,
@@ -95,9 +80,6 @@ pub struct FunctionDeployConfig {
     /// Lambda Layer ARN to associate the deployed function with
     #[clap(long)]
     pub layer_arn: Option<Vec<String>>,
-
-    #[clap(long, hide = true, default_value = "10")]
-    wait_role: u64,
 }
 
 #[derive(Serialize)]
@@ -198,13 +180,8 @@ async fn upsert_function(
 
     let (arn, version) = match action {
         FunctionAction::Create => {
-            let wait_role = Duration::from_secs(function_config.wait_role);
-
             let (iam_role, is_new_role) = match &function_config.iam_role {
-                None => (
-                    create_lambda_role(sdk_config, wait_role, progress).await?,
-                    true,
-                ),
+                None => (roles::create(sdk_config, progress).await?, true),
                 Some(role) => (role.clone(), false),
             };
 
@@ -617,50 +594,8 @@ pub(crate) fn alias_doesnt_exist_error(err: &SdkError<GetAliasError>) -> bool {
     }
 }
 
-// There is specific error type for this failure case, so
+// There is no specific error type for this failure case, so
 // we need to compare error messages and hope for the best :(
 fn is_role_cannot_be_assumed_error(err: &SdkError<CreateFunctionError>) -> bool {
     err.to_string() == "InvalidParameterValueException: The role defined for the function cannot be assumed by Lambda."
-}
-
-async fn create_lambda_role(
-    config: &SdkConfig,
-    wait_role: Duration,
-    progress: &Progress,
-) -> Result<String> {
-    progress.set_message("creating execution role");
-
-    let role_name = format!("cargo-lambda-role-{}", uuid::Uuid::new_v4());
-    let client = IamClient::new(config);
-    let role = client
-        .create_role()
-        .role_name(&role_name)
-        .assume_role_policy_document(ASSUME_ROLE_TRUST_POLICY)
-        .send()
-        .await
-        .into_diagnostic()
-        .wrap_err("failed to create function role")?
-        .role
-        .expect("missing role information");
-
-    client
-        .attach_role_policy()
-        .role_name(&role_name)
-        .policy_arn(BASIC_LAMBDA_EXECUTION_POLICY)
-        .send()
-        .await
-        .into_diagnostic()
-        .wrap_err("failed to attach policy AWSLambdaBasicExecutionRole to function role")?;
-
-    progress.set_message(&format!(
-        "waiting {} seconds until the role propagates",
-        wait_role.as_secs()
-    ));
-    sleep(wait_role).await;
-
-    tracing::debug!(role = ?role, "function role created");
-
-    role.arn()
-        .map(String::from)
-        .ok_or_else(|| miette::miette!("missing role arn"))
 }
