@@ -21,29 +21,26 @@ pub(crate) async fn create(config: &SdkConfig, progress: &Progress) -> Result<St
         .into_diagnostic()
         .wrap_err("failed to get caller identity")?;
 
-    let policy = format!(
-        "{{
-        \"Version\": \"2012-10-17\",
-        \"Statement\": [
-          {{
-            \"Effect\": \"Allow\",
-            \"Principal\": {{
-              \"AWS\": \"{}\",
-              \"Service\": \"lambda.amazonaws.com\"
-            }},
-            \"Action\": \"sts:AssumeRole\"
-          }}
+    let mut policy = serde_json::json!({
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": "sts:AssumeRole",
+                "Principal": {
+                    "AWS": identity.arn().expect("missing account arn"),
+                    "Service": "lambda.amazonaws.com"
+                }
+            }
         ]
-      }}",
-        identity.arn().expect("missing account arn")
-    );
+    });
 
     tracing::trace!(policy = ?policy, "creating role with assume policy");
 
     let role = client
         .create_role()
         .role_name(&role_name)
-        .assume_role_policy_document(&policy)
+        .assume_role_policy_document(policy.to_string())
         .send()
         .await
         .into_diagnostic()
@@ -67,6 +64,19 @@ pub(crate) async fn create(config: &SdkConfig, progress: &Progress) -> Result<St
     progress.set_message("verifying role access, this can take up to 20 seconds");
 
     try_assume_role(&sts_client, role_arn).await?;
+
+    policy["Statement"][0]["Principal"] = serde_json::json!({"Service": "lambda.amazonaws.com"});
+    tracing::trace!(policy = ?policy, "updating assume policy");
+
+    client
+        .update_assume_role_policy()
+        .role_name(&role_name)
+        .policy_document(policy.to_string())
+        .send()
+        .await
+        .into_diagnostic()
+        .wrap_err("failed to restrict service policy")?;
+
     tracing::debug!(role = ?role, "function role created");
 
     Ok(role_arn.to_string())
