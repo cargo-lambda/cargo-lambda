@@ -58,7 +58,7 @@ fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
 /// https://github.com/cargo-lambda/cargo-lambda#start---environment-variables
 pub fn function_metadata<P: AsRef<Path>>(
     manifest_path: P,
-    name: &str,
+    name: Option<&str>,
 ) -> Result<HashMap<String, String>> {
     let metadata = load_metadata(manifest_path)?;
     let mut env = HashMap::new();
@@ -66,16 +66,27 @@ pub fn function_metadata<P: AsRef<Path>>(
         serde_json::from_value(metadata.workspace_metadata).unwrap_or_default();
     env.extend(ws_metadata.env);
 
-    if let Some(res) = ws_metadata.bin.get(name) {
-        env.extend(res.env.clone());
+    if let Some(name) = name {
+        if let Some(res) = ws_metadata.bin.get(name) {
+            env.extend(res.env.clone());
+        }
     }
 
     for pkg in &metadata.packages {
+        let name = name.unwrap_or(&pkg.name);
+
         for target in &pkg.targets {
-            if target.name == name
+            let target_matches = target.name == name
                 && target.kind.iter().any(|kind| kind == "bin")
-                && pkg.metadata.is_object()
-            {
+                && pkg.metadata.is_object();
+
+            tracing::debug!(
+                name = name,
+                target_matches = target_matches,
+                "searching package metadata"
+            );
+
+            if target_matches {
                 let package_metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
                     .into_diagnostic()
                     .wrap_err("invalid lambda metadata in Cargo.toml file")?;
@@ -87,10 +98,8 @@ pub fn function_metadata<P: AsRef<Path>>(
             }
         }
     }
-    if !env.is_empty() {
-        tracing::debug!("using {} environment variables from metadata", env.len());
-        tracing::debug!("{env:#?}");
-    }
+
+    tracing::debug!(env = ?env, "using environment variables from metadata");
     Ok(env)
 }
 
@@ -167,29 +176,38 @@ mod tests {
 
     #[test]
     fn test_metadata_packages() {
-        let env = function_metadata(fixture("single-binary-package"), "basic-lambda").unwrap();
+        let env =
+            function_metadata(fixture("single-binary-package"), Some("basic-lambda")).unwrap();
 
         assert_eq!(env.get("FOO").unwrap(), "BAR");
     }
 
     #[test]
     fn test_metadata_multi_packages() {
-        let env = function_metadata(fixture("multi-binary-package"), "get-product").unwrap();
+        let env = function_metadata(fixture("multi-binary-package"), Some("get-product")).unwrap();
 
         assert_eq!(env.get("FOO").unwrap(), "BAR");
 
-        let env = function_metadata(fixture("multi-binary-package"), "delete-product").unwrap();
+        let env =
+            function_metadata(fixture("multi-binary-package"), Some("delete-product")).unwrap();
 
         assert_eq!(env.get("BAZ").unwrap(), "QUX");
     }
 
     #[test]
     fn test_metadata_workspace_packages() {
-        let env = function_metadata(fixture("workspace-package"), "basic-lambda-1").unwrap();
+        let env = function_metadata(fixture("workspace-package"), Some("basic-lambda-1")).unwrap();
 
         assert_eq!(env.get("FOO").unwrap(), "BAR");
 
-        let env = function_metadata(fixture("workspace-package"), "basic-lambda-2").unwrap();
+        let env = function_metadata(fixture("workspace-package"), Some("basic-lambda-2")).unwrap();
+
+        assert_eq!(env.get("FOO").unwrap(), "BAR");
+    }
+
+    #[test]
+    fn test_metadata_packages_without_name() {
+        let env = function_metadata(fixture("single-binary-package"), None).unwrap();
 
         assert_eq!(env.get("FOO").unwrap(), "BAR");
     }

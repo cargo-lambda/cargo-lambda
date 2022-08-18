@@ -31,7 +31,11 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
     // Prepare the response
     let resp = Response {
         req_id: event.context.request_id,
-        msg: format!("Command {}.", command),
+        msg: format!(
+            "Command {}. Env FOO={}",
+            command,
+            std::env::var("FOO").unwrap()
+        ),
     };
 
     // Return `Response` (it will be serialized to JSON automatically by the runtime)

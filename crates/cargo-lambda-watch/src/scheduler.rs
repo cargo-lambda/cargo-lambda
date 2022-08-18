@@ -185,15 +185,7 @@ async fn start_function(
     no_reload: bool,
     gc_tx: Sender<String>,
 ) -> Result<(), ServerError> {
-    info!(function = ?name, "starting lambda function");
-
-    let env = match function_metadata(manifest_path, &name) {
-        Err(e) => {
-            warn!(error = %e, "ignoring invalid function metadata");
-            HashMap::new()
-        }
-        Ok(m) => m,
-    };
+    info!(function = ?name, manifest = ?manifest_path, "starting lambda function");
 
     let mut cmd = new_command("cargo");
 
@@ -208,11 +200,22 @@ async fn start_function(
         cmd.args(["--features", features]);
     }
 
-    if name != DEFAULT_PACKAGE_FUNCTION {
-        cmd.args(["--bin", &name]);
-    }
+    let bin_name = if is_valid_bin_name(&name) {
+        let str_name = name.as_str();
+        cmd.args(["--bin", str_name]);
+        Some(str_name)
+    } else {
+        None
+    };
 
-    tracing::debug!(command = ?cmd, "spawning watch command");
+    let env = function_metadata(manifest_path, bin_name)
+        .map_err(|err| {
+            warn!(error = %err, "ignoring invalid function metadata");
+            err
+        })
+        .unwrap_or_default();
+
+    tracing::debug!(env = ?env, command = ?cmd, "spawning watch command");
 
     let mut child = cmd
         .env("RUST_LOG", std::env::var("RUST_LOG").unwrap_or_default())
@@ -239,4 +242,8 @@ async fn start_function(
     }
 
     Ok(())
+}
+
+fn is_valid_bin_name(name: &str) -> bool {
+    !name.is_empty() && name != DEFAULT_PACKAGE_FUNCTION
 }
