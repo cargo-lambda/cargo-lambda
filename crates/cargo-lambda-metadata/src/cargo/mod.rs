@@ -20,8 +20,6 @@ pub struct LambdaMetadata {
     pub env: HashMap<String, String>,
     #[serde(default)]
     pub bin: HashMap<String, PackageMetadata>,
-    #[serde(default)]
-    pub template: TemplateMetadata,
 }
 
 #[derive(Clone, Default, Deserialize)]
@@ -29,13 +27,6 @@ pub struct LambdaMetadata {
 pub struct PackageMetadata {
     #[serde(default)]
     pub env: HashMap<String, String>,
-}
-
-#[derive(Clone, Default, Deserialize)]
-#[non_exhaustive]
-pub struct TemplateMetadata {
-    #[serde(default)]
-    pub render: Vec<String>,
 }
 
 /// Extract all the binary target names from a Cargo.toml file
