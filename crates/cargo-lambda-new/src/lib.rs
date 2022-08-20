@@ -52,11 +52,15 @@ pub struct New {
 
     /// List of additional files to render with the template engine
     #[clap(long)]
-    render_path: Option<Vec<PathBuf>>,
+    render_file: Option<Vec<PathBuf>>,
 
     /// Map of additional variables to pass to the template engine, in KEY=VALUE format
     #[clap(long)]
     render_var: Option<Vec<String>>,
+
+    /// List of files to ignore from the template
+    #[clap(long)]
+    ignore_file: Option<Vec<PathBuf>>,
 
     /// Name of the Rust package to create
     #[clap()]
@@ -125,6 +129,7 @@ impl New {
                 continue;
             } else {
                 let relative = entry_path.strip_prefix(&template_path).into_diagnostic()?;
+
                 let new_path = render_path.join(relative);
                 let parent_name = if let Some(parent) = new_path.parent() {
                     create_dir_all(parent).into_diagnostic()?;
@@ -132,6 +137,10 @@ impl New {
                 } else {
                     None
                 };
+
+                if entry_name == "LICENSE" || self.is_ignore_file(relative) {
+                    continue;
+                }
 
                 if entry_name == "Cargo.toml"
                     || entry_name == "README.md"
@@ -199,7 +208,7 @@ impl New {
     }
 
     fn is_render_file(&self, path: &Path) -> bool {
-        self.render_path
+        self.render_file
             .as_ref()
             .map(|v| v.contains(&path.to_path_buf()))
             .unwrap_or(false)
@@ -222,6 +231,13 @@ impl New {
         }
 
         object
+    }
+
+    fn is_ignore_file(&self, path: &Path) -> bool {
+        self.ignore_file
+            .as_ref()
+            .map(|v| v.contains(&path.to_path_buf()))
+            .unwrap_or(false)
     }
 }
 
