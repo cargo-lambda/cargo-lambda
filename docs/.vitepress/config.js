@@ -60,8 +60,9 @@ function sidebarGuide() {
             collapsible: true,
             items: [
                 { text: 'What is Cargo Lambda?', link: '/guide/what-is-cargo-lambda' },
-                { text: 'Getting Started', link: '/guide/getting-started' },
                 { text: 'Installation', link: '/guide/installation' },
+                { text: 'Getting Started', link: '/guide/getting-started' },
+                { text: 'Lambda Extensions', link: '/guide/lambda-extensions' },
                 { text: 'Screencasts', link: '/guide/screencasts' }
             ]
         }

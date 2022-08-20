@@ -20,6 +20,8 @@ pub struct LambdaMetadata {
     pub env: HashMap<String, String>,
     #[serde(default)]
     pub bin: HashMap<String, PackageMetadata>,
+    #[serde(default)]
+    pub template: TemplateMetadata,
 }
 
 #[derive(Clone, Default, Deserialize)]
@@ -27,6 +29,13 @@ pub struct LambdaMetadata {
 pub struct PackageMetadata {
     #[serde(default)]
     pub env: HashMap<String, String>,
+}
+
+#[derive(Clone, Default, Deserialize)]
+#[non_exhaustive]
+pub struct TemplateMetadata {
+    #[serde(default)]
+    pub render: Vec<String>,
 }
 
 /// Extract all the binary target names from a Cargo.toml file
@@ -61,9 +70,10 @@ pub fn function_metadata<P: AsRef<Path>>(
     name: Option<&str>,
 ) -> Result<HashMap<String, String>> {
     let metadata = load_metadata(manifest_path)?;
-    let mut env = HashMap::new();
     let ws_metadata: LambdaMetadata =
         serde_json::from_value(metadata.workspace_metadata).unwrap_or_default();
+
+    let mut env = HashMap::new();
     env.extend(ws_metadata.env);
 
     if let Some(name) = name {
