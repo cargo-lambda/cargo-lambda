@@ -17,7 +17,6 @@ rust-version = "1.59.0"
 # and it will keep the alphabetic ordering for you.
 [dependencies]
 cargo_metadata = "0.14.2"
-libc = "0.2.125"
 miette = "4.7.1"
 remove_dir_all = "0.7.0"
 serde = { version = "1.0.137", features = ["derive"] }
