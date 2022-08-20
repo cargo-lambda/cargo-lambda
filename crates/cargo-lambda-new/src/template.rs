@@ -9,9 +9,6 @@ use tempfile::{tempdir, TempDir};
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const DEFAULT_TEMPLATE_URL: &str =
-    "https://github.com/cargo-lambda/default-template/archive/refs/heads/main.zip";
-
 /// Enum describing the various places a template can come from.  Implements the
 /// logic to expand the template onto the local filesystem, downloading and
 /// unzipping where necessary.
@@ -45,17 +42,27 @@ impl TemplateSource {
     }
 }
 
-impl TryFrom<Option<&str>> for TemplateSource {
+impl TryFrom<&str> for TemplateSource {
     type Error = miette::Error;
 
-    fn try_from(value: Option<&str>) -> Result<Self, Self::Error> {
-        match value {
-            None => Ok(Self::RemoteZip(DEFAULT_TEMPLATE_URL.into())),
-            Some(s) if is_remote_zip_file(s) => Ok(Self::RemoteZip(s.into())),
-            Some(s) if is_local_zip_file(s) => Ok(Self::LocalZip(PathBuf::from(s))),
-            Some(s) if is_local_directory(s) => Ok(Self::LocalDir(PathBuf::from(s))),
-            Some(other) => Err(miette::miette!("invalid template: {}", other)),
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if is_remote_zip_file(value) {
+            return Ok(Self::RemoteZip(value.into()));
         }
+
+        if let Some(url) = match_github_url(value) {
+            return Ok(Self::RemoteZip(url));
+        }
+
+        if is_local_zip_file(value) {
+            return Ok(Self::LocalZip(value.into()));
+        }
+
+        if is_local_directory(value) {
+            return Ok(Self::LocalDir(value.into()));
+        }
+
+        Err(miette::miette!("invalid template: {value}"))
     }
 }
 
@@ -163,4 +170,60 @@ fn is_remote_zip_file(path: &str) -> bool {
 fn is_local_zip_file(path: &str) -> bool {
     let path = Path::new(path);
     path.exists() && path.is_file() && path.extension().unwrap_or_default() == "zip"
+}
+
+fn match_github_url(path: &str) -> Option<String> {
+    let github_repo_regex = regex::Regex::new(
+        r"https://github.com/(?P<repo>[a-zA-Z0-9][a-zA-Z0-9_-]+/[a-zA-Z0-9][a-zA-Z0-9_-]+)/?((?P<kind>branch|tag)/(?P<ref>.+))?$",
+    )
+    .into_diagnostic()
+    .unwrap();
+
+    github_repo_regex.captures(path).map(|caps| {
+        format!(
+            "https://github.com/{}/archive/refs/{}/{}.zip",
+            &caps["repo"],
+            &caps
+                .name("kind")
+                .map(|m| m.as_str())
+                .map(|m| if m == "tag" { "tags" } else { "heads" })
+                .unwrap_or("heads"),
+            &caps
+                .name("ref")
+                .map(|m| m.as_str().trim_end_matches('/').replace('/', "-"))
+                .unwrap_or_else(|| "main".into())
+        )
+    })
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_is_github_url() {
+        assert_eq!(
+            Some("https://github.com/cargo-lambda/cargo-lambda/archive/refs/heads/main.zip".into()),
+            match_github_url("https://github.com/cargo-lambda/cargo-lambda")
+        );
+        assert_eq!(
+            Some("https://github.com/cargo-lambda/cargo-lambda/archive/refs/heads/main.zip".into()),
+            match_github_url("https://github.com/cargo-lambda/cargo-lambda/")
+        );
+        assert_eq!(
+            Some("https://github.com/cargo-lambda/cargo-lambda/archive/refs/heads/branch-with-slashes.zip".into()),
+            match_github_url("https://github.com/cargo-lambda/cargo-lambda/branch/branch/with/slashes")
+        );
+        assert_eq!(
+            Some(
+                "https://github.com/cargo-lambda/cargo-lambda/archive/refs/tags/v0.1.0.zip".into()
+            ),
+            match_github_url("https://github.com/cargo-lambda/cargo-lambda/tag/v0.1.0")
+        );
+        assert_eq!(None, match_github_url("https://github.com/cargo-lambda"));
+        assert_eq!(
+            None,
+            match_github_url("https://gitlab.com/cargo-lambda/cargo-lambda")
+        );
+    }
 }

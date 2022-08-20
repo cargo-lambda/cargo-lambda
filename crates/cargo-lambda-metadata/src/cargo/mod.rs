@@ -61,9 +61,10 @@ pub fn function_metadata<P: AsRef<Path>>(
     name: Option<&str>,
 ) -> Result<HashMap<String, String>> {
     let metadata = load_metadata(manifest_path)?;
-    let mut env = HashMap::new();
     let ws_metadata: LambdaMetadata =
         serde_json::from_value(metadata.workspace_metadata).unwrap_or_default();
+
+    let mut env = HashMap::new();
     env.extend(ws_metadata.env);
 
     if let Some(name) = name {
