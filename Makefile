@@ -49,5 +49,27 @@ publish-all:
 	cd crates/cargo-lambda-cli && cargo publish
 
 run-integration: build
-	cd test/fixtures/single-binary-package && \
-	../../../target/debug/cargo-lambda lambda build
+	@rm -rf test/integration
+	@mkdir -p test/integration
+
+	@echo "testing HTTP functions" && \
+		cd test/integration && \
+		../../target/debug/cargo-lambda lambda new --http test-fun && \
+		cd test-fun && \
+		../../../target/debug/cargo-lambda lambda build --quiet --release && \
+		test -x target/lambda/test-fun
+
+	@echo "testing extensions" && \
+		cd test/integration && \
+		../../target/debug/cargo-lambda lambda new --extension test-ext && \
+		cd test-ext && \
+		../../../target/debug/cargo-lambda lambda build --quiet --release --extension && \
+		test -x target/lambda/extensions/test-ext
+
+	@echo "testing logs extensions" && \
+		cd test/integration && \
+		rm -rf test-ext && \
+		../../target/debug/cargo-lambda lambda new --extension --logs test-ext && \
+		cd test-ext && \
+		../../../target/debug/cargo-lambda lambda build --quiet --release --extension && \
+		test -x target/lambda/extensions/test-ext
