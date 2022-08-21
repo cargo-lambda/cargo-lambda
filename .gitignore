@@ -6,3 +6,4 @@ dist
 build
 node_modules
 .pnpm-debug.log
+test/integration

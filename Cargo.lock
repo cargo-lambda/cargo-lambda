@@ -765,7 +765,6 @@ name = "cargo-lambda-metadata"
 version = "0.10.0"
 dependencies = [
  "cargo_metadata 0.14.2",
- "libc",
  "miette",
  "remove_dir_all 0.7.0",
  "serde",

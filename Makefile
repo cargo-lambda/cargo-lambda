@@ -49,5 +49,4 @@ publish-all:
 	cd crates/cargo-lambda-cli && cargo publish
 
 run-integration: build
-	cd test/fixtures/single-binary-package && \
-	../../../target/debug/cargo-lambda lambda build
+	ruby test/integration.rb

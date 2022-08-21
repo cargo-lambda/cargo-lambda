@@ -35,14 +35,7 @@ where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
-    match fs::rename(&from, &to) {
-        Ok(ok) => Ok(ok),
-        Err(e) if Some(libc::EXDEV) == e.raw_os_error() => match copy_and_delete(from, to) {
-            Ok(()) => Ok(()),
-            Err(_) => Err(e),
-        },
-        Err(e) => Err(e),
-    }
+    copy_and_delete(from, to)
 }
 
 fn copy_and_delete<P, Q>(from: P, to: Q) -> io::Result<()>
