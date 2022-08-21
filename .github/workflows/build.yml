@@ -63,6 +63,9 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
+      - uses: actions/setup-ruby@v1
+        with:
+          ruby-version: '2.7'
 
       - name: Run integration tests
         shell: bash

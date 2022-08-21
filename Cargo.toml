@@ -18,7 +18,8 @@ exclude = [
     "test/fixtures/multi-binary-package",
     "test/fixtures/workspace-package",
     "test/integration/test-fun",
-    "test/integration/test-ext"
+    "test/integration/test-ext",
+    "test/integration/test-logs"
 ]
 
 [profile.release]
