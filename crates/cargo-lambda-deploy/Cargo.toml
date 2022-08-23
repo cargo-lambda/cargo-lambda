@@ -1,7 +1,7 @@
 [package]
 name = "cargo-lambda-deploy"
 description = "Cargo subcommand to work with AWS Lambda"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 license = "MIT"
 readme = "README.md"
@@ -16,10 +16,10 @@ aws-sdk-iam = "0.17.0"
 aws-sdk-s3 = "0.17.0"
 aws-sdk-sts = "0.17.0"
 aws-smithy-types = "0.47.0"
-cargo-lambda-build = { version = "0.10.0", path = "../cargo-lambda-build" }
-cargo-lambda-interactive = { version = "0.10.0", path = "../cargo-lambda-interactive" }
-cargo-lambda-metadata = { version = "0.10.0", path = "../cargo-lambda-metadata" }
-cargo-lambda-remote = { version = "0.10.0", path = "../cargo-lambda-remote" }
+cargo-lambda-build = { version = "0.11.0", path = "../cargo-lambda-build" }
+cargo-lambda-interactive = { version = "0.11.0", path = "../cargo-lambda-interactive" }
+cargo-lambda-metadata = { version = "0.11.0", path = "../cargo-lambda-metadata" }
+cargo-lambda-remote = { version = "0.11.0", path = "../cargo-lambda-remote" }
 clap = { version = "3.1.18", features = ["derive"] }
 miette = "4.7.1"
 serde = { version = "1.0.137", features = ["derive"] }
