@@ -3,7 +3,7 @@ name: Deploy documentation
 
 on:
   push:
-    tags: ["v0.10.1"]
+    tags: ["v0.11.0"]
 
 permissions:
   contents: read

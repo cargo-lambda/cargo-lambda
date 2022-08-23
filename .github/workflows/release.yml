@@ -159,10 +159,8 @@ jobs:
           mv target/github-release/**/*.whl target/upload
 
       - name: Upload binaries to GitHub Release
-        uses: svenstaro/upload-release-action@v2
+        uses: softprops/action-gh-release@v1
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/upload/*
-          file_glob: true
-          overwrite: true
-          tag: ${{ github.ref }}
+          files: target/upload/*
+          prerelease: ${{ contains(github.ref, '-pre') }}
+          generate_release_notes: true
