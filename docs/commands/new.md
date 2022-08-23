@@ -118,10 +118,9 @@ cargo lambda new \
 
 Cargo Lambda's `new` subcommand displays several interactive questions for the default templates to work. If you have a custom template and you want to skip these questions, you can use the flag `--no-interactive`:
 
-```
 ```sh
 cargo lambda new \
     --template https://github.com/calavera/custom-template \
-    --no-interactive
+    --no-interactive \
     new-project
 ```
