@@ -41,15 +41,7 @@ function nav() {
     return [
         { text: 'Guide', link: '/guide/what-is-cargo-lambda', activeMatch: '/guide/' },
         { text: 'Commands', link: '/commands/introduction', activeMatch: '/commands/' },
-        {
-            text: version,
-            items: [
-                {
-                    text: 'Changelog',
-                    link: `https://github.com/cargo-lambda/cargo-lambda/releases/tag/v${version}`
-                }
-            ],
-        },
+        { text: `Version: ${version}`, link: `https://github.com/cargo-lambda/cargo-lambda/releases/tag/v${version}` }
     ]
 }
 
