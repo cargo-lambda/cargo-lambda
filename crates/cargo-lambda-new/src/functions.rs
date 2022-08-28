@@ -1,7 +1,9 @@
-use cargo_lambda_interactive::{choose_option, is_stdin_tty, Confirm, Text};
+use cargo_lambda_interactive::{choose_option, error::InquireError, is_stdin_tty, Confirm, Text};
 use clap::Args;
 use liquid::{model::Value, Object};
-use miette::{IntoDiagnostic, Result};
+use miette::Result;
+
+use crate::error::CreateError;
 
 pub(crate) const DEFAULT_TEMPLATE_URL: &str =
     "https://github.com/cargo-lambda/default-template/archive/refs/heads/main.zip";
@@ -76,46 +78,43 @@ impl HttpEndpoints {
 }
 
 impl Options {
-    pub(crate) fn validate_options(&mut self, no_interactive: bool) -> Result<()> {
+    pub(crate) fn validate_options(&mut self, no_interactive: bool) -> Result<(), CreateError> {
         if self.http_feature.is_some() && !self.http {
             self.http = true;
         }
 
         if self.missing_options() {
             if !is_stdin_tty() || no_interactive {
-                return Err(miette::miette!("missing options: --event-type, --http"));
+                return Err(CreateError::MissingFunctionOptions);
             }
 
             self.ask_template_options()?;
+
             if self.missing_options() {
-                return Err(miette::miette!("missing options: --event-type, --http"));
+                return Err(CreateError::MissingFunctionOptions);
             }
         }
 
         if self.http && self.has_event_type() {
-            return Err(miette::miette!(
-                "invalid options: --event-type and --http cannot be specified at the same time"
-            ));
+            return Err(CreateError::InvalidFunctionOptions);
         }
 
         Ok(())
     }
 
-    pub(crate) fn ask_template_options(&mut self) -> Result<()> {
+    pub(crate) fn ask_template_options(&mut self) -> Result<(), InquireError> {
         if !self.http {
             self.http = Confirm::new("Is this function an HTTP function?")
                 .with_help_message("type `yes` if the Lambda function is triggered by an API Gateway, Amazon Load Balancer(ALB), or a Lambda URL")
                 .with_default(false)
-                .prompt()
-                .into_diagnostic()?;
+                .prompt()?;
         }
 
         if self.http && self.http_feature.is_none() {
             let http_endpoint = choose_option(
                 "Which service is this function receiving events from?",
                 HttpEndpoints::all(),
-            )
-            .into_diagnostic()?;
+            )?;
             self.http_feature = http_endpoint.to_feature();
         }
 
@@ -124,8 +123,7 @@ impl Options {
             .with_suggester(&suggest_event_type)
             .with_validator(&validate_event_type)
             .with_help_message("↑↓ to move, tab to auto-complete, enter to submit. Leave it blank if you don't want to use any event from the aws_lambda_events crate")
-            .prompt()
-            .into_diagnostic()?;
+            .prompt()?;
             self.event_type = Some(event_type);
         }
 

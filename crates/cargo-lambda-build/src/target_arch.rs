@@ -1,3 +1,4 @@
+use crate::error::BuildError;
 use miette::Result;
 use std::{fmt::Display, str::FromStr};
 
@@ -98,11 +99,7 @@ fn check_build_target(target: &str) -> Result<Arch> {
     } else if target.starts_with("x86_64-unknown-linux") {
         Ok(Arch::X86_64)
     } else {
-        // Unsupported target for an AWS Lambda environment
-        Err(miette::miette!(
-            "Invalid or unsupported target for AWS Lambda: {}",
-            target
-        ))
+        Err(BuildError::UnsupportedTarget(target.into()).into())
     }
 }
 

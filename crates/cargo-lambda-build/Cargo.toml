@@ -27,6 +27,7 @@ rustc_version = "0.4.0"
 sha2 = "0.10.2"
 strum = "0.24.0"
 strum_macros = "0.24.0"
+thiserror = "1.0.32"
 tracing = { version = "0.1.35", features = ["log"] }
 which = "4.2.5"
 zip = { version = "0.6.2", features = ["bzip2", "deflate", "time"] }
