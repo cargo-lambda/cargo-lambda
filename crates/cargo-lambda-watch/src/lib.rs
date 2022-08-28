@@ -43,6 +43,16 @@ pub struct Watch {
     #[clap(long)]
     print_traces: bool,
 
+    #[clap(flatten)]
+    cargo_options: CargoOptions,
+
+    /// Arguments and flags to pass to `cargo watch`
+    #[clap(value_hint = ValueHint::CommandWithArguments)]
+    watch_args: Vec<String>,
+}
+
+#[derive(Args, Clone, Debug)]
+struct CargoOptions {
     /// Path to Cargo.toml
     #[clap(long, value_name = "PATH", parse(from_os_str), value_hint = ValueHint::FilePath)]
     #[clap(default_value = "Cargo.toml")]
@@ -52,9 +62,9 @@ pub struct Watch {
     #[clap(long)]
     features: Option<String>,
 
-    /// Arguments and flags to pass to `cargo watch`
-    #[clap(value_hint = ValueHint::CommandWithArguments)]
-    watch_args: Vec<String>,
+    /// Enable release mode when the emulator starts
+    #[clap(long)]
+    release: bool,
 }
 
 impl Watch {
@@ -67,14 +77,13 @@ impl Watch {
         }
 
         let port = self.invoke_port;
-        let manifest_path = self.manifest_path.clone();
         let no_reload = self.no_reload;
         let watch_args = self.watch_args.clone();
-        let features = self.features.clone();
+        let cargo_options = self.cargo_options.clone();
 
         Toplevel::new()
             .start("Lambda server", move |s| {
-                start_server(s, port, manifest_path, watch_args, features, no_reload)
+                start_server(s, port, watch_args, cargo_options, no_reload)
             })
             .catch_signals()
             .handle_shutdown_requests(Duration::from_millis(1000))
@@ -105,9 +114,8 @@ impl Watch {
 async fn start_server(
     subsys: SubsystemHandle,
     invoke_port: u16,
-    manifest_path: PathBuf,
     watch_args: Vec<String>,
-    features: Option<String>,
+    cargo_options: CargoOptions,
     no_reload: bool,
 ) -> Result<(), axum::Error> {
     let addr = SocketAddr::from(([127, 0, 0, 1], invoke_port));
@@ -117,9 +125,8 @@ async fn start_server(
     let req_tx = init_scheduler(
         &subsys,
         req_cache.clone(),
-        manifest_path,
         watch_args,
-        features,
+        cargo_options,
         no_reload,
     )
     .await;

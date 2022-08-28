@@ -1,11 +1,13 @@
-use crate::requests::{InvokeRequest, ServerError};
+use crate::{
+    requests::{InvokeRequest, ServerError},
+    CargoOptions,
+};
 use axum::{body::Body, response::Response};
 use cargo_lambda_interactive::command::new_command;
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
 use cargo_lambda_metadata::cargo::function_metadata;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
-    path::PathBuf,
     sync::Arc,
 };
 use tokio::sync::{
@@ -116,24 +118,14 @@ impl ResponseCache {
 pub(crate) async fn init_scheduler(
     subsys: &SubsystemHandle,
     req_cache: RequestCache,
-    manifest_path: PathBuf,
     watch_args: Vec<String>,
-    features: Option<String>,
+    cargo_options: CargoOptions,
     no_reload: bool,
 ) -> Sender<InvokeRequest> {
     let (req_tx, req_rx) = mpsc::channel::<InvokeRequest>(100);
 
     subsys.start("lambda scheduler", move |s| async move {
-        start_scheduler(
-            s,
-            req_cache,
-            manifest_path,
-            watch_args,
-            features,
-            no_reload,
-            req_rx,
-        )
-        .await;
+        start_scheduler(s, req_cache, watch_args, cargo_options, no_reload, req_rx).await;
         Ok::<_, std::convert::Infallible>(())
     });
 
@@ -143,9 +135,8 @@ pub(crate) async fn init_scheduler(
 async fn start_scheduler(
     subsys: SubsystemHandle,
     req_cache: RequestCache,
-    manifest_path: PathBuf,
     watch_args: Vec<String>,
-    features: Option<String>,
+    cargo_options: CargoOptions,
     no_reload: bool,
     mut req_rx: Receiver<InvokeRequest>,
 ) {
@@ -156,10 +147,9 @@ async fn start_scheduler(
             Some(req) = req_rx.recv() => {
                 if let Some((name, api)) = req_cache.upsert(req).await {
                     let gc_tx = gc_tx.clone();
-                    let pb = manifest_path.clone();
                     let watch_args = watch_args.clone();
-                    let features = features.clone();
-                    subsys.start("lambda runtime", move |s| start_function(s, name, api, pb, watch_args, features, no_reload, gc_tx));
+                    let cargo_options = cargo_options.clone();
+                    subsys.start("lambda runtime", move |s| start_function(s, name, api, watch_args, cargo_options, no_reload, gc_tx));
                 }
             },
             Some(gc) = gc_rx.recv() => {
@@ -174,18 +164,16 @@ async fn start_scheduler(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn start_function(
     subsys: SubsystemHandle,
     name: String,
     runtime_api: String,
-    manifest_path: PathBuf,
     watch_args: Vec<String>,
-    features: Option<String>,
+    cargo_options: CargoOptions,
     no_reload: bool,
     gc_tx: Sender<String>,
 ) -> Result<(), ServerError> {
-    info!(function = ?name, manifest = ?manifest_path, "starting lambda function");
+    info!(function = ?name, manifest = ?cargo_options.manifest_path, "starting lambda function");
 
     let mut cmd = new_command("cargo");
 
@@ -196,8 +184,12 @@ async fn start_function(
     }
     cmd.arg("run");
 
-    if let Some(features) = features.as_deref() {
+    if let Some(features) = cargo_options.features.as_deref() {
         cmd.args(["--features", features]);
+    }
+
+    if cargo_options.release {
+        cmd.arg("--release");
     }
 
     let bin_name = if is_valid_bin_name(&name) {
@@ -208,7 +200,7 @@ async fn start_function(
         None
     };
 
-    let env = function_metadata(manifest_path, bin_name)
+    let env = function_metadata(cargo_options.manifest_path, bin_name)
         .map_err(|err| {
             warn!(error = %err, "ignoring invalid function metadata");
             err
