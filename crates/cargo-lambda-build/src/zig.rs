@@ -1,12 +1,14 @@
+use crate::error::BuildError;
 use cargo_lambda_interactive::{
-    choose_option, command::silent_command, is_stdin_tty, progress::Progress,
+    choose_option, command::silent_command, is_stdin_tty, is_user_cancellation_error,
+    progress::Progress,
 };
 use cargo_zigbuild::Zig;
 use miette::{IntoDiagnostic, Result};
 
-pub async fn check_installation() -> Result<()> {
+pub async fn check_installation() -> Result<bool> {
     if Zig::find_zig().is_ok() {
-        return Ok(());
+        return Ok(true);
     }
 
     let options = install_options();
@@ -20,16 +22,19 @@ pub async fn check_installation() -> Result<()> {
             }
         }
         println!("\t* Download Zig 0.9.1 or newer from https://ziglang.org/download/ and add it to your PATH");
-        return Err(miette::miette!("Install Zig and run cargo-lambda again"));
+        return Err(BuildError::ZigMissing.into());
     }
 
     let choice = choose_option(
         "Zig is not installed in your system.\nHow do you want to install Zig?",
         options,
-    )
-    .into_diagnostic()?;
+    );
 
-    choice.install().await
+    match choice {
+        Ok(choice) => choice.install().await.map(|_| true),
+        Err(err) if is_user_cancellation_error(&err) => Ok(false),
+        Err(err) => Err(err).into_diagnostic(),
+    }
 }
 
 enum InstallOption {

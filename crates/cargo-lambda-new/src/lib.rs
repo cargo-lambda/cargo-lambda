@@ -1,4 +1,4 @@
-use cargo_lambda_interactive::command::silent_command;
+use cargo_lambda_interactive::{command::silent_command, is_user_cancellation_error};
 use cargo_lambda_metadata::fs::rename;
 use clap::Args;
 use liquid::{model::Value, Object, ParserBuilder};
@@ -13,6 +13,9 @@ use std::{
 use walkdir::WalkDir;
 
 use crate::template::TemplateSource;
+
+mod error;
+use error::CreateError;
 
 mod events;
 mod extensions;
@@ -80,8 +83,13 @@ impl New {
         if self.extension {
             self.extension_options.validate_options()?;
         } else {
-            self.function_options
-                .validate_options(self.no_interactive)?;
+            match self.function_options.validate_options(self.no_interactive) {
+                Err(CreateError::UnexpectedInput(err)) if is_user_cancellation_error(&err) => {
+                    return Ok(())
+                }
+                Err(err) => return Err(err.into()),
+                Ok(()) => {}
+            }
         }
 
         self.create_package().await?;

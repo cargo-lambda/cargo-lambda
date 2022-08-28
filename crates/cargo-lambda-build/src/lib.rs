@@ -16,6 +16,12 @@ use target_arch::TargetArch;
 use tracing::{debug, warn};
 use zip::{write::FileOptions, ZipWriter};
 
+pub use cargo_zigbuild::Zig;
+
+mod error;
+use error::BuildError;
+
+mod target_arch;
 mod toolchain;
 mod zig;
 
@@ -61,10 +67,6 @@ pub struct Build {
     build: ZigBuild,
 }
 
-pub use cargo_zigbuild::Zig;
-
-mod target_arch;
-
 #[derive(Clone, Debug, strum_macros::Display, EnumString)]
 #[strum(ascii_case_insensitive)]
 enum OutputFormat {
@@ -83,9 +85,7 @@ impl Build {
         let compatible_host_linker = TargetArch::compatible_host_linker(host_target);
 
         if self.arm64 && !self.build.target.is_empty() {
-            return Err(miette::miette!(
-                "invalid options: --arm and --target cannot be specified at the same time"
-            ));
+            return Err(BuildError::InvalidTargetOptions.into());
         }
 
         let mut target_arch = if self.arm64 {
@@ -109,9 +109,7 @@ impl Build {
                 target_arch.set_al2_glibc_version();
                 self.build.disable_zig_linker = self.disable_zig_linker;
             } else {
-                return Err(miette::miette!(
-                    "invalid options: --disable-zig-linker is only allowed on Linux"
-                ));
+                return Err(BuildError::InvalidLinkerOption.into());
             }
         }
 
@@ -120,6 +118,14 @@ impl Build {
 
         #[cfg(windows)]
         self.force_windows_release_profile();
+
+        if !self.build.disable_zig_linker {
+            match zig::check_installation().await {
+                Ok(true) => {}
+                Ok(false) => return Ok(()),
+                Err(err) => return Err(err),
+            }
+        }
 
         let profile = match self.build.profile.as_deref() {
             Some("dev" | "test") => "debug",
@@ -149,16 +155,9 @@ impl Build {
         if !self.build.bin.is_empty() {
             for name in &self.build.bin {
                 if !binaries.contains(name) {
-                    return Err(miette::miette!(
-                        "binary target is missing from this project: {}",
-                        name
-                    ));
+                    return Err(BuildError::FunctionBinaryMissing(name.into()).into());
                 }
             }
-        }
-
-        if !self.build.disable_zig_linker {
-            zig::check_installation().await?;
         }
 
         let mut cmd = self
@@ -299,11 +298,7 @@ pub fn find_binary_archive<P: AsRef<Path>>(
         } else {
             "build"
         };
-        return Err(miette::miette!(
-            "binary file for {} not found, use `cargo lambda {}` to create it",
-            name,
-            build_cmd
-        ));
+        return Err(BuildError::BinaryMissing(name.into(), build_cmd.into()).into());
     }
 
     zip_binary(binary_name, binary_path, bootstrap_dir, parent)
@@ -332,7 +327,7 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     let arch = match object.architecture() {
         Architecture::Aarch64 => "arm64",
         Architecture::X86_64 => "x86_64",
-        other => return Err(miette::miette!("invalid binary architecture: {:?}", other)),
+        other => return Err(BuildError::InvalidBinaryArchitecture(other).into()),
     };
 
     let mut hasher = Sha256::new();
