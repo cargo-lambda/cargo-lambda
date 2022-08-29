@@ -19,6 +19,15 @@ def test_build(name, output, new_flags: '', build_flags: '')
     assert(File.exist?(output), "binary doesn't exist: #{output}")
 end
 
+def test_version
+    regex = %r{cargo-lambda \d+\.\d+\.\d+(-pre\d+)? \([a-zA-Z0-9]+(-dirty)? \d{4}-\d{2}-\d{2}Z\)}
+    out = `#{BINARY} lambda --version`.chomp
+    assert(out =~ regex, "version doesn't match: `#{out}`, `#{regex}")
+end
+
+puts "testing version output"
+test_version
+
 puts "testing HTTP functions"
 test_build('test-fun', 'test-fun', new_flags: '--http')
 
