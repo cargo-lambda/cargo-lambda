@@ -3,7 +3,7 @@ use cargo_lambda_remote::{
     RemoteConfig,
 };
 use clap::{Args, ValueHint};
-use miette::{IntoDiagnostic, Result, WrapErr};
+use miette::{IntoDiagnostic, Report, Result, WrapErr};
 use reqwest::{Client, StatusCode};
 use serde_json::{from_str, to_string_pretty, value::Value};
 use std::{
@@ -123,6 +123,7 @@ impl Invoke {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self, data), target = "cargo_lambda")]
     async fn invoke_remote(&self, data: &str) -> Result<String> {
         if self.function_name == DEFAULT_PACKAGE_FUNCTION {
             return Err(InvokeError::InvalidFunctionName.into());
@@ -157,6 +158,7 @@ impl Invoke {
         }
     }
 
+    #[tracing::instrument(skip(self, data), target = "cargo_lambda")]
     async fn invoke_local(&self, data: &str) -> Result<String> {
         let host = parse_invoke_ip_address(&self.invoke_address)?;
 
@@ -190,6 +192,7 @@ impl Invoke {
     }
 }
 
+#[tracing::instrument(skip(cache), target = "cargo_lambda")]
 async fn download_example(name: &str, cache: Option<PathBuf>) -> Result<String> {
     let target = format!("https://github.com/LegNeato/aws-lambda-events/raw/master/aws_lambda_events/src/generated/fixtures/{name}");
 
@@ -225,6 +228,10 @@ fn parse_invoke_ip_address(address: &str) -> Result<String> {
     };
 
     Ok(invoke_address)
+}
+
+pub fn is_remote_invoke_err(err: &Report) -> bool {
+    err.downcast_ref::<RemoteInvokeError>().is_some()
 }
 
 #[cfg(test)]

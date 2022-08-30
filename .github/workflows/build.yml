@@ -24,6 +24,11 @@ jobs:
       - name: Run cargo check
         run: cargo check
 
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy -- -D warnings
+
   test:
     name: Test -- ${{ matrix.os }} -- ${{ matrix.rust_version }}
     runs-on: ${{ matrix.os }}
