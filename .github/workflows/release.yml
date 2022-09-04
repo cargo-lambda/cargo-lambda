@@ -31,7 +31,7 @@ jobs:
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: apple-darwin-bin
+          name: apple-darwin-${{ github.ref_name }}-bin
           path: target/release/cargo-lambda
           if-no-files-found: error
 
@@ -69,7 +69,7 @@ jobs:
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: windows-${{ matrix.platform.arch }}-bin
+          name: windows-${{ matrix.platform.arch }}-${{ github.ref_name }}-bin
           path: target/${{ matrix.platform.target }}/release/cargo-lambda.exe
           if-no-files-found: error
 
@@ -95,7 +95,7 @@ jobs:
         with:
           key: ${{ matrix.platform.target }}
       - name: Build
-        uses: messense/maturin-action@main
+        uses: messense/maturin-action@v1
         with:
           maturin-version: 0.13.0
           target: ${{ matrix.platform.target }}
@@ -110,7 +110,7 @@ jobs:
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.platform.target }}-bin
+          name: ${{ matrix.platform.target }}-${{ github.ref_name }}-bin
           path: target/${{ matrix.platform.target }}/release/cargo-lambda
           if-no-files-found: error
 
@@ -123,9 +123,6 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           path: target/github-release
-      - name: Get tag
-        id: tag
-        uses: dawidd6/action-get-tag@v1
       - name: Create upload directory
         run: |
           mkdir -p target/github-release
@@ -134,22 +131,22 @@ jobs:
       - name: Package Windows files
         working-directory: target/github-release
         run: |
-          make -f ../../Makefile build-release-zip tag=${{ steps.tag.outputs.tag }} target=windows-x64
-          make -f ../../Makefile build-release-zip tag=${{ steps.tag.outputs.tag }} target=windows-x86
+          make -f ../../Makefile build-release-zip tag=${{ github.ref_name }} target=windows-x64
+          make -f ../../Makefile build-release-zip tag=${{ github.ref_name }} target=windows-x86
 
       - name: Package MacOS files
         working-directory: target/github-release
         run: |
-          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=apple-darwin
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=apple-darwin
 
       - name: Package Linux files
         working-directory: target/github-release
         run: |
-          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=x86_64-unknown-linux-musl
-          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=i686-unknown-linux-musl
-          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=aarch64-unknown-linux-musl
-          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=armv7-unknown-linux-musleabihf
-          make -f ../../Makefile build-release-tar tag=${{ steps.tag.outputs.tag }} target=armv7-unknown-linux-musleabi
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=x86_64-unknown-linux-musl
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=i686-unknown-linux-musl
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=aarch64-unknown-linux-musl
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=armv7-unknown-linux-musleabihf
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=armv7-unknown-linux-musleabi
 
       - name: Move release files to upload
         run: |
@@ -162,5 +159,5 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: target/upload/*
-          prerelease: ${{ contains(github.ref, '-pre') }}
+          prerelease: ${{ contains(github.ref_name, '-pre') }}
           generate_release_notes: true

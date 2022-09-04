@@ -4,13 +4,13 @@ build:
 	cargo build
 
 build-release-tar:
-	cd $(target)-bin && \
+	cd $(target)-$(tag)-bin && \
 		tar czvf cargo-lambda-$(tag).$(target).tar.gz cargo-lambda && \
 		shasum -a 256 cargo-lambda-$(tag).$(target).tar.gz > cargo-lambda-$(tag).$(target).tar.gz.sha256 && \
 		mv *.tar.gz* .. && cd ..
 
 build-release-zip:
-	cd $(target)-bin && \
+	cd $(target)-$(tag)-bin && \
 		zip cargo-lambda-$(tag).$(target).zip cargo-lambda.exe && \
 		shasum -a 256 cargo-lambda-$(tag).$(target).zip > cargo-lambda-$(tag).$(target).zip.sha256 && \
 		mv *.zip* .. && cd ..
