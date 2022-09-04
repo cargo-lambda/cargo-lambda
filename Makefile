@@ -4,17 +4,14 @@ build:
 	cargo build
 
 build-release-tar:
-	mkdir -p $(target)
-	mv $(target)-bin $(target)/cargo-lambda
-	cd $(target) && \
+	cd $(target)-$(tag)-bin && \
+		chmod +x cargo-lambda && \
 		tar czvf cargo-lambda-$(tag).$(target).tar.gz cargo-lambda && \
 		shasum -a 256 cargo-lambda-$(tag).$(target).tar.gz > cargo-lambda-$(tag).$(target).tar.gz.sha256 && \
 		mv *.tar.gz* .. && cd ..
 
 build-release-zip:
-	mkdir -p $(target)
-	mv $(target)-bin $(target)/cargo-lambda.exe
-	cd $(target) && \
+	cd $(target)-$(tag)-bin && \
 		zip cargo-lambda-$(tag).$(target).zip cargo-lambda.exe && \
 		shasum -a 256 cargo-lambda-$(tag).$(target).zip > cargo-lambda-$(tag).$(target).zip.sha256 && \
 		mv *.zip* .. && cd ..
