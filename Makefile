@@ -5,6 +5,7 @@ build:
 
 build-release-tar:
 	cd $(target)-$(tag)-bin && \
+		chmod +x cargo-lambda && \
 		tar czvf cargo-lambda-$(tag).$(target).tar.gz cargo-lambda && \
 		shasum -a 256 cargo-lambda-$(tag).$(target).tar.gz > cargo-lambda-$(tag).$(target).tar.gz.sha256 && \
 		mv *.tar.gz* .. && cd ..

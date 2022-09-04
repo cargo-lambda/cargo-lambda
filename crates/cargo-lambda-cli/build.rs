@@ -1,9 +1,24 @@
 fn main() {
-    let git_commit = build_data::get_git_commit_short();
-    let git_dirty = build_data::get_git_dirty();
+    let git_commit = match build_data::get_git_commit_short() {
+        Ok(commit) => commit,
+        Err(err) => {
+            println!("failed to get git commit information: {err}");
+            let mut s = std::env::var("CARGO_LAMBDA_RELEASE_GIT_SHA").unwrap_or_default();
+            s.truncate(7);
+            s
+        }
+    };
+
+    let git_dirty = match build_data::get_git_dirty() {
+        Ok(dirty) => dirty,
+        Err(err) => {
+            println!("failed to get git status information: {err}");
+            false
+        }
+    };
     let build_date = build_data::format_date(build_data::now());
 
-    let build_info = if let (Ok(git_commit), Ok(git_dirty)) = (git_commit, git_dirty) {
+    let build_info = if !git_commit.is_empty() {
         let git_info = if git_dirty {
             format!("{}-dirty", git_commit)
         } else {
