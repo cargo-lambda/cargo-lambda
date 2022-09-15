@@ -61,8 +61,8 @@ GET_PRODUCT_ENV_VARIABLE = "custom value"
 ```
 These behave in the same way, package environment variables will override workspace settings, the order of precedence is:
 
-1) Pacakge Binary
-2) Pacakge Global
+1) Package Binary
+2) Package Global
 3) Workspace Binary
 4) Workspace Global
 
