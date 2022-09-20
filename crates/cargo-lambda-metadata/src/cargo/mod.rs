@@ -55,7 +55,7 @@ fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
 
 /// Create a HashMap of environment varibales from the package and workspace manifest
 /// See the documentation to learn about how we use this metadata:
-/// https://github.com/cargo-lambda/cargo-lambda#start---environment-variables
+/// https://www.cargo-lambda.info/commands/watch.html#environment-variables
 pub fn function_metadata<P: AsRef<Path>>(
     manifest_path: P,
     name: Option<&str>,
