@@ -85,7 +85,7 @@ impl Build {
         let compatible_host_linker = TargetArch::compatible_host_linker(host_target);
 
         if self.arm64 && !self.build.target.is_empty() {
-            return Err(BuildError::InvalidTargetOptions.into());
+            Err(BuildError::InvalidTargetOptions)?;
         }
 
         let mut target_arch = if self.arm64 {

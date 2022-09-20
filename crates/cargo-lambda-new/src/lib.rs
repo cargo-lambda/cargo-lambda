@@ -127,7 +127,7 @@ impl New {
 
             let entry_name = entry_path
                 .file_name()
-                .ok_or_else(|| miette::miette!("invalid entry: {:?}", &entry_path))?;
+                .ok_or_else(|| CreateError::InvalidTemplateEntry(entry_path.to_path_buf()))?;
 
             if entry_path.is_dir() {
                 if entry_name != ".git" {
@@ -198,10 +198,7 @@ impl New {
         let editor = env::var("EDITOR").unwrap_or_default();
         let editor = editor.trim();
         if editor.is_empty() {
-            Err(miette::miette!(
-                "project created in {}, but the EDITOR variable is missing",
-                &self.package_name
-            ))
+            Err(CreateError::InvalidEditor(self.package_name.clone()).into())
         } else {
             silent_command(editor.trim(), &[&self.package_name]).await
         }
@@ -256,6 +253,6 @@ pub(crate) fn validate_name(name: &str) -> Result<()> {
 
     match valid_ident.is_match(name) {
         true => Ok(()),
-        false => Err(miette::miette!("invalid package name: {}", name)),
+        false => Err(CreateError::InvalidPackageName(name.to_string()).into()),
     }
 }

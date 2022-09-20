@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use cargo_lambda_interactive::error::InquireError;
 use miette::Diagnostic;
 use thiserror::Error;
@@ -10,4 +12,10 @@ pub(crate) enum CreateError {
     InvalidFunctionOptions,
     #[error("unexpected input")]
     UnexpectedInput(#[from] InquireError),
+    #[error("invalid file path in template {0:?}")]
+    InvalidTemplateEntry(PathBuf),
+    #[error("project created in {0}, but the EDITOR variable is missing")]
+    InvalidEditor(String),
+    #[error("invalid package name: {0}")]
+    InvalidPackageName(String),
 }
