@@ -7,6 +7,7 @@ use miette::{IntoDiagnostic, Result, WrapErr};
 use reqwest::{Client, StatusCode};
 use serde_json::{from_str, to_string_pretty, value::Value};
 use std::{
+    convert::TryFrom,
     fs::{create_dir_all, read_to_string, File},
     io::copy,
     net::IpAddr,
@@ -14,6 +15,9 @@ use std::{
     str::{from_utf8, FromStr},
 };
 use strum_macros::{Display, EnumString};
+
+mod error;
+use error::*;
 
 /// Name for the function when no name is provided.
 /// This will make the watch command to compile
@@ -92,7 +96,7 @@ impl Invoke {
                 _ => download_example(&name, cache).await?,
             }
         } else {
-            return Err(miette::miette!("no data payload provided, use one of the data flags: `--data-file`, `--data-ascii`, `--data-example`"));
+            return Err(InvokeError::MissingPayload.into());
         };
 
         let text = if self.remote {
@@ -121,7 +125,7 @@ impl Invoke {
 
     async fn invoke_remote(&self, data: &str) -> Result<String> {
         if self.function_name == DEFAULT_PACKAGE_FUNCTION {
-            return Err(miette::miette!("invalid function name, it must match the name you used to create the function remotely"));
+            return Err(InvokeError::InvalidFunctionName.into());
         }
         let sdk_config = self.remote_config.sdk_config(None).await;
         let client = LambdaClient::new(&sdk_config);
@@ -136,23 +140,18 @@ impl Invoke {
             .into_diagnostic()
             .wrap_err("failed to invoke remote function")?;
 
-        if let Some(fail) = resp.function_error {
-            let blob = resp
-                .payload
-                .expect("function error is not in the payload")
-                .into_inner();
-            let text = from_utf8(&blob)
-                .into_diagnostic()
-                .wrap_err("failed to read response payload")?;
-            return Err(miette::miette!("{}: {}", fail, text));
-        }
-
         if let Some(payload) = resp.payload {
             let blob = payload.into_inner();
-            from_utf8(&blob)
-                .map(String::from)
+            let data = from_utf8(&blob)
                 .into_diagnostic()
-                .wrap_err("failed to read response payload")
+                .wrap_err("failed to read response payload")?;
+
+            if resp.function_error.is_some() {
+                let err = RemoteInvokeError::try_from(data)?;
+                Err(err.into())
+            } else {
+                Ok(data.into())
+            }
         } else {
             Ok("OK".into())
         }
@@ -185,30 +184,27 @@ impl Invoke {
 async fn download_example(name: &str, cache: Option<PathBuf>) -> Result<String> {
     let target = format!("https://github.com/LegNeato/aws-lambda-events/raw/master/aws_lambda_events/src/generated/fixtures/{name}");
 
-    let response = reqwest::get(target)
+    let response = reqwest::get(&target)
         .await
         .into_diagnostic()
         .wrap_err("error dowloading example data")?;
 
     if response.status() != StatusCode::OK {
-        return Err(miette::miette!(
-            "error downloading example data -- {:?}",
-            response
-        ));
-    }
+        Err(InvokeError::ExampleDownloadFailed(target, response).into())
+    } else {
+        let content = response
+            .text()
+            .await
+            .into_diagnostic()
+            .wrap_err("error reading example data")?;
 
-    let content = response
-        .text()
-        .await
-        .into_diagnostic()
-        .wrap_err("error reading example data")?;
-
-    if let Some(cache) = cache {
-        create_dir_all(cache.parent().unwrap()).into_diagnostic()?;
-        let mut dest = File::create(cache).into_diagnostic()?;
-        copy(&mut content.as_bytes(), &mut dest).into_diagnostic()?;
+        if let Some(cache) = cache {
+            create_dir_all(cache.parent().unwrap()).into_diagnostic()?;
+            let mut dest = File::create(cache).into_diagnostic()?;
+            copy(&mut content.as_bytes(), &mut dest).into_diagnostic()?;
+        }
+        Ok(content)
     }
-    Ok(content)
 }
 
 fn parse_invoke_ip_address(address: &str) -> Result<String> {

@@ -754,9 +754,11 @@ dependencies = [
  "dirs",
  "miette",
  "reqwest",
+ "serde",
  "serde_json",
  "strum",
  "strum_macros",
+ "thiserror",
  "tokio",
  "tracing",
 ]
