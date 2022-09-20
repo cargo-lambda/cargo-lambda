@@ -8,7 +8,7 @@ members = [
     "crates/cargo-lambda-metadata",
     "crates/cargo-lambda-new",
     "crates/cargo-lambda-remote",
-    "crates/cargo-lambda-watch"
+    "crates/cargo-lambda-watch",
 ]
 
 exclude = [
@@ -16,10 +16,11 @@ exclude = [
     "test/fixtures/mixed-workspace-package",
     "test/fixtures/missing-binary-package",
     "test/fixtures/multi-binary-package",
+    "test/fixtures/target-dir-set-in-project",
     "test/fixtures/workspace-package",
     "test/integration/test-fun",
     "test/integration/test-ext",
-    "test/integration/test-logs"
+    "test/integration/test-logs",
 ]
 
 [profile.release]

@@ -1,4 +1,7 @@
-use cargo_lambda_metadata::{cargo::binary_targets, fs::rename};
+use cargo_lambda_metadata::{
+    cargo::{binary_targets, target_dir},
+    fs::rename,
+};
 use cargo_zigbuild::Build as ZigBuild;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
@@ -198,7 +201,9 @@ impl Build {
             std::process::exit(status.code().unwrap_or(1));
         }
 
-        let target_dir = Path::new("target");
+        // extract resolved target dir from cargo metadata
+        let target_dir = target_dir(manifest_path).unwrap_or_else(|_| PathBuf::from("target"));
+        let target_dir = Path::new(&target_dir);
         let lambda_dir = if let Some(dir) = &self.lambda_dir {
             dir.clone()
         } else {

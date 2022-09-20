@@ -3,7 +3,7 @@ use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 #[derive(Default, Deserialize)]
@@ -45,11 +45,41 @@ pub fn binary_targets<P: AsRef<Path>>(manifest_path: P) -> Result<HashSet<String
     Ok(bins)
 }
 
+/// Extract target directory information
+///
+/// This fetches the target directory from `cargo metadata`, resolving the
+/// user and project configuration and the environment variables in the right
+/// way.
+pub fn target_dir<P: AsRef<Path>>(manifest_path: P) -> Result<PathBuf> {
+    let metadata = load_metadata(manifest_path)?;
+    Ok(metadata.target_directory.into_std_path_buf())
+}
+
 /// Create metadata about the root package in the Cargo manifest, without any dependencies.
 fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
-    metadata_cmd.manifest_path(manifest_path.as_ref());
+
+    // try to split manifest path and assign current_dir to enable parsing a project-specific
+    // cargo config
+    match (
+        manifest_path.as_ref().parent(),
+        manifest_path.as_ref().file_name(),
+    ) {
+        (Some(mut project_dir), Some(manifest_file)) => {
+            if project_dir == Path::new("") {
+                project_dir = Path::new("./")
+            }
+            metadata_cmd.current_dir(project_dir);
+            metadata_cmd.manifest_path(manifest_file);
+        }
+        _ => {
+            // fall back to using the manifest_path without changing the dir
+            // this means there will not be any proejct-specific config parsing
+            metadata_cmd.manifest_path(manifest_path.as_ref());
+        }
+    }
+
     metadata_cmd.exec().into_diagnostic()
 }
 
@@ -211,5 +241,35 @@ mod tests {
         let env = function_metadata(fixture("single-binary-package"), None).unwrap();
 
         assert_eq!(env.get("FOO").unwrap(), "BAR");
+    }
+
+    #[test]
+    fn test_target_dir_non_set() {
+        use std::env;
+
+        // ensure there is no environment variable set
+        env::remove_var("CARGO_TARGET_DIR");
+        let target_dir = target_dir(fixture("single-binary-package")).unwrap();
+        assert!(target_dir.ends_with("test/fixtures/single-binary-package/target"));
+    }
+
+    #[test]
+    fn test_target_dir_from_project_config() {
+        use std::env;
+
+        // ensure there is no environment variable set
+        env::remove_var("CARGO_TARGET_DIR");
+        let target_dir = target_dir(fixture("target-dir-set-in-project")).unwrap();
+        assert!(target_dir.ends_with("project_specific_target"));
+    }
+
+    #[test]
+    fn test_target_dir_from_env() {
+        use std::env;
+
+        // set environment variable
+        env::set_var("CARGO_TARGET_DIR", "/tmp/exotic_path");
+        let target_dir = target_dir(fixture("single-binary-package")).unwrap();
+        assert!(target_dir.ends_with("/tmp/exotic_path"));
     }
 }
