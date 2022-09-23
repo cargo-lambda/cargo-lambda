@@ -48,7 +48,7 @@ cargo lambda new new-lambda-project \
 ```
 
 ::: tip
-Add the flag `--http-feature apigw_rest` if you want to automatically generate an HTTP function that integrates with Amazon API Gateway
+Add the flag `--http` if you want to automatically generate an HTTP function that integrates with Amazon API Gateway
 :::
 
 ## Step 3: Serve the function locally for testing
