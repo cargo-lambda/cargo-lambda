@@ -145,6 +145,7 @@ impl Build {
             }
         }
 
+<<<<<<< HEAD
         let mut build_config = function_build_metadata(&metadata)?;
         if self.compiler == CompilerFlag::Cargo && build_config.is_zig_enabled() {
             build_config.compiler = CompilerOptions::from(self.compiler.to_string());
@@ -157,6 +158,9 @@ impl Build {
                 return Err(BuildError::InvalidLinkerOption.into());
             }
         }
+=======
+        let mut cmd = self.build.build_command().map_err(|e| miette::miette!(e))?;
+>>>>>>> Add telemetry to track usage.
 
         let rust_flags = if self.build.release {
             let mut rust_flags = env::var("RUSTFLAGS").unwrap_or_default();

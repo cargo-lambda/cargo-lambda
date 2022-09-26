@@ -24,15 +24,20 @@ cargo-lambda-new.workspace = true
 cargo-lambda-watch.workspace = true
 clap = { workspace = true, features = ["suggestions"] }
 miette = { workspace = true, features = ["fancy"] }
+reqwest = { workspace = true, features = ["rustls-tls", "json"] }
 sentry = { version = "0.27.0", default-features = false, features = [
     "rustls",
     "reqwest",
     "tracing",
 ] }
 sentry-core = "0.27.0"
+serde = { version = "1.0.137", features = ["derive"] }
+serde_json = "1.0.81"
+sysinfo = "0.26.3"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
+uuid.workspace = true
 
 [build-dependencies]
 build-data = "0.1"
