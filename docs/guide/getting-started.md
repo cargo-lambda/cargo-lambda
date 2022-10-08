@@ -99,4 +99,4 @@ Use the flag `--verbose` with any subcommand to enable tracing instrumentation. 
 
 ## Rust version
 
-This project works with Rust 1.59 and above.
+This project works with Rust 1.64 and above.
