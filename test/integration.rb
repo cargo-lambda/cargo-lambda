@@ -3,6 +3,7 @@ include FileUtils
 require 'test/unit/assertions'
 include Test::Unit::Assertions
 
+ENV['CARGO_TARGET_DIR'] = File.expand_path('target')
 BINARY = File.expand_path(File.join('target', 'debug', 'cargo-lambda'))
 BASE = File.expand_path(File.join('test', 'integration'))
 
@@ -13,9 +14,11 @@ def test_build(name, output, new_flags: '', build_flags: '')
     cd BASE
     system "#{BINARY} lambda new #{new_flags} #{name}"
 
+    build_flags << ' --quiet' if !ENV["DEBUG"]
+
     cd name
-    system "#{BINARY} lambda build --release --quiet #{build_flags}"
-    output = File.join('target', 'lambda', output)
+    system "#{BINARY} lambda build --release #{build_flags}"
+    output = File.join(ENV['CARGO_TARGET_DIR'], 'lambda', output)
     assert(File.exist?(output), "binary doesn't exist: #{output}")
 end
 
