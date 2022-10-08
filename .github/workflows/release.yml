@@ -4,6 +4,9 @@ on:
   push:
     tags: [ 'v*' ]
 
+env:
+  MATURIN_VERSION: 0.13.6
+
 jobs:
   release-macos:
     runs-on: macos-latest
@@ -21,7 +24,7 @@ jobs:
       - name: Build
         uses: messense/maturin-action@v1
         with:
-          maturin-version: 0.13.0
+          maturin-version: ${{ env.MATURIN_VERSION }}
           args: --release --out dist --strip --universal2 -m crates/cargo-lambda-cli/Cargo.toml
       - name: Upload wheels
         uses: actions/upload-artifact@v3
@@ -58,7 +61,7 @@ jobs:
       - name: Build
         uses: messense/maturin-action@v1
         with:
-          maturin-version: 0.13.0
+          maturin-version: ${{ env.MATURIN_VERSION }}
           target: ${{ matrix.platform.target }}
           args: --release --out dist --strip -m crates/cargo-lambda-cli/Cargo.toml
       - name: Upload wheels
@@ -101,7 +104,7 @@ jobs:
       - name: Build
         uses: messense/maturin-action@v1
         with:
-          maturin-version: 0.13.0
+          maturin-version: ${{ env.MATURIN_VERSION }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
           container: off
