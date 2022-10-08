@@ -12,14 +12,14 @@ use aws_lambda_events::{
 use axum::{
     body::Body,
     extract::{Extension, Path},
-    http::Request,
+    http::{HeaderValue, Request},
     response::Response,
     routing::{any, post},
     Router,
 };
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
 use chrono::Utc;
-use hyper::body::to_bytes;
+use hyper::{body::to_bytes, header};
 use miette::Result;
 use opentelemetry::{
     global,
@@ -153,6 +153,13 @@ async fn furls_handler(
     if let Some(headers) = builder.headers_mut() {
         headers.extend(resp_event.headers);
         headers.extend(resp_event.multi_value_headers);
+
+        resp_event.cookies.iter().try_for_each(|cookie| {
+            let header_value =
+                HeaderValue::try_from(cookie).map_err(|e| ServerError::ResponseBuild(e.into()))?;
+            headers.append(header::SET_COOKIE, header_value);
+            Ok::<(), ServerError>(())
+        })?;
     }
 
     builder.body(resp_body).map_err(ServerError::ResponseBuild)
