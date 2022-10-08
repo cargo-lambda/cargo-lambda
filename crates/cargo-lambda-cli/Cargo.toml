@@ -1,14 +1,15 @@
 [package]
 name = "cargo-lambda"
-description = "Cargo subcommand to work with AWS Lambda"
-version = "0.11.1"
-edition = "2021"
-license = "MIT"
 readme = "../../README.md"
-homepage = "https://github.com/cargo-lambda/cargo-lambda"
-repository = "https://github.com/cargo-lambda/cargo-lambda"
-keywords = ["cargo", "subcommand", "aws", "lambda"]
-rust-version = "1.59.0"
+rust-version.workspace = true
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+description.workspace = true
 
 # Use cargo-edit(https://github.com/killercup/cargo-edit#installation)
 # to manage dependencies.
@@ -16,16 +17,16 @@ rust-version = "1.59.0"
 # add the latest version of a dependency to the list,
 # and it will keep the alphabetic ordering for you.
 [dependencies]
-cargo-lambda-build = { version = "0.11.0", path = "../cargo-lambda-build" }
-cargo-lambda-deploy = { version = "0.11.0", path = "../cargo-lambda-deploy" }
-cargo-lambda-invoke = { version = "0.11.0", path = "../cargo-lambda-invoke" }
-cargo-lambda-new = { version = "0.11.0", path = "../cargo-lambda-new" }
-cargo-lambda-watch = { version = "0.11.0", path = "../cargo-lambda-watch" }
-clap = { version = "3.1.18", features = ["derive", "suggestions"] }
-miette = { version = "4.7.1", features = ["fancy"] }
-tokio = { version = "1.18.2", features = ["macros", "rt-multi-thread"] }
-tracing = "0.1.34"
-tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
+cargo-lambda-build.workspace = true
+cargo-lambda-deploy.workspace = true
+cargo-lambda-invoke.workspace = true
+cargo-lambda-new.workspace = true
+cargo-lambda-watch.workspace = true
+clap = { workspace = true, features = ["suggestions"] }
+miette = { workspace = true, features = ["fancy"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 [build-dependencies]
 build-data = "0.1"

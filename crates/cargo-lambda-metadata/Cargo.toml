@@ -1,14 +1,15 @@
 [package]
 name = "cargo-lambda-metadata"
-description = "Cargo subcommand to work with AWS Lambda"
-version = "0.11.0"
-edition = "2021"
-license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/cargo-lambda/cargo-lambda"
-repository = "https://github.com/cargo-lambda/cargo-lambda"
-keywords = ["cargo", "subcommand", "aws", "lambda"]
-rust-version = "1.59.0"
+rust-version.workspace = true
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+description.workspace = true
 
 # Use cargo-edit(https://github.com/killercup/cargo-edit#installation)
 # to manage dependencies.
@@ -19,6 +20,6 @@ rust-version = "1.59.0"
 cargo_metadata = "0.14.2"
 miette = "4.7.1"
 remove_dir_all = "0.7.0"
-serde = { version = "1.0.137", features = ["derive"] }
-serde_json = "1.0.81"
-tracing = { version = "0.1.35", features = ["log"] }
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
