@@ -28,6 +28,14 @@ You can also use [PyPI](https://pypi.org/) to install Cargo Lambda on any system
 pip3 install cargo-lambda
 ```
 
+## With Docker
+
+You can run Cargo Lambda directly from our official Docker image:
+
+```sh
+docker pull calavera/cargo-lambda
+```
+
 ## Download the binary from the releases page
 
 You can also download any Cargo Lambda binary from the [Release page](https://github.com/cargo-lambda/cargo-lambda/releases).
