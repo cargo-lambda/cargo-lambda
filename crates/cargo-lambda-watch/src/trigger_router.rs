@@ -109,7 +109,7 @@ async fn furls_handler(
             path: Some(path.clone()),
             protocol: Some("http".into()),
             source_ip: Some("127.0.0.1".into()),
-            user_agent: Some("cargo-lamba".into()),
+            user_agent: Some("cargo-lambda".into()),
         },
         time: Some(time.format("%d/%b/%Y:%T %z").to_string()),
         time_epoch: time.timestamp(),
