@@ -1,12 +1,16 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
 use clap::{Args, ValueHint};
-use miette::Result;
+use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
     global,
     sdk::{export::trace::stdout, trace, trace::Tracer},
 };
 use opentelemetry_aws::trace::XrayPropagator;
-use std::{net::SocketAddr, path::PathBuf};
+use std::{
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+    str::FromStr,
+};
 use tokio::time::Duration;
 use tokio_graceful_shutdown::{SubsystemHandle, Toplevel};
 use tower_http::{
@@ -34,6 +38,17 @@ pub struct Watch {
     /// Avoid hot-reload
     #[clap(long)]
     no_reload: bool,
+
+    #[cfg_attr(
+        target_os = "windows",
+        clap(short = 'a', long, default_value = "127.0.0.1")
+    )]
+    #[cfg_attr(
+        not(target_os = "windows"),
+        clap(short = 'a', long, default_value = "::")
+    )]
+    /// Address where users send invoke requests
+    invoke_address: String,
 
     /// Address port where users send invoke requests
     #[clap(short = 'p', long, default_value = "9000")]
@@ -76,14 +91,17 @@ impl Watch {
             watch_installer::install().await?;
         }
 
-        let port = self.invoke_port;
+        let ip = IpAddr::from_str(&self.invoke_address)
+            .into_diagnostic()
+            .wrap_err("invalid invoke address")?;
+        let addr = SocketAddr::from((ip, self.invoke_port));
         let no_reload = self.no_reload;
         let watch_args = self.watch_args.clone();
         let cargo_options = self.cargo_options.clone();
 
         Toplevel::new()
             .start("Lambda server", move |s| {
-                start_server(s, port, watch_args, cargo_options, no_reload)
+                start_server(s, addr, watch_args, cargo_options, no_reload)
             })
             .catch_signals()
             .handle_shutdown_requests(Duration::from_millis(1000))
@@ -113,12 +131,11 @@ impl Watch {
 
 async fn start_server(
     subsys: SubsystemHandle,
-    invoke_port: u16,
+    addr: SocketAddr,
     watch_args: Vec<String>,
     cargo_options: CargoOptions,
     no_reload: bool,
 ) -> Result<(), axum::Error> {
-    let addr = SocketAddr::from(([127, 0, 0, 1], invoke_port));
     let runtime_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
 
     let req_cache = RequestCache::new(runtime_addr);
