@@ -29,6 +29,7 @@ use std::{
 };
 use strum_macros::{Display, EnumString};
 use tokio::time::{sleep, Duration};
+use uuid::Uuid;
 
 enum FunctionAction {
     Create,
@@ -466,13 +467,14 @@ pub(crate) async fn upsert_function_url_config(
     let url = match result {
         Ok(fun) => fun.function_url,
         Err(no_fun) if function_url_config_doesnt_exist_error(&no_fun) => {
+            let statement = format!("FunctionUrlAllowPublicAccess-{}", Uuid::new_v4());
             client
                 .add_permission()
                 .function_name(name)
                 .set_qualifier(alias.clone())
                 .action("lambda:InvokeFunctionUrl")
                 .principal("*")
-                .statement_id("FunctionUrlAllowPublicAccess")
+                .statement_id(statement)
                 .function_url_auth_type(FunctionUrlAuthType::None)
                 .send()
                 .await
