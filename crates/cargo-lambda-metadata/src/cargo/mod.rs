@@ -250,7 +250,11 @@ mod tests {
         // ensure there is no environment variable set
         env::remove_var("CARGO_TARGET_DIR");
         let target_dir = target_dir(fixture("single-binary-package")).unwrap();
-        assert!(target_dir.ends_with("test/fixtures/single-binary-package/target"));
+        assert!(
+            target_dir.ends_with("test/fixtures/single-binary-package/target"),
+            "unexpected directory {:?}",
+            target_dir
+        );
     }
 
     #[test]
@@ -260,7 +264,11 @@ mod tests {
         // ensure there is no environment variable set
         env::remove_var("CARGO_TARGET_DIR");
         let target_dir = target_dir(fixture("target-dir-set-in-project")).unwrap();
-        assert!(target_dir.ends_with("project_specific_target"));
+        assert!(
+            target_dir.ends_with("project_specific_target"),
+            "unexpected directory {:?}",
+            target_dir
+        );
     }
 
     #[test]
@@ -270,6 +278,10 @@ mod tests {
         // set environment variable
         env::set_var("CARGO_TARGET_DIR", "/tmp/exotic_path");
         let target_dir = target_dir(fixture("single-binary-package")).unwrap();
-        assert!(target_dir.ends_with("/tmp/exotic_path"));
+        assert!(
+            target_dir.ends_with("/tmp/exotic_path"),
+            "unexpected directory {:?}",
+            target_dir
+        );
     }
 }
