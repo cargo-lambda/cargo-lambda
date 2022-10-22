@@ -173,11 +173,20 @@ impl Invoke {
             .await
             .into_diagnostic()
             .wrap_err("error sending request to the runtime emulator")?;
+        let success = resp.status() == StatusCode::OK;
 
-        resp.text()
+        let payload = resp
+            .text()
             .await
             .into_diagnostic()
-            .wrap_err("error reading response body")
+            .wrap_err("error reading response body")?;
+
+        if success {
+            Ok(payload)
+        } else {
+            let err = RemoteInvokeError::try_from(payload.as_str())?;
+            Err(err.into())
+        }
     }
 }
 
