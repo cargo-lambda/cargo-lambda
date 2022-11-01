@@ -78,7 +78,7 @@ cargo lambda build --release
 ```
 
 ::: tip
-Add the flag `--arm64` if you want to use Gravitron processors on AWS Lambda
+Add the flag `--arm64` if you want to use Graviton processors on AWS Lambda
 :::
 
 ## Step 6: Deploy the function on AWS Lambda
