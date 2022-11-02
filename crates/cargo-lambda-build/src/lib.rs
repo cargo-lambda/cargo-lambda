@@ -20,6 +20,7 @@ use tracing::{debug, warn};
 use zip::{write::FileOptions, ZipWriter};
 
 pub use cargo_zigbuild::Zig;
+use path_slash::PathExt;
 
 mod error;
 use error::BuildError;
@@ -349,7 +350,7 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     };
 
     zip.start_file(
-        file_name.to_str().expect("failed to convert file path"),
+        file_name.to_slash().expect("failed to convert file path"),
         FileOptions::default().unix_permissions(binary_perm),
     )
     .into_diagnostic()?;

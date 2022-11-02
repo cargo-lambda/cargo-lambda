@@ -32,6 +32,7 @@ thiserror.workspace = true
 tracing.workspace = true
 which.workspace = true
 zip.workspace = true
+path-slash = "0.2.1"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }
