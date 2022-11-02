@@ -28,7 +28,7 @@ pub(crate) async fn deploy(
     sdk_config: &SdkConfig,
     binary_data: Vec<u8>,
     architecture: Architecture,
-    compatible_runtime: Vec<Runtime>,
+    compatible_runtimes: Vec<Runtime>,
     s3_bucket: &Option<String>,
     progress: &Progress,
 ) -> Result<DeployResult> {
@@ -65,7 +65,7 @@ pub(crate) async fn deploy(
         .publish_layer_version()
         .layer_name(name)
         .compatible_architectures(architecture)
-        .set_compatible_runtimes(Some(compatible_runtime))
+        .set_compatible_runtimes(Some(compatible_runtimes))
         .content(input)
         .send()
         .await

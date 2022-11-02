@@ -120,7 +120,7 @@ impl Deploy {
 
         let sdk_config = self.remote_config.sdk_config(Some(retry)).await;
         let architecture = Architecture::from(archive.architecture.as_str());
-        let compatible_runtime = self.compatible_runtimes
+        let compatible_runtimes = self.compatible_runtimes
             .iter()
             .map(|runtime| Runtime::from(runtime.as_str()))
             .collect::<Vec<_>>();
@@ -135,7 +135,7 @@ impl Deploy {
                 &sdk_config,
                 binary_data,
                 architecture,
-                compatible_runtime,
+                compatible_runtimes,
                 &self.s3_bucket,
                 &progress,
             )
