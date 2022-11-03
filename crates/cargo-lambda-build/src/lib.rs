@@ -401,7 +401,8 @@ mod test {
 
     #[test]
     fn test_convert_to_unix_path() {
-        let path = PathBuf::from("extensions\\test\\filename");
+        // On Windows, a PathBuff constructed from Path::join will have "\" as separator, while on Unix-like systems it will have "/"
+        let path = Path::new("extensions").join("test").join("filename");
         assert_eq!(
             "extensions/test/filename",
             convert_to_unix_path(&path).expect("failed to convert file path")
@@ -418,7 +419,7 @@ mod test {
     }
 
     #[test]
-    fn test_convert_empty_str_to_unix_path() {
+    fn test_convert_to_unix_path_empty_path() {
         let path = PathBuf::from("");
         assert_eq!(
             "",
