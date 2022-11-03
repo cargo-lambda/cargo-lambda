@@ -377,7 +377,7 @@ fn binary_permissions(_path: &Path) -> Result<u32> {
 }
 
 #[cfg(target_os = "windows")]
-fn convert_to_unix_path(path: &PathBuf) -> Option<Cow<'_, str>> {
+fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
     let mut path_str = String::new();
     for component in path.components() {
         if let std::path::Component::Normal(os_str) = component {
@@ -391,7 +391,7 @@ fn convert_to_unix_path(path: &PathBuf) -> Option<Cow<'_, str>> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn convert_to_unix_path(path: &PathBuf) -> Option<Cow<'_, str>> {
+fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
     path.to_str().map(Cow::Borrowed)
 }
 
@@ -411,16 +411,16 @@ mod test {
 
     #[test]
     fn test_convert_to_unix_path_keep_original() {
-        let path = PathBuf::from("extensions/test/filename");
+        let path = Path::new("extensions/test/filename");
         assert_eq!(
             "extensions/test/filename",
-            convert_to_unix_path(&path).expect("failed to convert file path")
+            convert_to_unix_path(path).expect("failed to convert file path")
         );
     }
 
     #[test]
     fn test_convert_to_unix_path_empty_path() {
-        let path = PathBuf::from("");
+        let path = Path::new("");
         assert_eq!(
             "",
             convert_to_unix_path(&path).expect("failed to convert file path")
