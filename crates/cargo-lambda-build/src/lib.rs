@@ -8,6 +8,7 @@ use miette::{IntoDiagnostic, Result, WrapErr};
 use object::{read::File as ObjectFile, Architecture, Object};
 use sha2::{Digest, Sha256};
 use std::{
+    borrow::Cow,
     env,
     fs::{create_dir_all, read, File},
     io::Write,
@@ -349,7 +350,7 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     };
 
     zip.start_file(
-        file_name.to_str().expect("failed to convert file path"),
+        convert_to_unix_path(&file_name).expect("failed to convert file path"),
         FileOptions::default().unix_permissions(binary_perm),
     )
     .into_diagnostic()?;
@@ -373,4 +374,56 @@ fn binary_permissions(path: &Path) -> Result<u32> {
 #[cfg(not(unix))]
 fn binary_permissions(_path: &Path) -> Result<u32> {
     Ok(0o755)
+}
+
+#[cfg(target_os = "windows")]
+fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
+    let mut path_str = String::new();
+    for component in path.components() {
+        if let std::path::Component::Normal(os_str) = component {
+            if !path_str.is_empty() {
+                path_str.push('/');
+            }
+            path_str.push_str(os_str.to_str()?);
+        }
+    }
+    Some(Cow::Owned(path_str))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
+    path.to_str().map(Cow::Borrowed)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_convert_to_unix_path() {
+        // On Windows, a PathBuff constructed from Path::join will have "\" as separator, while on Unix-like systems it will have "/"
+        let path = Path::new("extensions").join("test").join("filename");
+        assert_eq!(
+            "extensions/test/filename",
+            convert_to_unix_path(&path).expect("failed to convert file path")
+        );
+    }
+
+    #[test]
+    fn test_convert_to_unix_path_keep_original() {
+        let path = Path::new("extensions/test/filename");
+        assert_eq!(
+            "extensions/test/filename",
+            convert_to_unix_path(path).expect("failed to convert file path")
+        );
+    }
+
+    #[test]
+    fn test_convert_to_unix_path_empty_path() {
+        let path = Path::new("");
+        assert_eq!(
+            "",
+            convert_to_unix_path(&path).expect("failed to convert file path")
+        );
+    }
 }
