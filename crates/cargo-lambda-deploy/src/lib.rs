@@ -2,7 +2,10 @@ use aws_smithy_types::retry::{RetryConfig, RetryMode};
 use cargo_lambda_build::{find_binary_archive, zip_binary, BinaryArchive};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::root_package;
-use cargo_lambda_remote::{aws_sdk_lambda::model::Architecture, RemoteConfig};
+use cargo_lambda_remote::{
+    aws_sdk_lambda::model::{Architecture, Runtime},
+    RemoteConfig,
+};
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
@@ -75,6 +78,16 @@ pub struct Deploy {
     #[clap(long)]
     extension: bool,
 
+    /// Comma separated list with compatible runtimes for the Lambda Extension (--compatible_runtimes=provided.al2,nodejs16.x)
+    /// List of allowed runtimes can be found in the AWS documentation: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
+    #[clap(
+        long,
+        use_value_delimiter = true,
+        value_delimiter = ',',
+        default_value = "provided.al2"
+    )]
+    pub compatible_runtimes: Vec<String>,
+
     /// Format to render the output (text, or json)
     #[clap(long, default_value_t = OutputFormat::Text)]
     output_format: OutputFormat,
@@ -109,6 +122,11 @@ impl Deploy {
 
         let sdk_config = self.remote_config.sdk_config(Some(retry)).await;
         let architecture = Architecture::from(archive.architecture.as_str());
+        let compatible_runtimes = self
+            .compatible_runtimes
+            .iter()
+            .map(|runtime| Runtime::from(runtime.as_str()))
+            .collect::<Vec<_>>();
 
         let binary_data = read(&archive.path)
             .into_diagnostic()
@@ -120,6 +138,7 @@ impl Deploy {
                 &sdk_config,
                 binary_data,
                 architecture,
+                compatible_runtimes,
                 &self.s3_bucket,
                 &progress,
             )

@@ -278,7 +278,7 @@ pub struct BinaryArchive {
 }
 
 /// Search for the bootstrap file for a function inside the target directory.
-/// If the binary file exists, it creates the zip archive and extracts its architectury by reading the binary.
+/// If the binary file exists, it creates the zip archive and extracts its architecture by reading the binary.
 pub fn find_binary_archive<P: AsRef<Path>>(
     name: &str,
     base_dir: &Option<P>,
