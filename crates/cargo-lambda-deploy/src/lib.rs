@@ -2,14 +2,16 @@ use aws_smithy_types::retry::{RetryConfig, RetryMode};
 use cargo_lambda_build::{find_binary_archive, zip_binary, BinaryArchive};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::root_package;
-use cargo_lambda_remote::{aws_sdk_lambda::model::Architecture, RemoteConfig};
+use cargo_lambda_remote::{
+    aws_sdk_lambda::model::{Architecture, Runtime},
+    RemoteConfig,
+};
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
 use serde_json::ser::to_string_pretty;
 use std::{fs::read, path::PathBuf, time::Duration};
 use strum_macros::{Display, EnumString};
-use cargo_lambda_remote::aws_sdk_lambda::model::Runtime;
 
 mod extensions;
 mod functions;
@@ -120,7 +122,8 @@ impl Deploy {
 
         let sdk_config = self.remote_config.sdk_config(Some(retry)).await;
         let architecture = Architecture::from(archive.architecture.as_str());
-        let compatible_runtimes = self.compatible_runtimes
+        let compatible_runtimes = self
+            .compatible_runtimes
             .iter()
             .map(|runtime| Runtime::from(runtime.as_str()))
             .collect::<Vec<_>>();
