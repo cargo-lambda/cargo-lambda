@@ -144,8 +144,12 @@ async fn furls_handler(
     let resp_event: ApiGatewayV2httpResponse =
         serde_json::from_slice(&body).map_err(ServerError::SerializationError)?;
 
+    let is_base64_encoded = resp_event.is_base64_encoded.unwrap_or(false);
     let resp_body = match resp_event.body.unwrap_or(LambdaBody::Empty) {
         LambdaBody::Empty => Body::empty(),
+        b if is_base64_encoded => {
+            Body::from(base64::decode(b.as_ref()).map_err(ServerError::BodyDecodeError)?)
+        }
         LambdaBody::Text(s) => Body::from(s),
         LambdaBody::Binary(b) => Body::from(b),
     };

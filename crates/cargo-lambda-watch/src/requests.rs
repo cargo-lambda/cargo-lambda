@@ -21,6 +21,10 @@ pub enum ServerError {
     #[diagnostic()]
     ResponseBuild(#[from] axum::http::Error),
 
+    #[error("failed to decode a base64 encoded body")]
+    #[diagnostic()]
+    BodyDecodeError(#[from] base64::DecodeError),
+
     #[error("failed to send message to api")]
     #[diagnostic()]
     SendFunctionMessage,
