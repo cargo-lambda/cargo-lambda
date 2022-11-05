@@ -131,7 +131,7 @@ impl New {
 
             if entry_path.is_dir() {
                 if entry_name != ".git" {
-                    create_dir_all(&entry_path).into_diagnostic()?;
+                    create_dir_all(entry_path).into_diagnostic()?;
                 }
             } else if entry_name == "cargo-lambda-template.zip" {
                 continue;
@@ -157,7 +157,7 @@ impl New {
                     || parent_name == Some("bin")
                     || self.is_render_file(relative)
                 {
-                    let template = parser.parse_file(&entry_path).into_diagnostic()?;
+                    let template = parser.parse_file(entry_path).into_diagnostic()?;
 
                     let mut file = File::create(&new_path).into_diagnostic()?;
                     template
@@ -167,7 +167,7 @@ impl New {
                             format!("failed to render template file: {:?}", &new_path)
                         })?;
                 } else {
-                    copy_file(&entry_path, &new_path)
+                    copy_file(entry_path, &new_path)
                         .into_diagnostic()
                         .wrap_err_with(|| {
                             format!(
@@ -179,7 +179,7 @@ impl New {
             }
         }
 
-        rename(&render_path, &self.package_name)
+        rename(render_path, &self.package_name)
             .into_diagnostic()
             .wrap_err_with(|| {
                 format!(
