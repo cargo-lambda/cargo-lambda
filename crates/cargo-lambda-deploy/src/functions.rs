@@ -11,7 +11,7 @@ use cargo_lambda_remote::{
         },
         model::{
             Architecture, Environment, FunctionCode, FunctionConfiguration, FunctionUrlAuthType,
-            Runtime, State, TracingConfig,
+            LastUpdateStatus, Runtime, State, TracingConfig,
         },
         output::GetFunctionOutput,
         types::{Blob, SdkError},
@@ -191,10 +191,12 @@ async fn upsert_function(
 
             let code = match &s3_bucket {
                 None => {
+                    tracing::debug!("uploading zip to Lambda");
                     let blob = Blob::new(binary_data);
                     FunctionCode::builder().zip_file(blob).build()
                 }
                 Some(bucket) => {
+                    tracing::debug!(bucket = bucket, "uploading zip to S3");
                     let client = S3Client::new(sdk_config);
                     client
                         .put_object()
@@ -265,92 +267,80 @@ async fn upsert_function(
         FunctionAction::Update(fun) => {
             progress.set_message("deploying function");
 
-            if let Some(conf) = fun.configuration {
-                let mut update_config = false;
-                let mut builder = client.update_function_configuration().function_name(name);
+            let conf = fun
+                .configuration
+                .ok_or_else(|| miette::miette!("missing function configuration"))?;
 
-                if let Some(iam_role) = &function_config.iam_role {
-                    builder = builder.role(iam_role);
+            let mut wait_for_readiness = false;
+            if conf.state.is_none() || conf.state == Some(State::Pending) {
+                wait_for_readiness = true;
+            }
+
+            if let Some(status) = conf.last_update_status() {
+                if status == &LastUpdateStatus::InProgress {
+                    wait_for_readiness = true;
                 }
+            }
 
-                if function_config.memory_size.is_some()
-                    && conf.memory_size != function_config.memory_size
-                {
-                    update_config = true;
-                    builder = builder.set_memory_size(function_config.memory_size);
-                }
+            if wait_for_readiness {
+                wait_for_ready_state(client, name, &remote_config.alias, progress).await?;
+                progress.set_message("deploying function");
+            }
 
-                if conf.timeout.unwrap_or_default() != function_config.timeout {
-                    update_config = true;
-                    builder = builder.timeout(function_config.timeout);
-                }
+            let mut update_config = false;
+            let mut builder = client.update_function_configuration().function_name(name);
 
-                if should_update_layers(&function_config.layer_arn, &conf) {
-                    update_config = true;
-                    builder = builder.set_layers(function_config.layer_arn.clone());
-                }
+            if let Some(iam_role) = &function_config.iam_role {
+                builder = builder.role(iam_role);
+            }
 
-                let env =
-                    function_environment(&function_config.env_file, &function_config.env_var)?;
-                if env.variables != conf.environment.map(|e| e.variables).unwrap_or_default() {
-                    update_config = true;
-                    builder = builder.environment(env);
-                }
+            if function_config.memory_size.is_some()
+                && conf.memory_size != function_config.memory_size
+            {
+                update_config = true;
+                builder = builder.set_memory_size(function_config.memory_size);
+            }
 
-                if tracing_config.mode != conf.tracing_config.map(|t| t.mode).unwrap_or_default() {
-                    update_config = true;
-                    builder = builder.tracing_config(tracing_config);
-                }
+            if conf.timeout.unwrap_or_default() != function_config.timeout {
+                update_config = true;
+                builder = builder.timeout(function_config.timeout);
+            }
 
-                if update_config {
-                    builder
-                        .send()
-                        .await
-                        .into_diagnostic()
-                        .wrap_err("failed to update function configuration")?;
+            if should_update_layers(&function_config.layer_arn, &conf) {
+                update_config = true;
+                builder = builder.set_layers(function_config.layer_arn.clone());
+            }
 
-                    // wait until the update has been conpletely propagated
-                    for attempt in 1..4 {
-                        let conf = client
-                            .get_function_configuration()
-                            .function_name(name)
-                            .set_qualifier(remote_config.alias.clone())
-                            .send()
-                            .await
-                            .into_diagnostic()
-                            .wrap_err("failed to fetch the function configuration")?;
+            let env = function_environment(&function_config.env_file, &function_config.env_var)?;
+            if env.variables != conf.environment.map(|e| e.variables).unwrap_or_default() {
+                update_config = true;
+                builder = builder.environment(env);
+            }
 
-                        match &conf.state {
-                            Some(state) => match state {
-                                State::Active => break,
-                                State::Pending => {
-                                    sleep(Duration::from_secs(attempt * attempt)).await;
-                                }
-                                other => {
-                                    return Err(miette::miette!(
-                                        "unexpected function state: {:?}",
-                                        other
-                                    ))
-                                }
-                            },
-                            None => return Err(miette::miette!("unknown function state")),
-                        }
+            if tracing_config.mode != conf.tracing_config.map(|t| t.mode).unwrap_or_default() {
+                update_config = true;
+                builder = builder.tracing_config(tracing_config);
+            }
 
-                        if attempt == 3 {
-                            return Err(miette::miette!("configuration update didn't finish in time, wait a few minutes and try again"));
-                        }
-                    }
-                }
+            if update_config {
+                tracing::debug!(config = ?builder, "updating function's configuration");
+                builder
+                    .send()
+                    .await
+                    .into_diagnostic()
+                    .wrap_err("failed to update function configuration")?;
             }
 
             let mut builder = client.update_function_code().function_name(name);
 
             match &s3_bucket {
                 None => {
+                    tracing::debug!("uploading zip to Lambda");
                     let blob = Blob::new(binary_data);
                     builder = builder.zip_file(blob)
                 }
                 Some(bucket) => {
+                    tracing::debug!(bucket = bucket, "uploading zip to S3");
                     let client = S3Client::new(sdk_config);
                     client
                         .put_object()
@@ -381,6 +371,63 @@ async fn upsert_function(
         arn.expect("missing function ARN"),
         version.expect("missing function version"),
     ))
+}
+
+async fn wait_for_ready_state(
+    client: &LambdaClient,
+    name: &str,
+    alias: &Option<String>,
+    progress: &Progress,
+) -> Result<()> {
+    // wait until the function state has been completely propagated
+    for attempt in 2..5 {
+        let backoff = attempt * attempt;
+        progress.set_message(&format!(
+            "the function is not ready for updates, waiting {} seconds before checking for state changes",
+            backoff
+        ));
+        sleep(Duration::from_secs(backoff)).await;
+
+        let conf = client
+            .get_function_configuration()
+            .function_name(name)
+            .set_qualifier(alias.clone())
+            .send()
+            .await
+            .into_diagnostic()
+            .wrap_err("failed to fetch the function configuration")?;
+
+        match &conf.state {
+            Some(state) => match state {
+                State::Active | State::Inactive | State::Failed => break,
+                State::Pending => {}
+                other => return Err(miette::miette!("unexpected function state: {:?}", other)),
+            },
+            None => return Err(miette::miette!("unknown function state")),
+        }
+
+        match &conf.last_update_status {
+            Some(state) => match state {
+                LastUpdateStatus::Failed | LastUpdateStatus::Successful => break,
+                LastUpdateStatus::InProgress => {}
+                other => {
+                    return Err(miette::miette!(
+                        "unexpected last update status: {:?}",
+                        other
+                    ))
+                }
+            },
+            None => return Ok(()),
+        }
+
+        if attempt == 5 {
+            return Err(miette::miette!(
+                "configuration update didn't finish in time, wait a few minutes and try again"
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 pub(crate) fn should_update_layers(
