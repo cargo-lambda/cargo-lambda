@@ -20,7 +20,7 @@ jobs:
           profile: minimal
           default: true
       - name: Cache cargo build
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2.1
       - name: Build
         uses: messense/maturin-action@v1
         with:
@@ -58,7 +58,7 @@ jobs:
           profile: minimal
           default: true
       - name: Cache cargo build
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2.1
       - name: Build
         uses: messense/maturin-action@v1
         with:
@@ -99,7 +99,7 @@ jobs:
         run: |
           echo "CARGO_LAMBDA_RELEASE_GIT_SHA=$GITHUB_SHA" >> $GITHUB_ENV
       - name: Cache cargo build
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2.1
         with:
           key: ${{ matrix.platform.target }}
 
