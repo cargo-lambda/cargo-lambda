@@ -24,7 +24,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.11.2"
+version = "0.11.3"
 authors = ["David Calavera"]
 edition = "2021"
 license = "MIT"
@@ -53,7 +53,9 @@ cargo-lambda-watch = { version = "0.11.2", path = "crates/cargo-lambda-watch" }
 clap = { version = "3.1.18", features = ["derive"] }
 home = "0.5.3"
 miette = { version = "4.7.1" }
-reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.11.10", default-features = false, features = [
+    "rustls-tls",
+] }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 strum = "0.24.0"
