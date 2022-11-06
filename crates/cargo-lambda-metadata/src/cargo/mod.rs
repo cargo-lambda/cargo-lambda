@@ -244,11 +244,9 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "changing the environment is not reliable"]
     fn test_target_dir_non_set() {
-        use std::env;
-
-        // ensure there is no environment variable set
-        env::remove_var("CARGO_TARGET_DIR");
+        std::env::remove_var("CARGO_TARGET_DIR");
         let target_dir = target_dir(fixture("single-binary-package")).unwrap();
         assert!(
             target_dir.ends_with("test/fixtures/single-binary-package/target"),
@@ -258,11 +256,9 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "changing the environment is not reliable"]
     fn test_target_dir_from_project_config() {
-        use std::env;
-
-        // ensure there is no environment variable set
-        env::remove_var("CARGO_TARGET_DIR");
+        std::env::remove_var("CARGO_TARGET_DIR");
         let target_dir = target_dir(fixture("target-dir-set-in-project")).unwrap();
         assert!(
             target_dir.ends_with("project_specific_target"),
@@ -272,11 +268,9 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "changing the environment is not reliable"]
     fn test_target_dir_from_env() {
-        use std::env;
-
-        // set environment variable
-        env::set_var("CARGO_TARGET_DIR", "/tmp/exotic_path");
+        std::env::set_var("CARGO_TARGET_DIR", "/tmp/exotic_path");
         let target_dir = target_dir(fixture("single-binary-package")).unwrap();
         assert!(
             target_dir.ends_with("/tmp/exotic_path"),
