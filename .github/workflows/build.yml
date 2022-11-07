@@ -42,7 +42,7 @@ jobs:
           profile: minimal
           toolchain: ${{ matrix.rust_version }}
           override: true
-      - uses: Swatinem/rust-cache@v2.1
+      - uses: Swatinem/rust-cache@v2
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
@@ -65,7 +65,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2.1
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-ruby@v1
         with:
           ruby-version: '2.7'
