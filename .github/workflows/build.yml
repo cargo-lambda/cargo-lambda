@@ -17,7 +17,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          override: true
 
       - name: Run cargo check
         run: cargo check
@@ -37,7 +36,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust_version }}
-          override: true
       - uses: Swatinem/rust-cache@v2
 
       - name: Run cargo test
@@ -78,7 +76,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          override: true
           components: clippy
 
       - name: Run cargo clippy
