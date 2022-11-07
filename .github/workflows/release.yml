@@ -164,8 +164,8 @@ jobs:
           mv target/github-release/**/*.whl target/upload
 
       - name: Upload binaries to GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: ncipollo/release-action@v1
         with:
-          files: target/upload/*
+          artifacts: target/upload/*
           prerelease: ${{ contains(github.ref_name, '-pre') }}
-          generate_release_notes: true
+          generateReleaseNotes: true
