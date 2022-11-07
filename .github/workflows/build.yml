@@ -49,9 +49,9 @@ jobs:
         os: [macos-latest, ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v3
-      - uses: goto-bus-stop/setup-zig@v1
+      - uses: korandoru/setup-zig@v1
         with:
-          version: 0.9.1
+          zig-version: 0.9.1
 
       - uses: dtolnay/rust-toolchain@master
         with:
