@@ -16,7 +16,6 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
           override: true
 
@@ -39,7 +38,6 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust_version }}
           override: true
       - uses: Swatinem/rust-cache@v2
@@ -84,7 +82,6 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
           override: true
           components: clippy
