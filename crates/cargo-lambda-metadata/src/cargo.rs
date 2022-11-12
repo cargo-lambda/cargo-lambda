@@ -1,9 +1,14 @@
 use cargo_metadata::{Metadata as CargoMetadata, Package};
-use miette::{IntoDiagnostic, Result, WrapErr};
+use miette::{IntoDiagnostic, Result};
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
+};
+
+use crate::{
+    error::MetadataError,
+    lambda::{Memory, Timeout, Tracing},
 };
 
 #[derive(Default, Deserialize)]
@@ -13,20 +18,40 @@ pub struct Metadata {
     pub lambda: LambdaMetadata,
 }
 
-#[derive(Clone, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 #[non_exhaustive]
 pub struct LambdaMetadata {
-    #[serde(default)]
-    pub env: HashMap<String, String>,
+    #[serde(flatten)]
+    pub package: PackageMetadata,
     #[serde(default)]
     pub bin: HashMap<String, PackageMetadata>,
 }
 
-#[derive(Clone, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 #[non_exhaustive]
 pub struct PackageMetadata {
     #[serde(default)]
     pub env: HashMap<String, String>,
+    #[serde(default)]
+    pub deploy: DeployConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct DeployConfig {
+    #[serde(default)]
+    pub memory: Option<Memory>,
+    #[serde(default)]
+    pub timeout: Timeout,
+    #[serde(default)]
+    pub env: HashMap<String, String>,
+    #[serde(default)]
+    pub env_file: Option<PathBuf>,
+    #[serde(default)]
+    pub tracing: Tracing,
+    #[serde(default, alias = "role")]
+    pub iam_role: Option<String>,
+    #[serde(default)]
+    pub layers: Option<Vec<String>>,
 }
 
 /// Extract all the binary target names from a Cargo.toml file
@@ -62,13 +87,12 @@ fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
 
     // try to split manifest path and assign current_dir to enable parsing a project-specific
     // cargo config
-    match (
-        manifest_path.as_ref().parent(),
-        manifest_path.as_ref().file_name(),
-    ) {
+    let manifest_ref = manifest_path.as_ref();
+    let parent = manifest_ref.parent().map(|p| p.to_path_buf());
+    match (parent, manifest_ref.file_name()) {
         (Some(mut project_dir), Some(manifest_file)) => {
-            if project_dir == Path::new("") {
-                project_dir = Path::new("./")
+            if !project_dir.is_dir() {
+                project_dir = std::env::current_dir().into_diagnostic()?;
             }
             metadata_cmd.current_dir(project_dir);
             metadata_cmd.manifest_path(manifest_file);
@@ -76,7 +100,7 @@ fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
         _ => {
             // fall back to using the manifest_path without changing the dir
             // this means there will not be any proejct-specific config parsing
-            metadata_cmd.manifest_path(manifest_path.as_ref());
+            metadata_cmd.manifest_path(manifest_ref);
         }
     }
 
@@ -86,7 +110,7 @@ fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
 /// Create a HashMap of environment varibales from the package and workspace manifest
 /// See the documentation to learn about how we use this metadata:
 /// https://www.cargo-lambda.info/commands/watch.html#environment-variables
-pub fn function_metadata<P: AsRef<Path>>(
+pub fn function_environment_metadata<P: AsRef<Path>>(
     manifest_path: P,
     name: Option<&str>,
 ) -> Result<HashMap<String, String>> {
@@ -95,7 +119,7 @@ pub fn function_metadata<P: AsRef<Path>>(
         serde_json::from_value(metadata.workspace_metadata).unwrap_or_default();
 
     let mut env = HashMap::new();
-    env.extend(ws_metadata.env);
+    env.extend(ws_metadata.package.env);
 
     if let Some(name) = name {
         if let Some(res) = ws_metadata.bin.get(name) {
@@ -119,10 +143,9 @@ pub fn function_metadata<P: AsRef<Path>>(
 
             if target_matches {
                 let package_metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
-                    .into_diagnostic()
-                    .wrap_err("invalid lambda metadata in Cargo.toml file")?;
+                    .map_err(MetadataError::InvalidCargoMetadata)?;
 
-                env.extend(package_metadata.lambda.env);
+                env.extend(package_metadata.lambda.package.env);
                 if let Some(res) = package_metadata.lambda.bin.get(name) {
                     env.extend(res.env.clone());
                 }
@@ -134,6 +157,48 @@ pub fn function_metadata<P: AsRef<Path>>(
     Ok(env)
 }
 
+/// Create a `DeployConfig` struct from Cargo metadata.
+/// This configuration can be overwritten by flags from the cli.
+pub fn function_deploy_metadata<P: AsRef<Path>>(
+    manifest_path: P,
+    name: &str,
+) -> Result<DeployConfig> {
+    let metadata = load_metadata(manifest_path)?;
+    let ws_metadata: LambdaMetadata =
+        serde_json::from_value(metadata.workspace_metadata).unwrap_or_default();
+
+    let mut config = ws_metadata.package.deploy;
+
+    if let Some(package_metadata) = ws_metadata.bin.get(name) {
+        merge_deploy_config(&mut config, &package_metadata.deploy);
+    }
+
+    for pkg in &metadata.packages {
+        for target in &pkg.targets {
+            let target_matches = target.name == name
+                && target.kind.iter().any(|kind| kind == "bin")
+                && pkg.metadata.is_object();
+
+            tracing::debug!(
+                name = name,
+                target_matches = target_matches,
+                "searching package metadata"
+            );
+
+            if target_matches {
+                let package_metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
+                    .map_err(MetadataError::InvalidCargoMetadata)?;
+                let package_deploy = package_metadata.lambda.package.deploy;
+
+                merge_deploy_config(&mut config, &package_deploy);
+            }
+        }
+    }
+
+    tracing::debug!(config = ?config, "using deploy configuration from metadata");
+    Ok(config)
+}
+
 /// Load the main package in the project.
 /// It returns an error if the project includes from than one package.
 /// Use this function when the user didn't provide any funcion name
@@ -141,18 +206,39 @@ pub fn function_metadata<P: AsRef<Path>>(
 pub fn root_package<P: AsRef<Path>>(manifest_path: P) -> Result<Package> {
     let metadata = load_metadata(manifest_path)?;
     if metadata.packages.len() > 1 {
-        Err(miette::miette!(
-            "there are more than one package in the project, you must specify a function name"
-        ))
+        Err(MetadataError::MultiplePackagesInProject)?;
     } else if metadata.packages.is_empty() {
-        Err(miette::miette!("there are no packages in this project"))
-    } else {
-        Ok(metadata
-            .packages
-            .into_iter()
-            .next()
-            .expect("failed to extract the root package from the metadata"))
+        Err(MetadataError::MissingPackageInProject)?;
     }
+
+    Ok(metadata
+        .packages
+        .into_iter()
+        .next()
+        .expect("failed to extract the root package from the metadata"))
+}
+
+fn merge_deploy_config(base: &mut DeployConfig, package_deploy: &DeployConfig) {
+    if package_deploy.memory.is_some() {
+        base.memory = package_deploy.memory.clone();
+    }
+    if !package_deploy.timeout.is_zero() {
+        base.timeout = package_deploy.timeout.clone();
+    }
+    base.env.extend(package_deploy.env.clone());
+    if package_deploy.env_file.is_some() && base.env_file.is_none() {
+        base.env_file = package_deploy.env_file.clone();
+    }
+    if package_deploy.tracing != Tracing::default() {
+        base.tracing = package_deploy.tracing.clone();
+    }
+    if package_deploy.iam_role.is_some() {
+        base.iam_role = package_deploy.iam_role.clone();
+    }
+    if package_deploy.layers.is_some() {
+        base.layers = package_deploy.layers.clone();
+    }
+    tracing::debug!(ws_metadata = ?base, package_metadata = ?package_deploy, "finished merging deploy metadata");
 }
 
 #[cfg(test)]
@@ -208,37 +294,70 @@ mod tests {
     #[test]
     fn test_metadata_packages() {
         let env =
-            function_metadata(fixture("single-binary-package"), Some("basic-lambda")).unwrap();
+            function_environment_metadata(fixture("single-binary-package"), Some("basic-lambda"))
+                .unwrap();
 
         assert_eq!(env.get("FOO").unwrap(), "BAR");
     }
 
     #[test]
+    fn test_deploy_metadata_packages() {
+        let env =
+            function_deploy_metadata(fixture("single-binary-package"), "basic-lambda").unwrap();
+
+        let layers = [
+            "arn:aws:lambda:us-east-1:xxxxxxxx:layers:layer1".to_string(),
+            "arn:aws:lambda:us-east-1:xxxxxxxx:layers:layer2".to_string(),
+        ];
+
+        let mut vars = HashMap::new();
+        vars.insert("VAR1".to_string(), "VAL1".to_string());
+
+        assert_eq!(Some(Memory::Mb512), env.memory);
+        assert_eq!(Timeout::new(60), env.timeout);
+        assert_eq!(Some(Path::new(".env.production")), env.env_file.as_deref());
+        assert_eq!(Some(layers.to_vec()), env.layers);
+        assert_eq!(Tracing::Active, env.tracing);
+        assert_eq!(vars, env.env);
+        assert_eq!(
+            Some("arn:aws:lambda:us-east-1:xxxxxxxx:iam:role1".to_string()),
+            env.iam_role
+        );
+    }
+
+    #[test]
     fn test_metadata_multi_packages() {
-        let env = function_metadata(fixture("multi-binary-package"), Some("get-product")).unwrap();
+        let env =
+            function_environment_metadata(fixture("multi-binary-package"), Some("get-product"))
+                .unwrap();
 
         assert_eq!(env.get("FOO").unwrap(), "BAR");
 
         let env =
-            function_metadata(fixture("multi-binary-package"), Some("delete-product")).unwrap();
+            function_environment_metadata(fixture("multi-binary-package"), Some("delete-product"))
+                .unwrap();
 
         assert_eq!(env.get("BAZ").unwrap(), "QUX");
     }
 
     #[test]
     fn test_metadata_workspace_packages() {
-        let env = function_metadata(fixture("workspace-package"), Some("basic-lambda-1")).unwrap();
+        let env =
+            function_environment_metadata(fixture("workspace-package"), Some("basic-lambda-1"))
+                .unwrap();
 
         assert_eq!(env.get("FOO").unwrap(), "BAR");
 
-        let env = function_metadata(fixture("workspace-package"), Some("basic-lambda-2")).unwrap();
+        let env =
+            function_environment_metadata(fixture("workspace-package"), Some("basic-lambda-2"))
+                .unwrap();
 
         assert_eq!(env.get("FOO").unwrap(), "BAR");
     }
 
     #[test]
     fn test_metadata_packages_without_name() {
-        let env = function_metadata(fixture("single-binary-package"), None).unwrap();
+        let env = function_environment_metadata(fixture("single-binary-package"), None).unwrap();
 
         assert_eq!(env.get("FOO").unwrap(), "BAR");
     }

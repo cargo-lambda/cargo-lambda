@@ -5,7 +5,7 @@ use crate::{
 use axum::{body::Body, response::Response};
 use cargo_lambda_interactive::command::new_command;
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
-use cargo_lambda_metadata::cargo::function_metadata;
+use cargo_lambda_metadata::cargo::function_environment_metadata;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::Arc,
@@ -200,7 +200,7 @@ async fn start_function(
         None
     };
 
-    let env = function_metadata(cargo_options.manifest_path, bin_name)
+    let env = function_environment_metadata(cargo_options.manifest_path, bin_name)
         .map_err(|err| {
             warn!(error = %err, "ignoring invalid function metadata");
             err

@@ -772,6 +772,9 @@ dependencies = [
  "remove_dir_all 0.7.0",
  "serde",
  "serde_json",
+ "strum",
+ "strum_macros",
+ "thiserror",
  "tracing",
 ]
 

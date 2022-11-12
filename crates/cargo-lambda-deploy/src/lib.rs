@@ -144,8 +144,11 @@ impl Deploy {
             )
             .await
         } else {
+            let binary_name = self.binary_name.clone().unwrap_or_else(|| name.clone());
             functions::deploy(
                 &name,
+                &binary_name,
+                &self.manifest_path,
                 &self.function_config,
                 &self.remote_config,
                 &sdk_config,

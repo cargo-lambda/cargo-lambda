@@ -67,6 +67,23 @@ cargo lambda build --release --extension
 cargo lambda deploy --extension
 ```
 
+## Deploy configuration in Cargo's Metadata
+
+You can keep some deploy configuration options in your project's `Cargo.toml` file. This give you a more "configuration as code" approach since you can store that configuration along side your project. The following example shows the options that you can specify in the metadata, all of them are optional:
+
+```toml
+[package.metadata.lambda.deploy]
+memory = 512                   # Function's memory
+timeout = 60                   # Function's execution timeout
+tracing = "active"             # Tracing mode
+role = "role-full-arn"         # Function's execution role
+env_file = ".env.production"   # File to load environment variables from
+env = { "VAR1" = "VAL1" }      # Additional environment variables
+layers = [                     # List of layers to deploy with your function
+    "layer-full-arn"
+]
+```
+
 ## Other options
 
 Use the `--help` flag to see other options to configure the function's deployment.

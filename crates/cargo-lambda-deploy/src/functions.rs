@@ -2,6 +2,10 @@ use super::DeployResult;
 use crate::roles;
 use aws_sdk_s3::{types::ByteStream, Client as S3Client};
 use cargo_lambda_interactive::progress::Progress;
+use cargo_lambda_metadata::{
+    cargo::function_deploy_metadata,
+    lambda::{Memory, Timeout, Tracing},
+};
 use cargo_lambda_remote::{
     aws_sdk_config::SdkConfig,
     aws_sdk_lambda::{
@@ -23,11 +27,11 @@ use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
 use std::{
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
     path::PathBuf,
 };
-use strum_macros::{Display, EnumString};
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
@@ -36,18 +40,11 @@ enum FunctionAction {
     Update(Box<GetFunctionOutput>),
 }
 
-#[derive(Clone, Debug, Display, EnumString)]
-#[strum(ascii_case_insensitive)]
-pub enum Tracing {
-    Active,
-    Passthrough,
-}
-
 #[derive(Args, Clone, Debug)]
 pub struct FunctionDeployConfig {
     /// Memory allocated for the function
-    #[clap(long)]
-    pub memory_size: Option<i32>,
+    #[clap(long, alias = "memory-size")]
+    pub memory: Option<Memory>,
 
     /// Enable function URL for this function
     #[clap(long)]
@@ -58,8 +55,8 @@ pub struct FunctionDeployConfig {
     pub disable_function_url: bool,
 
     /// How long the function can be running for, in seconds
-    #[clap(long, default_value = "30")]
-    pub timeout: i32,
+    #[clap(long)]
+    pub timeout: Option<Timeout>,
 
     /// Option to add one or many environment variables, allows multiple repetitions
     /// Use VAR_KEY=VAR_VALUE as format
@@ -71,16 +68,16 @@ pub struct FunctionDeployConfig {
     pub env_file: Option<PathBuf>,
 
     /// Tracing mode with X-Ray
-    #[clap(long, default_value_t = Tracing::Active)]
-    pub tracing: Tracing,
+    #[clap(long)]
+    pub tracing: Option<Tracing>,
 
     /// IAM Role associated with the function
-    #[clap(long)]
-    pub iam_role: Option<String>,
+    #[clap(long, alias = "iam-role")]
+    pub role: Option<String>,
 
     /// Lambda Layer ARN to associate the deployed function with
-    #[clap(long)]
-    pub layer_arn: Option<Vec<String>>,
+    #[clap(long, alias = "layer-arn")]
+    pub layer: Option<Vec<String>>,
 }
 
 #[derive(Serialize)]
@@ -102,6 +99,8 @@ impl std::fmt::Display for DeployOutput {
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn deploy(
     name: &str,
+    binary_name: &str,
+    manifest_path: &PathBuf,
     function_config: &FunctionDeployConfig,
     remote_config: &RemoteConfig,
     sdk_config: &SdkConfig,
@@ -114,6 +113,8 @@ pub(crate) async fn deploy(
 
     let (function_arn, version) = upsert_function(
         name,
+        binary_name,
+        manifest_path,
         &client,
         function_config,
         remote_config,
@@ -154,6 +155,8 @@ pub(crate) async fn deploy(
 #[allow(clippy::too_many_arguments)]
 async fn upsert_function(
     name: &str,
+    binary_name: &str,
+    manifest_path: &PathBuf,
     client: &LambdaClient,
     function_config: &FunctionDeployConfig,
     remote_config: &RemoteConfig,
@@ -164,6 +167,42 @@ async fn upsert_function(
     progress: &Progress,
 ) -> Result<(String, String)> {
     let current_function = client.get_function().function_name(name).send().await;
+
+    let mut deploy_metadata = function_deploy_metadata(manifest_path, binary_name)?;
+
+    if let Some(tracing) = &function_config.tracing {
+        if &deploy_metadata.tracing != tracing {
+            deploy_metadata.tracing = tracing.clone();
+        }
+    }
+
+    if function_config.role.is_some() {
+        deploy_metadata.iam_role = function_config.role.clone();
+    }
+
+    if function_config.memory.is_some() {
+        deploy_metadata.memory = function_config.memory.clone();
+    }
+
+    if let Some(timeout) = &function_config.timeout {
+        if !timeout.is_zero() {
+            deploy_metadata.timeout = timeout.clone()
+        }
+    }
+
+    if function_config.env_file.is_some() {
+        deploy_metadata.env_file = function_config.env_file.clone();
+    }
+
+    let environment = function_environment(
+        deploy_metadata.env.clone(),
+        &deploy_metadata.env_file,
+        &function_config.env_var,
+    )?;
+
+    if function_config.layer.is_some() {
+        deploy_metadata.layers = function_config.layer.clone();
+    }
 
     let action = match current_function {
         Ok(fun) => FunctionAction::Update(Box::new(fun)),
@@ -176,17 +215,17 @@ async fn upsert_function(
     };
 
     let tracing_config = TracingConfig::builder()
-        .mode(function_config.tracing.to_string().as_str().into())
+        .mode(deploy_metadata.tracing.to_string().as_str().into())
         .build();
 
     let (arn, version) = match action {
         FunctionAction::Create => {
-            let (iam_role, is_new_role) = match &function_config.iam_role {
+            let (iam_role, is_new_role) = match &deploy_metadata.iam_role {
                 None => (roles::create(sdk_config, progress).await?, true),
                 Some(role) => (role.clone(), false),
             };
 
-            tracing::debug!(role_arn = ?iam_role, "using iam role");
+            tracing::debug!(role_arn = ?iam_role, config = ?deploy_metadata, "creating new function");
             progress.set_message("deploying function");
 
             let code = match &s3_bucket {
@@ -216,6 +255,9 @@ async fn upsert_function(
 
             let mut output = None;
             for attempt in 2..5 {
+                let memory = deploy_metadata.memory.clone().map(Into::into);
+                let timeout = deploy_metadata.timeout.clone().into();
+
                 let result = client
                     .create_function()
                     .runtime(Runtime::Providedal2)
@@ -225,14 +267,11 @@ async fn upsert_function(
                     .architectures(architecture.clone())
                     .code(code.clone())
                     .publish(true)
-                    .set_memory_size(function_config.memory_size)
-                    .timeout(function_config.timeout)
+                    .set_memory_size(memory)
+                    .timeout(timeout)
                     .tracing_config(tracing_config.clone())
-                    .environment(function_environment(
-                        &function_config.env_file,
-                        &function_config.env_var,
-                    )?)
-                    .set_layers(function_config.layer_arn.clone())
+                    .environment(environment.clone())
+                    .set_layers(deploy_metadata.layers.clone())
                     .send()
                     .await;
 
@@ -290,31 +329,30 @@ async fn upsert_function(
             let mut update_config = false;
             let mut builder = client.update_function_configuration().function_name(name);
 
-            if let Some(iam_role) = &function_config.iam_role {
+            if let Some(iam_role) = &deploy_metadata.iam_role {
                 builder = builder.role(iam_role);
             }
 
-            if function_config.memory_size.is_some()
-                && conf.memory_size != function_config.memory_size
-            {
+            let memory = deploy_metadata.memory.clone().map(Into::into);
+            if memory.is_some() && conf.memory_size != memory {
                 update_config = true;
-                builder = builder.set_memory_size(function_config.memory_size);
+                builder = builder.set_memory_size(memory);
             }
 
-            if conf.timeout.unwrap_or_default() != function_config.timeout {
+            let timeout: i32 = deploy_metadata.timeout.clone().into();
+            if conf.timeout.unwrap_or_default() != timeout {
                 update_config = true;
-                builder = builder.timeout(function_config.timeout);
+                builder = builder.timeout(timeout);
             }
 
-            if should_update_layers(&function_config.layer_arn, &conf) {
+            if should_update_layers(&deploy_metadata.layers, &conf) {
                 update_config = true;
-                builder = builder.set_layers(function_config.layer_arn.clone());
+                builder = builder.set_layers(deploy_metadata.layers.clone());
             }
 
-            let env = function_environment(&function_config.env_file, &function_config.env_var)?;
-            if env.variables != conf.environment.map(|e| e.variables).unwrap_or_default() {
+            if environment.variables != conf.environment.map(|e| e.variables).unwrap_or_default() {
                 update_config = true;
-                builder = builder.environment(env);
+                builder = builder.environment(environment);
             }
 
             if tracing_config.mode != conf.tracing_config.map(|t| t.mode).unwrap_or_default() {
@@ -329,6 +367,9 @@ async fn upsert_function(
                     .await
                     .into_diagnostic()
                     .wrap_err("failed to update function configuration")?;
+
+                wait_for_ready_state(client, name, &remote_config.alias, progress).await?;
+                progress.set_message("deploying function");
             }
 
             let mut builder = client.update_function_code().function_name(name);
@@ -571,10 +612,12 @@ pub(crate) async fn delete_function_url_config(
 }
 
 pub(crate) fn function_environment(
+    variables: HashMap<String, String>,
     env_file: &Option<PathBuf>,
     env_vars: &Option<Vec<String>>,
 ) -> Result<Environment> {
-    let mut env = Environment::builder();
+    let mut env = Environment::builder().set_variables(Some(variables));
+
     if let Some(path) = env_file {
         let file = File::open(path)
             .into_diagnostic()
