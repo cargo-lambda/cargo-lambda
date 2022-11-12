@@ -10,3 +10,15 @@ tokio = { version = "1", features = ["macros"] }
 
 [package.metadata.lambda.env]
 FOO = "BAR"
+
+[package.metadata.lambda.deploy]
+memory = 512
+timeout = 60
+env_file = ".env.production"
+layers = [
+    "arn:aws:lambda:us-east-1:xxxxxxxx:layers:layer1",
+    "arn:aws:lambda:us-east-1:xxxxxxxx:layers:layer2",
+]
+tracing = "active"
+role = "arn:aws:lambda:us-east-1:xxxxxxxx:iam:role1"
+env = { "VAR1" = "VAL1" }
