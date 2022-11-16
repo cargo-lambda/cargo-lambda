@@ -13,7 +13,7 @@ cargo lambda new --extension extension-project
 ```
 
 ::: tip
-Add the `--logs` flag if your extension in a Logs extension.
+Add the `--logs` flag if your extension in a Logs extension, or the `--telemetry` flag if you want to process Lambda telemetry data.
 :::
 
 ## Step 2: Build your extension
