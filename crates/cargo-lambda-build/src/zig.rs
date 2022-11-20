@@ -1,14 +1,13 @@
 use crate::error::BuildError;
 use cargo_lambda_interactive::{
-    choose_option, command::silent_command, is_stdin_tty, is_user_cancellation_error,
-    progress::Progress,
+    choose_option, command::silent_command, is_stdin_tty, progress::Progress,
 };
 use cargo_zigbuild::Zig;
 use miette::{IntoDiagnostic, Result};
 
-pub async fn check_installation() -> Result<bool> {
+pub async fn check_installation() -> Result<()> {
     if Zig::find_zig().is_ok() {
-        return Ok(true);
+        return Ok(());
     }
 
     let options = install_options();
@@ -31,8 +30,7 @@ pub async fn check_installation() -> Result<bool> {
     );
 
     match choice {
-        Ok(choice) => choice.install().await.map(|_| true),
-        Err(err) if is_user_cancellation_error(&err) => Ok(false),
+        Ok(choice) => choice.install().await.map(|_| ()),
         Err(err) => Err(err).into_diagnostic(),
     }
 }

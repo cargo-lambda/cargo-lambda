@@ -7,7 +7,7 @@ use thiserror::Error;
 pub enum MetadataError {
     #[error("invalid memory value `{0}`")]
     InvalidMemory(i32),
-    #[error("invalid lambda metadata in Cargo.toml file")]
+    #[error("invalid lambda metadata in Cargo.toml file: {0}")]
     InvalidCargoMetadata(#[from] serde_json::Error),
     #[error("invalid timeout value")]
     InvalidTimeout(#[from] ParseIntError),

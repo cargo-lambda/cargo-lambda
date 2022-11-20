@@ -34,6 +34,44 @@ pub struct PackageMetadata {
     pub env: HashMap<String, String>,
     #[serde(default)]
     pub deploy: DeployConfig,
+    #[serde(default)]
+    pub build: BuildConfig,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct BuildConfig {
+    pub compiler: CompilerOptions,
+}
+
+impl BuildConfig {
+    pub fn is_zig_enabled(&self) -> bool {
+        self.compiler == CompilerOptions::CargoZigbuild
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CompilerOptions {
+    #[default]
+    CargoZigbuild,
+    Cargo(CargoCompilerOptions),
+}
+
+impl From<String> for CompilerOptions {
+    fn from(s: String) -> Self {
+        match s.to_lowercase().as_str() {
+            "cargo" => Self::Cargo(CargoCompilerOptions::default()),
+            _ => Self::CargoZigbuild,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub struct CargoCompilerOptions {
+    #[serde(default)]
+    pub subcommand: Option<Vec<String>>,
+    #[serde(default)]
+    pub extra_args: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -70,6 +108,20 @@ pub fn binary_targets<P: AsRef<Path>>(manifest_path: P) -> Result<HashSet<String
     Ok(bins)
 }
 
+pub fn binary_targets_from_metadata(metadata: &CargoMetadata) -> Result<HashSet<String>> {
+    let bins = metadata
+        .packages
+        .iter()
+        .flat_map(|p| {
+            p.targets
+                .iter()
+                .filter(|target| target.kind.iter().any(|k| k == "bin"))
+        })
+        .map(|target| target.name.clone())
+        .collect::<_>();
+    Ok(bins)
+}
+
 /// Extract target directory information
 ///
 /// This fetches the target directory from `cargo metadata`, resolving the
@@ -80,8 +132,12 @@ pub fn target_dir<P: AsRef<Path>>(manifest_path: P) -> Result<PathBuf> {
     Ok(metadata.target_directory.into_std_path_buf())
 }
 
+pub fn target_dir_from_metadata(metadata: &CargoMetadata) -> Result<PathBuf> {
+    Ok(metadata.target_directory.clone().into_std_path_buf())
+}
+
 /// Create metadata about the root package in the Cargo manifest, without any dependencies.
-fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
+pub fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
 
@@ -199,6 +255,34 @@ pub fn function_deploy_metadata<P: AsRef<Path>>(
     Ok(config)
 }
 
+/// Create a `BuildConfig` struct from Cargo metadata.
+/// This configuration can be overwritten by flags from the cli.
+/// This function loads the workspace configuration that's merged
+/// with the configuration from the first binary target in the project.
+/// It assumes that all functions in the workspace will use the same compiler configuration.
+pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig> {
+    let ws_metadata: LambdaMetadata =
+        serde_json::from_value(metadata.workspace_metadata.clone()).unwrap_or_default();
+
+    let mut config = ws_metadata.package.build;
+
+    'outer: for pkg in &metadata.packages {
+        for target in &pkg.targets {
+            if target.kind.iter().any(|kind| kind == "bin") && pkg.metadata.is_object() {
+                let package_metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
+                    .map_err(MetadataError::InvalidCargoMetadata)?;
+                let package_build = package_metadata.lambda.package.build;
+
+                merge_build_config(&mut config, &package_build);
+                break 'outer;
+            }
+        }
+    }
+
+    tracing::debug!(config = ?config, "using build compiler configuration from metadata");
+    Ok(config)
+}
+
 /// Load the main package in the project.
 /// It returns an error if the project includes from than one package.
 /// Use this function when the user didn't provide any funcion name
@@ -239,6 +323,13 @@ fn merge_deploy_config(base: &mut DeployConfig, package_deploy: &DeployConfig) {
         base.layers = package_deploy.layers.clone();
     }
     tracing::debug!(ws_metadata = ?base, package_metadata = ?package_deploy, "finished merging deploy metadata");
+}
+
+fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
+    if package_build.compiler != base.compiler {
+        base.compiler = package_build.compiler.clone();
+    }
+    tracing::debug!(ws_metadata = ?base, package_metadata = ?package_build, "finished merging build metadata");
 }
 
 #[cfg(test)]
@@ -396,5 +487,21 @@ mod tests {
             "unexpected directory {:?}",
             target_dir
         );
+    }
+
+    #[test]
+    fn test_build_config_metadata() {
+        let manifest_path = fixture("single-binary-package");
+        let metadata = load_metadata(manifest_path).unwrap();
+
+        let env = function_build_metadata(&metadata).unwrap();
+
+        let opts = match env.compiler {
+            CompilerOptions::Cargo(opts) => opts,
+            other => panic!("unexpected compiler: {:?}", other),
+        };
+
+        let subcommand = opts.subcommand.unwrap();
+        assert_eq!(vec!["brazil".to_string(), "build".to_string()], subcommand);
     }
 }
