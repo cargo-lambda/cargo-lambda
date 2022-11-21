@@ -50,7 +50,7 @@ cargo-lambda-metadata = { version = "0.12.0", path = "crates/cargo-lambda-metada
 cargo-lambda-new = { version = "0.12.0", path = "crates/cargo-lambda-new" }
 cargo-lambda-remote = { version = "0.12.0", path = "crates/cargo-lambda-remote" }
 cargo-lambda-watch = { version = "0.12.0", path = "crates/cargo-lambda-watch" }
-clap = { version = "3.1.18", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
 home = "0.5.3"
 miette = { version = "4.7.1" }
 reqwest = { version = "0.11.10", default-features = false, features = [

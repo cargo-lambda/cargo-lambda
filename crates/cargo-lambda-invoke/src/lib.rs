@@ -38,7 +38,7 @@ pub struct Invoke {
     invoke_port: u16,
 
     /// File to read the invoke payload from
-    #[clap(long, parse(from_os_str), value_hint = ValueHint::FilePath)]
+    #[clap(long, value_parser, value_hint = ValueHint::FilePath)]
     data_file: Option<PathBuf>,
 
     /// Invoke payload as a string

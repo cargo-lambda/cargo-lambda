@@ -69,7 +69,7 @@ pub struct Watch {
 #[derive(Args, Clone, Debug)]
 struct CargoOptions {
     /// Path to Cargo.toml
-    #[clap(long, value_name = "PATH", parse(from_os_str), value_hint = ValueHint::FilePath)]
+    #[clap(long, value_name = "PATH", value_parser, value_hint = ValueHint::FilePath)]
     #[clap(default_value = "Cargo.toml")]
     manifest_path: PathBuf,
 

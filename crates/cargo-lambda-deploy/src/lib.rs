@@ -54,12 +54,7 @@ pub struct Deploy {
     lambda_dir: Option<PathBuf>,
 
     /// Path to Cargo.toml
-    #[clap(
-        long,
-        value_name = "PATH",
-        parse(from_os_str),
-        default_value = "Cargo.toml"
-    )]
+    #[clap(long, value_name = "PATH", value_parser, default_value = "Cargo.toml")]
     pub manifest_path: PathBuf,
 
     /// Name of the binary to deploy if it doesn't match the name that you want to deploy it with

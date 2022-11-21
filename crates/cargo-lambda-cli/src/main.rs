@@ -6,15 +6,12 @@ use cargo_lambda_deploy::Deploy;
 use cargo_lambda_invoke::Invoke;
 use cargo_lambda_new::New;
 use cargo_lambda_watch::Watch;
-use clap::{AppSettings, CommandFactory, Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use miette::{miette, IntoDiagnostic, Result};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
-#[clap(name = "cargo")]
-#[clap(bin_name = "cargo")]
-#[clap(global_setting(AppSettings::DeriveDisplayOrder))]
-#[clap(global_setting(AppSettings::NoAutoVersion))]
+#[clap(name = "cargo", bin_name = "cargo", disable_version_flag = true)]
 enum App {
     Lambda(Lambda),
     #[clap(subcommand, hide = true)]
