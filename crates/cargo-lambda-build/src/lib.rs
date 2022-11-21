@@ -1,10 +1,14 @@
+use cargo_lambda_interactive::{error::InquireError, is_user_cancellation_error};
 use cargo_lambda_metadata::{
-    cargo::{binary_targets, target_dir},
+    cargo::{
+        binary_targets_from_metadata, function_build_metadata, load_metadata,
+        target_dir_from_metadata, CompilerOptions,
+    },
     fs::rename,
 };
-use cargo_zigbuild::Build as ZigBuild;
+use cargo_options::Build as CargoBuild;
 use clap::{Args, ValueHint};
-use miette::{IntoDiagnostic, Result, WrapErr};
+use miette::{IntoDiagnostic, Report, Result, WrapErr};
 use object::{read::File as ObjectFile, Architecture, Object};
 use sha2::{Digest, Sha256};
 use std::{
@@ -21,6 +25,9 @@ use tracing::{debug, warn};
 use zip::{write::FileOptions, ZipWriter};
 
 pub use cargo_zigbuild::Zig;
+
+mod compiler;
+use compiler::new_compiler;
 
 mod error;
 use error::BuildError;
@@ -44,6 +51,10 @@ pub struct Build {
     #[clap(long)]
     arm64: bool,
 
+    /// Shortcut for --target x86_64-unknown-linux-gnu
+    #[clap(long)]
+    x86_64: bool,
+
     /// Whether the code that you're building is a Lambda Extension
     #[clap(long)]
     extension: bool,
@@ -53,22 +64,15 @@ pub struct Build {
     #[clap(long)]
     flatten: Option<String>,
 
-    /// Disable Zig as the linker.
-    /// This option is only allowed when you're building from Linux.
-    /// This option can help you build native libraries when
-    /// the Zig linker is failing because it cannot find them correctly.
-    ///
-    /// If you use this option, the GLIBC version is set to 2.26
-    /// automatically to match the version supported by AWS Lambda.
-    /// https://aws.amazon.com/amazon-linux-2/faqs/
-    ///
-    /// Example:
-    /// cargo lambda build --release --disable-zig-linker
     #[clap(long)]
+    #[deprecated]
     disable_zig_linker: bool,
 
+    #[clap(long, default_value_t = CompilerFlag::CargoZigbuild, env = "CARGO_LAMBDA_COMPILER")]
+    compiler: CompilerFlag,
+
     #[clap(flatten)]
-    build: ZigBuild,
+    build: CargoBuild,
 }
 
 #[derive(Clone, Debug, strum_macros::Display, EnumString)]
@@ -78,22 +82,35 @@ enum OutputFormat {
     Zip,
 }
 
+#[derive(Clone, Debug, strum_macros::Display, EnumString, Eq, PartialEq)]
+#[strum(ascii_case_insensitive, serialize_all = "snake_case")]
+enum CompilerFlag {
+    CargoZigbuild,
+    Cargo,
+}
+
 impl Build {
     #[tracing::instrument(skip(self), target = "cargo_lambda")]
     pub async fn run(&mut self) -> Result<()> {
         tracing::trace!(options = ?self, "building project");
 
-        let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
-        let host_target = &rustc_meta.host;
-        let release_channel = &rustc_meta.channel;
-        let compatible_host_linker = TargetArch::compatible_host_linker(host_target);
+        #[allow(deprecated)]
+        if self.disable_zig_linker {
+            warn!("the --disable-zig-linker flag is deprecated and will be removed in cargo-lambda 0.14, use `--compiler cargo` instead");
+            self.compiler = CompilerFlag::Cargo;
+        }
 
-        if self.arm64 && !self.build.target.is_empty() {
+        let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
+        let compatible_host_linker = TargetArch::compatible_host_linker(&rustc_meta.host);
+
+        if (self.arm64 || self.x86_64) && !self.build.target.is_empty() {
             Err(BuildError::InvalidTargetOptions)?;
         }
 
         let mut target_arch = if self.arm64 {
             TargetArch::arm64()
+        } else if self.x86_64 {
+            TargetArch::x86_64()
         } else {
             let build_target = self.build.target.get(0);
             match build_target {
@@ -101,35 +118,14 @@ impl Build {
                 // No explicit target, but build host same as target host
                 None if compatible_host_linker => {
                     // Set the target explicitly, so it's easier to find the binaries later
-                    TargetArch::from_str(host_target)?
+                    TargetArch::from_str(&rustc_meta.host)?
                 }
                 // No explicit target, and build host not compatible with Lambda hosts
                 None => TargetArch::x86_64(),
             }
         };
 
-        if self.disable_zig_linker {
-            if compatible_host_linker {
-                target_arch.set_al2_glibc_version();
-                self.build.disable_zig_linker = self.disable_zig_linker;
-            } else {
-                return Err(BuildError::InvalidLinkerOption.into());
-            }
-        }
-
         self.build.target = vec![target_arch.to_string()];
-        let rustc_target_without_glibc_version = target_arch.rustc_target_without_glibc_version();
-
-        #[cfg(windows)]
-        self.force_windows_release_profile();
-
-        if !self.build.disable_zig_linker {
-            match zig::check_installation().await {
-                Ok(true) => {}
-                Ok(false) => return Ok(()),
-                Err(err) => return Err(err),
-            }
-        }
 
         let profile = match self.build.profile.as_deref() {
             Some("dev" | "test") => "debug",
@@ -139,21 +135,14 @@ impl Build {
             None => "debug",
         };
 
-        // confirm that target component is included in host toolchain, or add
-        // it with `rustup` otherwise.
-        toolchain::check_target_component_with_rustc_meta(
-            &rustc_target_without_glibc_version,
-            host_target,
-            release_channel,
-        )
-        .await?;
-
         let manifest_path = self
             .build
             .manifest_path
             .as_deref()
             .unwrap_or_else(|| Path::new("Cargo.toml"));
-        let binaries = binary_targets(manifest_path)?;
+
+        let metadata = load_metadata(manifest_path)?;
+        let binaries = binary_targets_from_metadata(&metadata)?;
         debug!(binaries = ?binaries, "found new target binaries to build");
 
         if !self.build.bin.is_empty() {
@@ -164,12 +153,20 @@ impl Build {
             }
         }
 
-        let mut cmd = self
-            .build
-            .build_command()
-            .map_err(|e| miette::miette!("{}", e))?;
+        let mut build_config = function_build_metadata(&metadata)?;
+        if self.compiler == CompilerFlag::Cargo && build_config.is_zig_enabled() {
+            build_config.compiler = CompilerOptions::from(self.compiler.to_string());
+            // This check only makes sense when the build host is local.
+            // If the build host was ever going to be remote, like in a container,
+            // this check would need to go away.
+            if compatible_host_linker {
+                target_arch.set_al2_glibc_version();
+            } else {
+                return Err(BuildError::InvalidLinkerOption.into());
+            }
+        }
 
-        if self.build.release {
+        let rust_flags = if self.build.release {
             let mut rust_flags = env::var("RUSTFLAGS").unwrap_or_default();
             if !rust_flags.contains("-C strip=") {
                 if !rust_flags.is_empty() {
@@ -187,6 +184,23 @@ impl Build {
             }
 
             debug!(rust_flags = ?rust_flags, "release RUSTFLAGS");
+            Some(rust_flags)
+        } else {
+            None
+        };
+
+        let compiler = new_compiler(build_config.compiler);
+        let cmd = compiler
+            .command(&self.build, &rustc_meta, &target_arch)
+            .await;
+
+        let mut cmd = match cmd {
+            Ok(cmd) => cmd,
+            Err(err) if downcasted_user_cancellation(&err) => return Ok(()),
+            Err(err) => return Err(err),
+        };
+
+        if let Some(rust_flags) = rust_flags {
             cmd.env("RUSTFLAGS", rust_flags);
         }
 
@@ -203,7 +217,8 @@ impl Build {
         }
 
         // extract resolved target dir from cargo metadata
-        let target_dir = target_dir(manifest_path).unwrap_or_else(|_| PathBuf::from("target"));
+        let target_dir =
+            target_dir_from_metadata(&metadata).unwrap_or_else(|_| PathBuf::from("target"));
         let target_dir = Path::new(&target_dir);
         let lambda_dir = if let Some(dir) = &self.lambda_dir {
             dir.clone()
@@ -212,7 +227,7 @@ impl Build {
         };
 
         let base = target_dir
-            .join(rustc_target_without_glibc_version)
+            .join(target_arch.rustc_target_without_glibc_version())
             .join(profile);
 
         let mut found_binaries = false;
@@ -259,15 +274,6 @@ impl Build {
         }
 
         Ok(())
-    }
-
-    #[cfg(windows)]
-    fn force_windows_release_profile(&mut self) {
-        if !self.build.release {
-            tracing::info!("Changing profile to release mode. Cargo-lambda doesn't support building on debug mode on Windows");
-            self.build.release = true;
-            self.build.profile = Some("release".to_string());
-        }
     }
 }
 
@@ -393,6 +399,13 @@ fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
 #[cfg(not(target_os = "windows"))]
 fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
     path.to_str().map(Cow::Borrowed)
+}
+
+fn downcasted_user_cancellation(err: &Report) -> bool {
+    match err.root_cause().downcast_ref::<InquireError>() {
+        Some(err) => is_user_cancellation_error(err),
+        None => false,
+    }
 }
 
 #[cfg(test)]

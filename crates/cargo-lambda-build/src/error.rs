@@ -4,7 +4,9 @@ use thiserror::Error;
 
 #[derive(Debug, Diagnostic, Error)]
 pub(crate) enum BuildError {
-    #[error("invalid options: --arm and --target cannot be specified at the same time")]
+    #[error(
+        "invalid options: --arm64, --x86-64, and --target cannot be specified at the same time"
+    )]
     InvalidTargetOptions,
     #[error("invalid options: --disable-zig-linker is only allowed on Linux")]
     InvalidLinkerOption,

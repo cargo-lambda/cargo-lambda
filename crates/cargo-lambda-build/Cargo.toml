@@ -17,8 +17,10 @@ description.workspace = true
 # add the latest version of a dependency to the list,
 # and it will keep the alphabetic ordering for you.
 [dependencies]
+async-trait = "0.1.58"
 cargo-lambda-interactive.workspace = true
 cargo-lambda-metadata.workspace = true
+cargo-options = "0.3.1"
 cargo-zigbuild = "0.11.1"
 clap.workspace = true
 home.workspace = true
