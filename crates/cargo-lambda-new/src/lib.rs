@@ -35,10 +35,12 @@ pub struct New {
 
     /// Options for function templates
     #[clap(flatten)]
+    #[group(skip)]
     function_options: functions::Options,
 
     /// Options for extension templates
     #[clap(flatten)]
+    #[group(skip)]
     extension_options: extensions::Options,
 
     /// Open the project in a code editor defined by the environment variable EDITOR
