@@ -11,23 +11,23 @@ use miette::{miette, IntoDiagnostic, Result};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
-#[clap(name = "cargo", bin_name = "cargo", disable_version_flag = true)]
+#[command(name = "cargo", bin_name = "cargo", disable_version_flag = true)]
 enum App {
     Lambda(Lambda),
-    #[clap(subcommand, hide = true)]
+    #[command(subcommand, hide = true)]
     Zig(Zig),
 }
 
 /// Cargo Lambda is a CLI to work with AWS Lambda functions locally
-#[derive(Clone, Debug, clap::Args)]
+#[derive(Clone, Debug, Parser)]
 struct Lambda {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     subcommand: Option<Box<LambdaSubcommand>>,
     /// Enable trace logs in any subcommand
-    #[clap(short, long, global = true)]
-    verbose: bool,
+    #[arg(short = 'v', long, action = clap::ArgAction::Count)]
+    verbose: u8,
     /// Print version information
-    #[clap(short = 'V', long)]
+    #[arg(short = 'V', long)]
     version: bool,
 }
 
@@ -100,10 +100,12 @@ async fn main() -> Result<()> {
         Some(subcommand) => subcommand,
     };
 
-    let log_directive = if lambda.verbose {
-        "cargo_lambda=trace".into()
-    } else {
+    let log_directive = if lambda.verbose == 0 {
         std::env::var("RUST_LOG").unwrap_or_else(|_| "cargo_lambda=info".into())
+    } else if lambda.verbose == 1 {
+        "cargo_lambda=debug".into()
+    } else {
+        "cargo_lambda=trace".into()
     };
 
     let fmt = tracing_subscriber::fmt::layer()

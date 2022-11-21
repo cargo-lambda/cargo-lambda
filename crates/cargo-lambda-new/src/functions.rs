@@ -9,17 +9,18 @@ pub(crate) const DEFAULT_TEMPLATE_URL: &str =
     "https://github.com/cargo-lambda/default-template/archive/refs/heads/main.zip";
 
 #[derive(Args, Clone, Debug, Default)]
+#[group(skip)]
 pub(crate) struct Options {
     /// Whether the function is going to be an HTTP endpoint or not
-    #[clap(long)]
+    #[arg(long)]
     http: bool,
 
     /// The specific HTTP feature to enable
-    #[clap(long)]
+    #[arg(long)]
     http_feature: Option<HttpFeature>,
 
     /// Type of AWS event that this function is going to receive, from the aws_lambda_events crate, for example s3::S3Event
-    #[clap(long)]
+    #[arg(long)]
     event_type: Option<String>,
 }
 

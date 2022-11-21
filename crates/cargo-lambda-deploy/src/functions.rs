@@ -43,40 +43,40 @@ enum FunctionAction {
 #[derive(Args, Clone, Debug)]
 pub struct FunctionDeployConfig {
     /// Memory allocated for the function
-    #[clap(long, alias = "memory-size")]
+    #[arg(long, alias = "memory-size")]
     pub memory: Option<Memory>,
 
     /// Enable function URL for this function
-    #[clap(long)]
+    #[arg(long)]
     pub enable_function_url: bool,
 
     /// Disable function URL for this function
-    #[clap(long)]
+    #[arg(long)]
     pub disable_function_url: bool,
 
     /// How long the function can be running for, in seconds
-    #[clap(long)]
+    #[arg(long)]
     pub timeout: Option<Timeout>,
 
     /// Option to add one or many environment variables, allows multiple repetitions
     /// Use VAR_KEY=VAR_VALUE as format
-    #[clap(long)]
+    #[arg(long)]
     pub env_var: Option<Vec<String>>,
 
     /// Read environment variables from a file
-    #[clap(long, value_hint = ValueHint::FilePath)]
+    #[arg(long, value_hint = ValueHint::FilePath)]
     pub env_file: Option<PathBuf>,
 
     /// Tracing mode with X-Ray
-    #[clap(long)]
+    #[arg(long)]
     pub tracing: Option<Tracing>,
 
     /// IAM Role associated with the function
-    #[clap(long, alias = "iam-role")]
+    #[arg(long, alias = "iam-role")]
     pub role: Option<String>,
 
     /// Lambda Layer ARN to associate the deployed function with
-    #[clap(long, alias = "layer-arn")]
+    #[arg(long, alias = "layer-arn")]
     pub layer: Option<Vec<String>>,
 }
 
