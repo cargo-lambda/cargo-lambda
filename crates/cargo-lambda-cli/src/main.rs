@@ -23,7 +23,7 @@ enum App {
 struct Lambda {
     #[command(subcommand)]
     subcommand: Option<Box<LambdaSubcommand>>,
-    /// Enable trace logs in any subcommand
+    /// Enable logs in any subcommand. Use `-v` for debug logs, and `-vv` for trace logs
     #[arg(short = 'v', long, action = clap::ArgAction::Count)]
     verbose: u8,
     /// Print version information
