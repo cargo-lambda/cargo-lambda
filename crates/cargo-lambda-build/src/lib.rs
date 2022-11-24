@@ -37,41 +37,41 @@ mod toolchain;
 mod zig;
 
 #[derive(Args, Clone, Debug)]
-#[clap(name = "build")]
+#[command(name = "build")]
 pub struct Build {
     /// The format to produce the compile Lambda into, acceptable values are [Binary, Zip]
-    #[clap(long, default_value_t = OutputFormat::Binary)]
+    #[arg(long, default_value_t = OutputFormat::Binary)]
     output_format: OutputFormat,
 
     /// Directory where the final lambda binaries will be located
-    #[clap(short, long, value_hint = ValueHint::DirPath)]
+    #[arg(short, long, value_hint = ValueHint::DirPath)]
     lambda_dir: Option<PathBuf>,
 
     /// Shortcut for --target aarch64-unknown-linux-gnu
-    #[clap(long)]
+    #[arg(long)]
     arm64: bool,
 
     /// Shortcut for --target x86_64-unknown-linux-gnu
-    #[clap(long)]
+    #[arg(long)]
     x86_64: bool,
 
     /// Whether the code that you're building is a Lambda Extension
-    #[clap(long)]
+    #[arg(long)]
     extension: bool,
 
     /// Put a bootstrap file in the root of the lambda directory.
     /// Use the name of the compiled binary to choose which file to move.
-    #[clap(long)]
+    #[arg(long)]
     flatten: Option<String>,
 
-    #[clap(long)]
+    #[arg(long)]
     #[deprecated]
     disable_zig_linker: bool,
 
-    #[clap(long, default_value_t = CompilerFlag::CargoZigbuild, env = "CARGO_LAMBDA_COMPILER")]
+    #[arg(long, default_value_t = CompilerFlag::CargoZigbuild, env = "CARGO_LAMBDA_COMPILER")]
     compiler: CompilerFlag,
 
-    #[clap(flatten)]
+    #[command(flatten)]
     build: CargoBuild,
 }
 

@@ -33,52 +33,52 @@ mod watch_installer;
 const RUNTIME_EMULATOR_PATH: &str = "/.rt";
 
 #[derive(Args, Clone, Debug)]
-#[clap(name = "watch", visible_alias = "start", trailing_var_arg = true)]
+#[command(name = "watch", visible_alias = "start")]
 pub struct Watch {
     /// Avoid hot-reload
-    #[clap(long)]
+    #[arg(long)]
     no_reload: bool,
 
     #[cfg_attr(
         target_os = "windows",
-        clap(short = 'a', long, default_value = "127.0.0.1")
+        arg(short = 'a', long, default_value = "127.0.0.1")
     )]
     #[cfg_attr(
         not(target_os = "windows"),
-        clap(short = 'a', long, default_value = "::")
+        arg(short = 'a', long, default_value = "::")
     )]
     /// Address where users send invoke requests
     invoke_address: String,
 
     /// Address port where users send invoke requests
-    #[clap(short = 'p', long, default_value = "9000")]
+    #[arg(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
 
     /// Print OpenTelemetry traces after each function invocation
-    #[clap(long)]
+    #[arg(long)]
     print_traces: bool,
 
-    #[clap(flatten)]
+    #[command(flatten)]
     cargo_options: CargoOptions,
 
     /// Arguments and flags to pass to `cargo watch`
-    #[clap(value_hint = ValueHint::CommandWithArguments)]
+    #[arg(value_hint = ValueHint::CommandWithArguments, trailing_var_arg = true)]
     watch_args: Vec<String>,
 }
 
 #[derive(Args, Clone, Debug)]
 struct CargoOptions {
     /// Path to Cargo.toml
-    #[clap(long, value_name = "PATH", parse(from_os_str), value_hint = ValueHint::FilePath)]
-    #[clap(default_value = "Cargo.toml")]
+    #[arg(long, value_name = "PATH", value_hint = ValueHint::FilePath)]
+    #[arg(default_value = "Cargo.toml")]
     manifest_path: PathBuf,
 
     /// Features to pass to `cargo run`, separated by comma
-    #[clap(long)]
+    #[arg(long)]
     features: Option<String>,
 
     /// Enable release mode when the emulator starts
-    #[clap(long)]
+    #[arg(long)]
     release: bool,
 }
 

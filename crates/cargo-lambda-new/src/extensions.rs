@@ -6,15 +6,16 @@ pub(crate) const DEFAULT_TEMPLATE_URL: &str =
     "https://github.com/cargo-lambda/default-extension-template/archive/refs/heads/main.zip";
 
 #[derive(Args, Clone, Debug, Default)]
+#[group(skip)]
 pub(crate) struct Options {
     /// Whether the extension includes a Logs processor
-    #[clap(long)]
+    #[arg(long)]
     logs: bool,
     /// Whether the extension includes a Telemetry processor
-    #[clap(long)]
+    #[arg(long)]
     telemetry: bool,
     /// Whether the extension includes an Events processor
-    #[clap(long)]
+    #[arg(long)]
     events: bool,
 }
 

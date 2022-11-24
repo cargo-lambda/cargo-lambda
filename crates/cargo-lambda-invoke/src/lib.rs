@@ -27,41 +27,41 @@ use error::*;
 pub const DEFAULT_PACKAGE_FUNCTION: &str = "@package-bootstrap@";
 
 #[derive(Args, Clone, Debug)]
-#[clap(name = "invoke")]
+#[command(name = "invoke")]
 pub struct Invoke {
     /// Local address host (IPv4 or IPv6) to send invoke requests
-    #[clap(short = 'a', long, default_value = "127.0.0.1")]
+    #[arg(short = 'a', long, default_value = "127.0.0.1")]
     invoke_address: String,
 
     /// Local port to send invoke requests
-    #[clap(short = 'p', long, default_value = "9000")]
+    #[arg(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
 
     /// File to read the invoke payload from
-    #[clap(long, parse(from_os_str), value_hint = ValueHint::FilePath)]
+    #[arg(long, value_hint = ValueHint::FilePath)]
     data_file: Option<PathBuf>,
 
     /// Invoke payload as a string
-    #[clap(long)]
+    #[arg(long)]
     data_ascii: Option<String>,
 
     /// Example payload from LegNeato/aws-lambda-events
-    #[clap(long)]
+    #[arg(long)]
     data_example: Option<String>,
 
     /// Invoke the function already deployed on AWS Lambda
-    #[clap(long)]
+    #[arg(long)]
     remote: bool,
 
-    #[clap(flatten)]
+    #[command(flatten)]
     remote_config: RemoteConfig,
 
     /// Format to render the output (text, or json)
-    #[clap(long, default_value_t = OutputFormat::Text)]
+    #[arg(long, default_value_t = OutputFormat::Text)]
     output_format: OutputFormat,
 
     /// Name of the function to invoke
-    #[clap(default_value = DEFAULT_PACKAGE_FUNCTION)]
+    #[arg(default_value = DEFAULT_PACKAGE_FUNCTION)]
     function_name: String,
 }
 

@@ -11,19 +11,19 @@ const DEFAULT_REGION: &str = "us-east-1";
 #[derive(Args, Clone, Debug)]
 pub struct RemoteConfig {
     /// AWS configuration profile to use for authorization
-    #[clap(short, long)]
+    #[arg(short, long)]
     pub profile: Option<String>,
 
     /// AWS region to deploy, if there is no default
-    #[clap(short, long)]
+    #[arg(short, long)]
     pub region: Option<String>,
 
     /// AWS Lambda alias to associate the function to
-    #[clap(short, long)]
+    #[arg(short, long)]
     pub alias: Option<String>,
 
     /// Number of attempts to try failed operations
-    #[clap(long, default_value = "1")]
+    #[arg(long, default_value = "1")]
     retry_attempts: u32,
 }
 

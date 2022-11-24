@@ -23,50 +23,51 @@ mod functions;
 mod template;
 
 #[derive(Args, Clone, Debug)]
-#[clap(name = "new")]
+#[command(name = "new")]
+#[group(skip)]
 pub struct New {
     /// Where to find the project template. It can be a local directory, a local zip file, or a URL to a remote zip file
-    #[clap(long)]
+    #[arg(long)]
     template: Option<String>,
 
     /// Start a project for a Lambda Extension
-    #[clap(long)]
+    #[arg(long)]
     extension: bool,
 
     /// Options for function templates
-    #[clap(flatten)]
+    #[command(flatten)]
     function_options: functions::Options,
 
     /// Options for extension templates
-    #[clap(flatten)]
+    #[command(flatten)]
     extension_options: extensions::Options,
 
     /// Open the project in a code editor defined by the environment variable EDITOR
-    #[clap(short, long)]
+    #[arg(short, long)]
     open: bool,
 
     /// Name of the binary, independent of the package's name
-    #[clap(long, alias = "function-name")]
+    #[arg(long, alias = "function-name")]
     bin_name: Option<String>,
 
     /// Don't show any prompt
-    #[clap(long)]
+    #[arg(long)]
     no_interactive: bool,
 
     /// List of additional files to render with the template engine
-    #[clap(long)]
+    #[arg(long)]
     render_file: Option<Vec<PathBuf>>,
 
     /// Map of additional variables to pass to the template engine, in KEY=VALUE format
-    #[clap(long)]
+    #[arg(long)]
     render_var: Option<Vec<String>>,
 
     /// List of files to ignore from the template
-    #[clap(long)]
+    #[arg(long)]
     ignore_file: Option<Vec<PathBuf>>,
 
     /// Name of the Rust package to create
-    #[clap()]
+    #[arg()]
     package_name: String,
 }
 
