@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "cargo-lambda"
-dependencies = ["ziglang>=0.9.1"]
+dependencies = ["ziglang>=0.10.0"]
 
 [tool.maturin]
 bindings = "bin"
