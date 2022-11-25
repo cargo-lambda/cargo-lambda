@@ -1,5 +1,6 @@
-use atty::is;
 use indicatif::{ProgressBar, ProgressStyle};
+
+use crate::is_stdout_tty;
 
 pub struct Progress {
     bar: Option<ProgressBar>,
@@ -7,7 +8,7 @@ pub struct Progress {
 
 impl Progress {
     pub fn start(msg: impl ToString) -> Progress {
-        let bar = if is(atty::Stream::Stdout) {
+        let bar = if is_stdout_tty() {
             Some(show_progress(msg))
         } else {
             println!("▹▹▹▹▹ {}", msg.to_string());
