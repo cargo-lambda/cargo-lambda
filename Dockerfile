@@ -1,4 +1,4 @@
-ARG RUST_VERSION=1.64.0
+ARG RUST_VERSION=1.65.0
 FROM --platform=$BUILDPLATFORM rust:${RUST_VERSION}
 
 RUN set -eux; \
@@ -7,7 +7,7 @@ RUN set -eux; \
 
 ENTRYPOINT [ "cargo", "lambda" ]
 
-ARG ZIG_VERSION=0.9.1
+ARG ZIG_VERSION=0.10.0
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
     case "${dpkgArch##*-}" in \
