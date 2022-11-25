@@ -63,7 +63,7 @@ strum_macros = "0.24.0"
 thiserror = "1.0.31"
 tokio = { version = "1.18.2" }
 tracing = { version = "0.1.35", features = ["log"] }
-tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 uuid = { version = "1.1.2", features = ["v4"] }
 which = "4.2.5"
 zip = { version = "0.6.2", features = ["bzip2", "deflate", "time"] }

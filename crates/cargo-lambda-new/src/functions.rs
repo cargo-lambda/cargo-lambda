@@ -1,4 +1,10 @@
-use cargo_lambda_interactive::{choose_option, error::InquireError, is_stdin_tty, Confirm, Text};
+use cargo_lambda_interactive::{
+    choose_option,
+    error::{CustomUserError, InquireError},
+    is_stdin_tty,
+    validator::{ErrorMessage, Validation},
+    Confirm, Text,
+};
 use clap::Args;
 use liquid::{model::Value, Object};
 use miette::Result;
@@ -121,8 +127,8 @@ impl Options {
 
         if !self.http {
             let event_type = Text::new("AWS Event type that this function receives")
-            .with_suggester(&suggest_event_type)
-            .with_validator(&validate_event_type)
+            .with_autocomplete(suggest_event_type)
+            .with_validator(validate_event_type)
             .with_help_message("↑↓ to move, tab to auto-complete, enter to submit. Leave it blank if you don't want to use any event from the aws_lambda_events crate")
             .prompt()?;
             self.event_type = Some(event_type);
@@ -203,15 +209,18 @@ impl Options {
     }
 }
 
-fn validate_event_type(name: &str) -> Result<(), String> {
+fn validate_event_type(name: &str) -> Result<Validation, CustomUserError> {
     match name.is_empty() || crate::events::WELL_KNOWN_EVENTS.contains(&name) {
-        true => Ok(()),
-        false => Err(format!("invalid event type: {}", name)),
+        true => Ok(Validation::Valid),
+        false => Ok(Validation::Invalid(ErrorMessage::Custom(format!(
+            "invalid event type: {}",
+            name
+        )))),
     }
 }
 
-fn suggest_event_type(text: &str) -> Vec<String> {
-    crate::events::WELL_KNOWN_EVENTS
+fn suggest_event_type(text: &str) -> Result<Vec<String>, CustomUserError> {
+    Ok(crate::events::WELL_KNOWN_EVENTS
         .iter()
         .filter_map(|s| {
             if s.starts_with(text) {
@@ -220,7 +229,7 @@ fn suggest_event_type(text: &str) -> Vec<String> {
                 None
             }
         })
-        .collect()
+        .collect())
 }
 
 #[cfg(test)]

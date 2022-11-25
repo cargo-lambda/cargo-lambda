@@ -1,6 +1,6 @@
-use indicatif::{ProgressBar, ProgressStyle};
-
 use crate::is_stdout_tty;
+use indicatif::{ProgressBar, ProgressStyle};
+use std::time::Duration;
 
 pub struct Progress {
     bar: Option<ProgressBar>,
@@ -42,20 +42,16 @@ impl Progress {
 
 fn show_progress(msg: impl ToString) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
-    pb.enable_steady_tick(120);
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.blue} {msg}")
-            .tick_strings(&[
-                "▹▹▹▹▹",
-                "▸▹▹▹▹",
-                "▹▸▹▹▹",
-                "▹▹▸▹▹",
-                "▹▹▹▸▹",
-                "▹▹▹▹▸",
-                "▪▪▪▪▪",
-            ]),
-    );
+    pb.enable_steady_tick(Duration::from_millis(120));
+    pb.set_style(ProgressStyle::default_spinner().tick_strings(&[
+        "▹▹▹▹▹",
+        "▸▹▹▹▹",
+        "▹▸▹▹▹",
+        "▹▹▸▹▹",
+        "▹▹▹▸▹",
+        "▹▹▹▹▸",
+        "▪▪▪▪▪",
+    ]));
     pb.set_message(msg.to_string());
     pb
 }
