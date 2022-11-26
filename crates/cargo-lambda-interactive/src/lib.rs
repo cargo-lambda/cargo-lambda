@@ -2,6 +2,7 @@ use inquire::{
     self,
     error::{InquireError, InquireResult},
 };
+use is_terminal::IsTerminal;
 use std::fmt::Display;
 
 pub mod command;
@@ -9,12 +10,12 @@ pub mod progress;
 
 /// Check if STDIN is a TTY
 pub fn is_stdin_tty() -> bool {
-    atty::is(atty::Stream::Stdin)
+    std::io::stdin().is_terminal()
 }
 
 /// Check if STDOUT is a TTY
 pub fn is_stdout_tty() -> bool {
-    atty::is(atty::Stream::Stdout)
+    std::io::stdout().is_terminal()
 }
 
 pub fn choose_option<T: Display>(message: &str, options: Vec<T>) -> InquireResult<T> {
