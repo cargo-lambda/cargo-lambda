@@ -72,7 +72,27 @@ If you want to create a zip file with the structure that AWS Lambda expects to f
 cargo lambda build --release --extension --output-format zip
 ```
 
-## How does it work?
+## Compiler backends
 
-cargo-lambda uses [Zig](https://ziglang.org) and [cargo-zigbuild](https://crates.io/crates/cargo-zigbuild)
-to compile the code for the right architecture. If Zig is not installed in your host machine, the first time that your run cargo-lambda, it will guide you through some installation options. If you run cargo-lambda in a non-interactive shell, the build process will fail until you install that dependency.
+Cargo Lambda has an internal abstraction to work with different ways to compile functions.
+
+The default compiler is `cargo-zigbuild`. This compiler uses [Zig](https://ziglang.org) to cross compile any Rust project to a Linux target on your own OS, without the need to a virtual machine or a Linux container. If Zig is not installed in your host machine, the first time that your run Cargo Lambda, it will guide you through some installation options. If you run Cargo Lambda in a non-interactive shell, the build process will fail until you install that dependency.
+
+Cargo Lambda also supports building Rust projects without Zig as the target linker. This compiler is identifed as just `cargo`. A disadvantage of this is that it's up to you to guarantee that the binary works on Linux. An advantage is that if you always build functions on Linux, you don't need to install Zig to use Cargo Lambda.
+
+To switch compilers, you can use the flag `--compiler` with the name of the compiler to use when you run `cargo lambda build`. For example:
+
+```
+cargo lambda build --compiler cargo
+```
+
+You can also use an environment variable to select the compiler:
+
+```
+export CARGO_LAMBDA_COMPILER=cargo
+cargo lambda build
+```
+
+### Additional compilers
+
+The concept of compilers on Cargo Lambda is an abstraction on top of different shell commands. If you want to add an additional compiler, you need to implement [Compiler](https://github.com/cargo-lambda/cargo-lambda/blob/main/crates/cargo-lambda-build/src/compiler/mod.rs#L14) trait. The command to execute needs to follow Rust compilations' convenctions, for example, if the user wants to build an Arm64 binary with the `release` profile, Cargo Lambda will expect that the resulting binary is in `target/aarch64-unknown-linux-gnu/release/`.
