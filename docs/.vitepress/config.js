@@ -1,4 +1,8 @@
-import { version } from '../package.json'
+const toml = require('toml');
+const fs = require('fs');
+
+const meta = toml.parse(fs.readFileSync('../Cargo.toml', 'utf-8'));
+const version = meta['workspace']['package']['version'];
 
 export default {
     lang: 'en-US',

@@ -1,10 +1,12 @@
 lockfileVersion: 5.4
 
 specifiers:
+  toml: ^3.0.0
   vitepress: 1.0.0-alpha.4
   vue: ^3.2.37
 
 devDependencies:
+  toml: 3.0.0
   vitepress: 1.0.0-alpha.4
   vue: 3.2.37
 
@@ -685,6 +687,10 @@ packages:
   /to-fast-properties/2.0.0:
     resolution: {integrity: sha512-/OaKK0xYrs3DmxRYqL/yDc+FxFUVYhDlXMhRmv3z915w2HF1tnN1omB354j8VUGO/hbRzyD6Y3sA7v7GS/ceog==}
     engines: {node: '>=4'}
+    dev: true
+
+  /toml/3.0.0:
+    resolution: {integrity: sha512-y/mWCZinnvxjTKYhJ+pYxwD0mRLVvOtdS2Awbgxln6iEnt4rk0yBxeSBHkGJcPucRiG0e55mwWp+g/05rsrd6w==}
     dev: true
 
   /vite/2.9.14:
