@@ -22,7 +22,7 @@ RUN set -eux; \
 
 ENV PATH=$PATH:/zig
 
-ARG CARGO_LAMBDA_VERSION=v0.12.0
+ARG CARGO_LAMBDA_VERSION=v0.13.0
 RUN set -eux; \
     mkdir cargo-lambda; \
     cd cargo-lambda; \
