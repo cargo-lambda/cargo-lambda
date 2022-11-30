@@ -1,0 +1,8 @@
+[default]
+region = af-south-1
+
+[profile apple]
+region = ca-central-1
+
+[profile banana]
+output = json
