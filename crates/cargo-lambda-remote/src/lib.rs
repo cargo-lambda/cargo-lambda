@@ -35,7 +35,6 @@ impl RemoteConfig {
         let region_provider = RegionProviderChain::first_try(explicit_region.clone())
             .or_default_provider()
             .or_else(Region::new(DEFAULT_REGION));
-        let region = region_provider.region().await;
 
         let retry =
             retry.unwrap_or_else(|| RetryConfig::default().with_max_attempts(self.retry_attempts));
@@ -49,8 +48,7 @@ impl RemoteConfig {
                 .build();
 
             let region_provider = RegionProviderChain::first_try(explicit_region)
-                .or_else(profile_region)
-                .or_else(region);
+                .or_else(profile_region);
             let region = region_provider.region().await;
 
             let conf = ProviderConfig::default().with_region(region);
@@ -79,7 +77,7 @@ mod tests {
     use aws_sdk_lambda::Region;
     use aws_types::credentials::ProvideCredentials;
 
-    use crate::{RemoteConfig, DEFAULT_REGION};
+    use crate::RemoteConfig;
 
     fn setup() {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
@@ -89,7 +87,7 @@ mod tests {
 
     /// Specify a profile which does not exist
     /// Expectations:
-    /// - Region is undefined, thus uses the `DEFAULT_REGION` as defined in the crate
+    /// - Region is undefined
     /// - Credentials are undefined
     #[tokio::test]
     async fn undefined_profile() {
@@ -105,13 +103,13 @@ mod tests {
         let config = args.sdk_config(None).await;
         let creds = config.credentials_provider().unwrap().provide_credentials().await;
 
-        assert_eq!(config.region(), Some(&Region::from_static(DEFAULT_REGION)));
+        assert_eq!(config.region(), None);
         assert!(creds.is_err());
     }
 
     /// Specify a profile which exists in the credentials file but not in the config file
     /// Expectations:
-    /// - Region is undefined, thus uses the `DEFAULT_REGION` as defined in the crate
+    /// - Region is undefined
     /// - Credentials are used from the profile
     #[tokio::test]
     async fn undefined_profile_with_creds() {
@@ -127,8 +125,8 @@ mod tests {
         let config = args.sdk_config(None).await;
         let creds = config.credentials_provider().unwrap().provide_credentials().await.unwrap();
 
-        assert_eq!(config.region(), Some(&Region::from_static(DEFAULT_REGION)));
-        assert_eq!(creds.access_key_id(), "CCCCCCCCCCCCCCCCCCCCC");
+        assert_eq!(config.region(), None);
+        assert_eq!(creds.access_key_id(), "CCCCCCCCCCCCCCCCCCCC");
     }
 
     /// Specify a profile which has a region associated to it
@@ -155,7 +153,7 @@ mod tests {
 
     /// Specify a profile which does not have a region associated to it
     /// Expectations:
-    /// - Region is undefined, thus uses the `DEFAULT_REGION` as defined in the crate
+    /// - Region is undefined
     /// - Credentials are used from the profile
     #[tokio::test]
     async fn profile_without_region() {
@@ -171,7 +169,7 @@ mod tests {
         let config = args.sdk_config(None).await;
         let creds = config.credentials_provider().unwrap().provide_credentials().await.unwrap();
 
-        assert_eq!(config.region(), Some(&Region::from_static(DEFAULT_REGION)));
+        assert_eq!(config.region(), None);
         assert_eq!(creds.access_key_id(), "BBBBBBBBBBBBBBBBBBBB");
     }
 
