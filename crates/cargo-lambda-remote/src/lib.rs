@@ -1,5 +1,6 @@
 use aws_config::{
-    meta::region::RegionProviderChain, profile::ProfileFileCredentialsProvider,
+    meta::region::RegionProviderChain,
+    profile::{ProfileFileCredentialsProvider, ProfileFileRegionProvider},
     provider_config::ProviderConfig,
 };
 use aws_sdk_lambda::RetryConfig;
@@ -29,7 +30,9 @@ pub struct RemoteConfig {
 
 impl RemoteConfig {
     pub async fn sdk_config(&self, retry: Option<RetryConfig>) -> SdkConfig {
-        let region_provider = RegionProviderChain::first_try(self.region.clone().map(Region::new))
+        let explicit_region = self.region.clone().map(Region::new);
+
+        let region_provider = RegionProviderChain::first_try(explicit_region.clone())
             .or_default_provider()
             .or_else(Region::new(DEFAULT_REGION));
         let region = region_provider.region().await;
@@ -41,12 +44,25 @@ impl RemoteConfig {
             .retry_config(retry);
 
         if let Some(profile) = &self.profile {
-            let conf = ProviderConfig::without_region().with_region(region);
+            let profile_region = ProfileFileRegionProvider::builder()
+                .profile_name(profile)
+                .build();
+
+            let region_provider = RegionProviderChain::first_try(explicit_region)
+                .or_else(profile_region)
+                .or_else(region);
+            let region = region_provider.region().await;
+
+            let conf = ProviderConfig::default().with_region(region);
+
             let creds_provider = ProfileFileCredentialsProvider::builder()
                 .profile_name(profile)
                 .configure(&conf)
                 .build();
-            config_loader = config_loader.credentials_provider(creds_provider);
+
+            config_loader = config_loader
+                .region(region_provider)
+                .credentials_provider(creds_provider);
         }
 
         config_loader.load().await
