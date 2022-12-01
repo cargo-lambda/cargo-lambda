@@ -47,8 +47,8 @@ impl RemoteConfig {
                 .profile_name(profile)
                 .build();
 
-            let region_provider = RegionProviderChain::first_try(explicit_region)
-                .or_else(profile_region);
+            let region_provider =
+                RegionProviderChain::first_try(explicit_region).or_else(profile_region);
             let region = region_provider.region().await;
 
             let conf = ProviderConfig::default().with_region(region);
@@ -81,8 +81,14 @@ mod tests {
 
     fn setup() {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        std::env::set_var("AWS_CONFIG_FILE", format!("{manifest_dir}/test-data/aws_config"));
-        std::env::set_var("AWS_SHARED_CREDENTIALS_FILE", format!("{manifest_dir}/test-data/aws_credentials"));
+        std::env::set_var(
+            "AWS_CONFIG_FILE",
+            format!("{manifest_dir}/test-data/aws_config"),
+        );
+        std::env::set_var(
+            "AWS_SHARED_CREDENTIALS_FILE",
+            format!("{manifest_dir}/test-data/aws_credentials"),
+        );
     }
 
     /// Specify a profile which does not exist
@@ -101,7 +107,11 @@ mod tests {
         };
 
         let config = args.sdk_config(None).await;
-        let creds = config.credentials_provider().unwrap().provide_credentials().await;
+        let creds = config
+            .credentials_provider()
+            .unwrap()
+            .provide_credentials()
+            .await;
 
         assert_eq!(config.region(), None);
         assert!(creds.is_err());
@@ -123,7 +133,12 @@ mod tests {
         };
 
         let config = args.sdk_config(None).await;
-        let creds = config.credentials_provider().unwrap().provide_credentials().await.unwrap();
+        let creds = config
+            .credentials_provider()
+            .unwrap()
+            .provide_credentials()
+            .await
+            .unwrap();
 
         assert_eq!(config.region(), None);
         assert_eq!(creds.access_key_id(), "CCCCCCCCCCCCCCCCCCCC");
@@ -145,7 +160,12 @@ mod tests {
         };
 
         let config = args.sdk_config(None).await;
-        let creds = config.credentials_provider().unwrap().provide_credentials().await.unwrap();
+        let creds = config
+            .credentials_provider()
+            .unwrap()
+            .provide_credentials()
+            .await
+            .unwrap();
 
         assert_eq!(config.region(), Some(&Region::from_static("ca-central-1")));
         assert_eq!(creds.access_key_id(), "AAAAAAAAAAAAAAAAAAAA");
@@ -167,7 +187,12 @@ mod tests {
         };
 
         let config = args.sdk_config(None).await;
-        let creds = config.credentials_provider().unwrap().provide_credentials().await.unwrap();
+        let creds = config
+            .credentials_provider()
+            .unwrap()
+            .provide_credentials()
+            .await
+            .unwrap();
 
         assert_eq!(config.region(), None);
         assert_eq!(creds.access_key_id(), "BBBBBBBBBBBBBBBBBBBB");
@@ -189,7 +214,12 @@ mod tests {
         };
 
         let config = args.sdk_config(None).await;
-        let creds = config.credentials_provider().unwrap().provide_credentials().await.unwrap();
+        let creds = config
+            .credentials_provider()
+            .unwrap()
+            .provide_credentials()
+            .await
+            .unwrap();
 
         assert_eq!(config.region(), Some(&Region::from_static("af-south-1")));
         assert_eq!(creds.access_key_id(), "DDDDDDDDDDDDDDDDDDDD");
