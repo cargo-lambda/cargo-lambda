@@ -35,7 +35,6 @@ impl RemoteConfig {
         let region_provider = RegionProviderChain::first_try(explicit_region.clone())
             .or_default_provider()
             .or_else(Region::new(DEFAULT_REGION));
-        let region = region_provider.region().await;
 
         let retry =
             retry.unwrap_or_else(|| RetryConfig::default().with_max_attempts(self.retry_attempts));
@@ -48,9 +47,8 @@ impl RemoteConfig {
                 .profile_name(profile)
                 .build();
 
-            let region_provider = RegionProviderChain::first_try(explicit_region)
-                .or_else(profile_region)
-                .or_else(region);
+            let region_provider =
+                RegionProviderChain::first_try(explicit_region).or_else(profile_region);
             let region = region_provider.region().await;
 
             let conf = ProviderConfig::default().with_region(region);
@@ -73,3 +71,157 @@ pub mod aws_sdk_config {
     pub use aws_types::SdkConfig;
 }
 pub use aws_sdk_lambda;
+
+#[cfg(test)]
+mod tests {
+    use aws_sdk_lambda::Region;
+    use aws_types::credentials::ProvideCredentials;
+
+    use crate::RemoteConfig;
+
+    fn setup() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        std::env::set_var(
+            "AWS_CONFIG_FILE",
+            format!("{manifest_dir}/test-data/aws_config"),
+        );
+        std::env::set_var(
+            "AWS_SHARED_CREDENTIALS_FILE",
+            format!("{manifest_dir}/test-data/aws_credentials"),
+        );
+    }
+
+    /// Specify a profile which does not exist
+    /// Expectations:
+    /// - Region is undefined
+    /// - Credentials are undefined
+    #[tokio::test]
+    async fn undefined_profile() {
+        setup();
+
+        let args = RemoteConfig {
+            profile: Some("durian".to_owned()),
+            region: None,
+            alias: None,
+            retry_attempts: 1,
+        };
+
+        let config = args.sdk_config(None).await;
+        let creds = config
+            .credentials_provider()
+            .unwrap()
+            .provide_credentials()
+            .await;
+
+        assert_eq!(config.region(), None);
+        assert!(creds.is_err());
+    }
+
+    /// Specify a profile which exists in the credentials file but not in the config file
+    /// Expectations:
+    /// - Region is undefined
+    /// - Credentials are used from the profile
+    #[tokio::test]
+    async fn undefined_profile_with_creds() {
+        setup();
+
+        let args = RemoteConfig {
+            profile: Some("cherry".to_owned()),
+            region: None,
+            alias: None,
+            retry_attempts: 1,
+        };
+
+        let config = args.sdk_config(None).await;
+        let creds = config
+            .credentials_provider()
+            .unwrap()
+            .provide_credentials()
+            .await
+            .unwrap();
+
+        assert_eq!(config.region(), None);
+        assert_eq!(creds.access_key_id(), "CCCCCCCCCCCCCCCCCCCC");
+    }
+
+    /// Specify a profile which has a region associated to it
+    /// Expectations:
+    /// - Region is used from the profile
+    /// - Credentials are used from the profile
+    #[tokio::test]
+    async fn profile_with_region() {
+        setup();
+
+        let args = RemoteConfig {
+            profile: Some("apple".to_owned()),
+            region: None,
+            alias: None,
+            retry_attempts: 1,
+        };
+
+        let config = args.sdk_config(None).await;
+        let creds = config
+            .credentials_provider()
+            .unwrap()
+            .provide_credentials()
+            .await
+            .unwrap();
+
+        assert_eq!(config.region(), Some(&Region::from_static("ca-central-1")));
+        assert_eq!(creds.access_key_id(), "AAAAAAAAAAAAAAAAAAAA");
+    }
+
+    /// Specify a profile which does not have a region associated to it
+    /// Expectations:
+    /// - Region is undefined
+    /// - Credentials are used from the profile
+    #[tokio::test]
+    async fn profile_without_region() {
+        setup();
+
+        let args = RemoteConfig {
+            profile: Some("banana".to_owned()),
+            region: None,
+            alias: None,
+            retry_attempts: 1,
+        };
+
+        let config = args.sdk_config(None).await;
+        let creds = config
+            .credentials_provider()
+            .unwrap()
+            .provide_credentials()
+            .await
+            .unwrap();
+
+        assert_eq!(config.region(), None);
+        assert_eq!(creds.access_key_id(), "BBBBBBBBBBBBBBBBBBBB");
+    }
+
+    /// Use the default profile which has a region associated to it
+    /// Expectations:
+    /// - Region is used from the profile
+    /// - Credentials are used from the profile
+    #[tokio::test]
+    async fn default_profile() {
+        setup();
+
+        let args = RemoteConfig {
+            profile: None,
+            region: None,
+            alias: None,
+            retry_attempts: 1,
+        };
+
+        let config = args.sdk_config(None).await;
+        let creds = config
+            .credentials_provider()
+            .unwrap()
+            .provide_credentials()
+            .await
+            .unwrap();
+
+        assert_eq!(config.region(), Some(&Region::from_static("af-south-1")));
+        assert_eq!(creds.access_key_id(), "DDDDDDDDDDDDDDDDDDDD");
+    }
+}
