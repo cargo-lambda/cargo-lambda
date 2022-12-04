@@ -209,7 +209,9 @@ pub fn function_environment_metadata<P: AsRef<Path>>(
         }
     }
 
-    tracing::debug!(env = ?env, "using environment variables from metadata");
+    if !env.is_empty() {
+        tracing::debug!(env = ?env, "using environment variables from metadata");
+    }
     Ok(env)
 }
 

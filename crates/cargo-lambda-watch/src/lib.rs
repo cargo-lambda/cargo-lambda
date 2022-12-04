@@ -1,5 +1,6 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
 use clap::{Args, ValueHint};
+use ignore_files::IgnoreFile;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
     global,
@@ -28,7 +29,7 @@ mod runtime_router;
 mod scheduler;
 use scheduler::*;
 mod trigger_router;
-mod watch_installer;
+mod watcher;
 
 const RUNTIME_EMULATOR_PATH: &str = "/.rt";
 
@@ -60,10 +61,6 @@ pub struct Watch {
 
     #[command(flatten)]
     cargo_options: CargoOptions,
-
-    /// Arguments and flags to pass to `cargo watch`
-    #[arg(value_hint = ValueHint::CommandWithArguments, trailing_var_arg = true)]
-    watch_args: Vec<String>,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -87,21 +84,20 @@ impl Watch {
     pub async fn run(&self) -> Result<()> {
         tracing::trace!(options = ?self, "watching project");
 
-        if !self.no_reload && which::which("cargo-watch").is_err() {
-            watch_installer::install().await?;
-        }
-
         let ip = IpAddr::from_str(&self.invoke_address)
             .into_diagnostic()
             .wrap_err("invalid invoke address")?;
         let addr = SocketAddr::from((ip, self.invoke_port));
         let no_reload = self.no_reload;
-        let watch_args = self.watch_args.clone();
         let cargo_options = self.cargo_options.clone();
+
+        let (mut global_ignore, _) = ignore_files::from_environment(Some("CARGO_LAMBDA")).await;
+        let (mut local_ignore, _) = ignore_files::from_origin(".").await;
+        local_ignore.append(&mut global_ignore);
 
         Toplevel::new()
             .start("Lambda server", move |s| {
-                start_server(s, addr, watch_args, cargo_options, no_reload)
+                start_server(s, addr, cargo_options, no_reload, local_ignore)
             })
             .catch_signals()
             .handle_shutdown_requests(Duration::from_millis(1000))
@@ -132,9 +128,9 @@ impl Watch {
 async fn start_server(
     subsys: SubsystemHandle,
     addr: SocketAddr,
-    watch_args: Vec<String>,
     cargo_options: CargoOptions,
     no_reload: bool,
+    ignore_files: Vec<IgnoreFile>,
 ) -> Result<(), axum::Error> {
     let runtime_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
 
@@ -142,9 +138,9 @@ async fn start_server(
     let req_tx = init_scheduler(
         &subsys,
         req_cache.clone(),
-        watch_args,
         cargo_options,
         no_reload,
+        ignore_files,
     )
     .await;
     let resp_cache = ResponseCache::new();
