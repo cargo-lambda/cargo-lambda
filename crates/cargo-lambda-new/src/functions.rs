@@ -74,12 +74,12 @@ impl HttpEndpoints {
 
     fn all() -> Vec<HttpEndpoints> {
         vec![
+            HttpEndpoints::Unknown,
             HttpEndpoints::Alb,
             HttpEndpoints::ApigwRest,
             HttpEndpoints::ApigwHttp,
             HttpEndpoints::ApigwWebsockets,
             HttpEndpoints::LambdaUrls,
-            HttpEndpoints::Unknown,
         ]
     }
 }
