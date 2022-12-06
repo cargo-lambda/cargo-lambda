@@ -366,7 +366,9 @@ async fn upsert_function(
                     builder = builder.set_layers(deploy_config.layers);
                 }
 
-                if environment.variables != conf.environment.map(|e| e.variables).unwrap_or_default() {
+                if environment.variables
+                    != conf.environment.map(|e| e.variables).unwrap_or_default()
+                {
                     update_config = true;
                     builder = builder.environment(environment);
                 }
