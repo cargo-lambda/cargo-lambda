@@ -41,11 +41,24 @@ enum FunctionAction {
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct FunctionDeployConfig {
+pub struct FunctionConfig {
     /// Memory allocated for the function
     #[arg(long, alias = "memory-size")]
     pub memory: Option<Memory>,
+    /// How long the function can be running for, in seconds
+    #[arg(long)]
+    pub timeout: Option<Timeout>,
+    /// Option to add one or many environment variables, allows multiple repetitions
+    /// Use VAR_KEY=VAR_VALUE as format
+    #[arg(long)]
+    pub env_var: Option<Vec<String>>,
+    /// Read environment variables from a file
+    #[arg(long, value_hint = ValueHint::FilePath)]
+    pub env_file: Option<PathBuf>,
+}
 
+#[derive(Args, Clone, Debug)]
+pub struct FunctionDeployConfig {
     /// Enable function URL for this function
     #[arg(long)]
     pub enable_function_url: bool,
@@ -54,18 +67,8 @@ pub struct FunctionDeployConfig {
     #[arg(long)]
     pub disable_function_url: bool,
 
-    /// How long the function can be running for, in seconds
-    #[arg(long)]
-    pub timeout: Option<Timeout>,
-
-    /// Option to add one or many environment variables, allows multiple repetitions
-    /// Use VAR_KEY=VAR_VALUE as format
-    #[arg(long)]
-    pub env_var: Option<Vec<String>>,
-
-    /// Read environment variables from a file
-    #[arg(long, value_hint = ValueHint::FilePath)]
-    pub env_file: Option<PathBuf>,
+    #[command(flatten)]
+    pub config: Option<FunctionConfig>,
 
     /// Tracing mode with X-Ray
     #[arg(long)]
@@ -168,41 +171,47 @@ async fn upsert_function(
 ) -> Result<(String, String)> {
     let current_function = client.get_function().function_name(name).send().await;
 
-    let mut deploy_metadata = function_deploy_metadata(manifest_path, binary_name)?;
+    let (environment, deploy_metadata) = if let Some(ref config) = function_config.config {
+        let mut deploy_metadata = function_deploy_metadata(manifest_path, binary_name)?;
 
-    if let Some(tracing) = &function_config.tracing {
-        if &deploy_metadata.tracing != tracing {
-            deploy_metadata.tracing = tracing.clone();
+        if let Some(tracing) = &function_config.tracing {
+            if &deploy_metadata.tracing != tracing {
+                deploy_metadata.tracing = tracing.clone();
+            }
         }
-    }
 
-    if function_config.role.is_some() {
-        deploy_metadata.iam_role = function_config.role.clone();
-    }
-
-    if function_config.memory.is_some() {
-        deploy_metadata.memory = function_config.memory.clone();
-    }
-
-    if let Some(timeout) = &function_config.timeout {
-        if !timeout.is_zero() {
-            deploy_metadata.timeout = timeout.clone()
+        if function_config.role.is_some() {
+            deploy_metadata.iam_role = function_config.role.clone();
         }
-    }
 
-    if function_config.env_file.is_some() {
-        deploy_metadata.env_file = function_config.env_file.clone();
-    }
+        if config.memory.is_some() {
+            deploy_metadata.memory = config.memory.clone();
+        }
 
-    let environment = function_environment(
-        deploy_metadata.env.clone(),
-        &deploy_metadata.env_file,
-        &function_config.env_var,
-    )?;
+        if let Some(timeout) = &config.timeout {
+            if !timeout.is_zero() {
+                deploy_metadata.timeout = timeout.clone()
+            }
+        }
 
-    if function_config.layer.is_some() {
-        deploy_metadata.layers = function_config.layer.clone();
-    }
+        if config.env_file.is_some() {
+            deploy_metadata.env_file = config.env_file.clone();
+        }
+
+        let environment = function_environment(
+            deploy_metadata.env.clone(),
+            &deploy_metadata.env_file,
+            &config.env_var,
+        )?;
+
+        if function_config.layer.is_some() {
+            deploy_metadata.layers = function_config.layer.clone();
+        }
+
+        (environment, Some(deploy_metadata))
+    } else {
+        (Environment::builder().build(), None)
+    };
 
     let action = match current_function {
         Ok(fun) => FunctionAction::Update(Box::new(fun)),
@@ -214,12 +223,18 @@ async fn upsert_function(
         }
     };
 
+    let tracing = if let Some(tracing) = deploy_metadata.as_ref().map(|c| &c.tracing) {
+        tracing.clone()
+    } else {
+        Tracing::default()
+    };
     let tracing_config = TracingConfig::builder()
-        .mode(deploy_metadata.tracing.to_string().as_str().into())
+        .mode(tracing.to_string().as_str().into())
         .build();
 
     let (arn, version) = match action {
         FunctionAction::Create => {
+            let deploy_metadata = deploy_metadata.unwrap_or_default();
             let (iam_role, is_new_role) = match &deploy_metadata.iam_role {
                 None => (roles::create(sdk_config, progress).await?, true),
                 Some(role) => (role.clone(), false),
@@ -329,35 +344,37 @@ async fn upsert_function(
             let mut update_config = false;
             let mut builder = client.update_function_configuration().function_name(name);
 
-            if let Some(iam_role) = &deploy_metadata.iam_role {
-                builder = builder.role(iam_role);
-            }
+            if let Some(deploy_config) = deploy_metadata {
+                if let Some(iam_role) = &deploy_config.iam_role {
+                    builder = builder.role(iam_role);
+                }
 
-            let memory = deploy_metadata.memory.clone().map(Into::into);
-            if memory.is_some() && conf.memory_size != memory {
-                update_config = true;
-                builder = builder.set_memory_size(memory);
-            }
+                let memory = deploy_config.memory.clone().map(Into::into);
+                if memory.is_some() && conf.memory_size != memory {
+                    update_config = true;
+                    builder = builder.set_memory_size(memory);
+                }
 
-            let timeout: i32 = deploy_metadata.timeout.clone().into();
-            if conf.timeout.unwrap_or_default() != timeout {
-                update_config = true;
-                builder = builder.timeout(timeout);
-            }
+                let timeout: i32 = deploy_config.timeout.clone().into();
+                if conf.timeout.unwrap_or_default() != timeout {
+                    update_config = true;
+                    builder = builder.timeout(timeout);
+                }
 
-            if should_update_layers(&deploy_metadata.layers, &conf) {
-                update_config = true;
-                builder = builder.set_layers(deploy_metadata.layers.clone());
-            }
+                if should_update_layers(&deploy_config.layers, &conf) {
+                    update_config = true;
+                    builder = builder.set_layers(deploy_config.layers);
+                }
 
-            if environment.variables != conf.environment.map(|e| e.variables).unwrap_or_default() {
-                update_config = true;
-                builder = builder.environment(environment);
-            }
+                if environment.variables != conf.environment.map(|e| e.variables).unwrap_or_default() {
+                    update_config = true;
+                    builder = builder.environment(environment);
+                }
 
-            if tracing_config.mode != conf.tracing_config.map(|t| t.mode).unwrap_or_default() {
-                update_config = true;
-                builder = builder.tracing_config(tracing_config);
+                if tracing_config.mode != conf.tracing_config.map(|t| t.mode).unwrap_or_default() {
+                    update_config = true;
+                    builder = builder.tracing_config(tracing_config);
+                }
             }
 
             if update_config {
