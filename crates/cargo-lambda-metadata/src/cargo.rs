@@ -3,8 +3,10 @@ use miette::{IntoDiagnostic, Result};
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Debug,
     path::{Path, PathBuf},
 };
+use tracing::{debug, trace};
 
 use crate::{
     error::MetadataError,
@@ -93,7 +95,7 @@ pub struct DeployConfig {
 }
 
 /// Extract all the binary target names from a Cargo.toml file
-pub fn binary_targets<P: AsRef<Path>>(manifest_path: P) -> Result<HashSet<String>> {
+pub fn binary_targets<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<HashSet<String>> {
     let metadata = load_metadata(manifest_path)?;
     let bins = metadata
         .packages
@@ -127,7 +129,7 @@ pub fn binary_targets_from_metadata(metadata: &CargoMetadata) -> Result<HashSet<
 /// This fetches the target directory from `cargo metadata`, resolving the
 /// user and project configuration and the environment variables in the right
 /// way.
-pub fn target_dir<P: AsRef<Path>>(manifest_path: P) -> Result<PathBuf> {
+pub fn target_dir<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<PathBuf> {
     let metadata = load_metadata(manifest_path)?;
     Ok(metadata.target_directory.into_std_path_buf())
 }
@@ -137,7 +139,9 @@ pub fn target_dir_from_metadata(metadata: &CargoMetadata) -> Result<PathBuf> {
 }
 
 /// Create metadata about the root package in the Cargo manifest, without any dependencies.
-pub fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> {
+#[tracing::instrument(target = "cargo_lambda")]
+pub fn load_metadata<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<CargoMetadata> {
+    trace!("loading Cargo metadata");
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
 
@@ -155,18 +159,22 @@ pub fn load_metadata<P: AsRef<Path>>(manifest_path: P) -> Result<CargoMetadata> 
         }
         _ => {
             // fall back to using the manifest_path without changing the dir
-            // this means there will not be any proejct-specific config parsing
+            // this means there will not be any project-specific config parsing
             metadata_cmd.manifest_path(manifest_ref);
         }
     }
 
-    metadata_cmd.exec().into_diagnostic()
+    let meta = metadata_cmd.exec().into_diagnostic()?;
+
+    trace!(metadata = ?meta, "loaded metadata");
+    Ok(meta)
 }
 
 /// Create a HashMap of environment varibales from the package and workspace manifest
 /// See the documentation to learn about how we use this metadata:
 /// https://www.cargo-lambda.info/commands/watch.html#environment-variables
-pub fn function_environment_metadata<P: AsRef<Path>>(
+#[tracing::instrument(target = "cargo_lambda")]
+pub fn function_environment_metadata<P: AsRef<Path> + Debug>(
     manifest_path: P,
     name: Option<&str>,
 ) -> Result<HashMap<String, String>> {
@@ -191,8 +199,11 @@ pub fn function_environment_metadata<P: AsRef<Path>>(
                 && target.kind.iter().any(|kind| kind == "bin")
                 && pkg.metadata.is_object();
 
-            tracing::debug!(
+            debug!(
                 name = name,
+                target_name = ?target.name,
+                target_kind = ?target.kind,
+                metadata_object = pkg.metadata.is_object(),
                 target_matches = target_matches,
                 "searching package metadata"
             );
@@ -209,13 +220,14 @@ pub fn function_environment_metadata<P: AsRef<Path>>(
         }
     }
 
-    tracing::debug!(env = ?env, "using environment variables from metadata");
+    debug!(env = ?env, "using environment variables from metadata");
     Ok(env)
 }
 
 /// Create a `DeployConfig` struct from Cargo metadata.
 /// This configuration can be overwritten by flags from the cli.
-pub fn function_deploy_metadata<P: AsRef<Path>>(
+#[tracing::instrument(target = "cargo_lambda")]
+pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
     manifest_path: P,
     name: &str,
 ) -> Result<DeployConfig> {
@@ -287,7 +299,7 @@ pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig> 
 /// It returns an error if the project includes from than one package.
 /// Use this function when the user didn't provide any funcion name
 /// assuming that there is only one package in the project
-pub fn root_package<P: AsRef<Path>>(manifest_path: P) -> Result<Package> {
+pub fn root_package<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<Package> {
     let metadata = load_metadata(manifest_path)?;
     if metadata.packages.len() > 1 {
         Err(MetadataError::MultiplePackagesInProject)?;

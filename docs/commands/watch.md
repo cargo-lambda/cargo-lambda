@@ -74,12 +74,18 @@ You can create functions compatible with this feature by running `cargo lambda n
 
 To access a function via its HTTP endpoint, start the watch subcommand `cargo lambda watch`, then send requests to the endpoint `http://localhost:9000/lambda-url/FUNCTION_NAME`. You can add any additional path after the function name, or any query parameters.
 
-## Extra arguments
+## Enabling features
 
-You can pass any extra arguments to `cargo lambda watch` that `cargo watch` supports after two trailing dashes. This allows you to send extra options to the command spawned to serve request, like features flags:
+You can pass a list of features separated by comma to the `watch` command to load them during run:
 
 ```
-cargo lambda watch -- --features my-own-features
+cargo lambda watch --features feature-1,feature-2
 ```
 
-See the available options in [the cargo-watch manual page](https://github.com/watchexec/cargo-watch/blob/main/cargo-watch.1.ronn).
+## Release mode
+
+You can also run your code in release mode if needed when the emulator is loaded:
+
+```
+cargo lambda watch --release
+```

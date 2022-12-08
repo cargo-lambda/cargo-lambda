@@ -20,18 +20,17 @@ description.workspace = true
 aws_lambda_events = { version = "0.6.3", features = ["apigw"] }
 axum = "0.5.4"
 base64 = "0.13.0"
-cargo-lambda-interactive.workspace = true
 cargo-lambda-invoke.workspace = true
 cargo-lambda-metadata.workspace = true
 chrono = "0.4.19"
 clap.workspace = true
-home.workspace = true
+dunce = "1.0.3"
 http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
 hyper = "0.14.18"
+ignore-files = "1.0.1"
 miette.workspace = true
 opentelemetry = "0.17.0"
 opentelemetry-aws = "0.5.0"
-platforms = "2.0.0"
 query_map = { version = "^0.5", features = ["url-query"] }
 reqwest.workspace = true
 serde_json.workspace = true
@@ -39,15 +38,13 @@ tempfile = "3.3.0"
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }
 tokio-graceful-shutdown = "0.5.0"
-tower-http = { version = "0.3.3", features = ["catch-panic", "request-id", "trace"] }
+tower-http = { version = "0.3.3", features = [
+    "catch-panic",
+    "request-id",
+    "trace",
+] }
 tracing.workspace = true
 tracing-opentelemetry = "0.17.2"
 tracing-subscriber.workspace = true
-which.workspace = true
-
-[target.'cfg(not(windows))'.dependencies]
-tar = "0.4.38"
-xz2 = "0.1.6"
-
-[target.'cfg(windows)'.dependencies]
-zip = { version = "0.6.2", features = ["bzip2", "deflate", "time"] }
+watchexec = "2.0.2"
+watchexec-filterer-ignore = "1.0.0"
