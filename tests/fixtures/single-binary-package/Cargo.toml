@@ -3,6 +3,10 @@ name = "basic-lambda"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "basic-lambda"
+src = "src/main.rs"
+
 [dependencies]
 lambda_runtime = "0.5.1"
 serde = "1.0.136"

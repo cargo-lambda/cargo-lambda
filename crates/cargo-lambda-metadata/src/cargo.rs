@@ -350,7 +350,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn fixture(name: &str) -> PathBuf {
-        format!("../../test/fixtures/{name}/Cargo.toml").into()
+        format!("../../tests/fixtures/{name}/Cargo.toml").into()
     }
 
     #[test]
@@ -471,7 +471,7 @@ mod tests {
         std::env::remove_var("CARGO_TARGET_DIR");
         let target_dir = target_dir(fixture("single-binary-package")).unwrap();
         assert!(
-            target_dir.ends_with("test/fixtures/single-binary-package/target"),
+            target_dir.ends_with("tests/fixtures/single-binary-package/target"),
             "unexpected directory {:?}",
             target_dir
         );

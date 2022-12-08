@@ -86,12 +86,16 @@ impl HttpEndpoints {
 
 impl Options {
     pub(crate) fn validate_options(&mut self, no_interactive: bool) -> Result<(), CreateError> {
+        if no_interactive {
+            return Ok(());
+        }
+
         if self.http_feature.is_some() && !self.http {
             self.http = true;
         }
 
         if self.missing_options() {
-            if !is_stdin_tty() || no_interactive {
+            if !is_stdin_tty() {
                 return Err(CreateError::MissingFunctionOptions);
             }
 
