@@ -13,26 +13,20 @@ use watchexec::{
     ErrorHook, Watchexec,
 };
 
-pub(crate) async fn new(
-    cmd: Command,
-    name: String,
-    runtime_api: String,
-    bin_name: Option<String>,
-    mp: PathBuf,
-    ignore_files: Vec<IgnoreFile>,
-    no_reload: bool,
-) -> Result<Arc<Watchexec>, ServerError> {
+#[derive(Clone, Debug, Default)]
+pub(crate) struct WatcherConfig {
+    pub runtime_api: String,
+    pub name: String,
+    pub bin_name: Option<String>,
+    pub base: PathBuf,
+    pub manifest_path: PathBuf,
+    pub ignore_files: Vec<IgnoreFile>,
+    pub no_reload: bool,
+}
+
+pub(crate) async fn new(cmd: Command, wc: WatcherConfig) -> Result<Arc<Watchexec>, ServerError> {
     let init = crate::watcher::init();
-    let runtime = crate::watcher::runtime(
-        cmd,
-        name.clone(),
-        runtime_api.clone(),
-        bin_name,
-        mp,
-        ignore_files,
-        no_reload,
-    )
-    .await?;
+    let runtime = crate::watcher::runtime(cmd, wc).await?;
 
     let wx = Watchexec::new(init, runtime).map_err(ServerError::WatcherError)?;
     wx.send_event(Event::default(), Priority::Urgent)
@@ -55,29 +49,21 @@ fn init() -> InitConfig {
     config
 }
 
-async fn runtime(
-    cmd: Command,
-    name: String,
-    runtime_api: String,
-    bin_name: Option<String>,
-    mp: PathBuf,
-    ignore_files: Vec<IgnoreFile>,
-    no_reload: bool,
-) -> Result<RuntimeConfig, ServerError> {
+async fn runtime(cmd: Command, wc: WatcherConfig) -> Result<RuntimeConfig, ServerError> {
     let mut config = RuntimeConfig::default();
 
-    debug!(ignore_files = ?ignore_files, "creating watcher config");
+    debug!(ignore_files = ?wc.ignore_files, "creating watcher config");
 
-    let base = dunce::canonicalize(".").map_err(|e| ServerError::Canonicalize(".", e))?;
-    config.pathset([base.clone()]);
+    // let base = dunce::canonicalize(".").map_err(|e| ServerError::Canonicalize(".", e))?;
+    config.pathset([wc.base.clone()]);
     config.commands(vec![cmd]);
 
-    let mut filter = IgnoreFilter::new(&base, &ignore_files)
+    let mut filter = IgnoreFilter::new(&wc.base, &wc.ignore_files)
         .await
         .map_err(ServerError::InvalidIgnoreFiles)?;
-    if no_reload {
+    if wc.no_reload {
         filter
-            .add_globs(&["**/*"], Some(base))
+            .add_globs(&["**/*"], Some(wc.base))
             .await
             .map_err(ServerError::InvalidIgnoreFiles)?;
     }
@@ -149,10 +135,10 @@ async fn runtime(
     });
 
     config.on_pre_spawn(move |prespawn: PreSpawn| {
-        let name = name.clone();
-        let runtime_api = runtime_api.clone();
-        let manifest_path = mp.clone();
-        let bin_name = bin_name.clone();
+        let name = wc.name.clone();
+        let runtime_api = wc.runtime_api.clone();
+        let manifest_path = wc.manifest_path.clone();
+        let bin_name = wc.bin_name.clone();
 
         async move {
             let env = function_environment_metadata(manifest_path, bin_name.as_deref())

@@ -1,6 +1,5 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
 use clap::{Args, ValueHint};
-use ignore_files::IgnoreFile;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
     global,
@@ -30,6 +29,7 @@ mod scheduler;
 use scheduler::*;
 mod trigger_router;
 mod watcher;
+use watcher::WatcherConfig;
 
 const RUNTIME_EMULATOR_PATH: &str = "/.rt";
 
@@ -91,13 +91,23 @@ impl Watch {
         let no_reload = self.no_reload;
         let cargo_options = self.cargo_options.clone();
 
+        let base = dunce::canonicalize(".").into_diagnostic()?;
+
         let (mut global_ignore, _) = ignore_files::from_environment(Some("CARGO_LAMBDA")).await;
-        let (mut local_ignore, _) = ignore_files::from_origin(".").await;
-        local_ignore.append(&mut global_ignore);
+        let (mut ignore_files, _) = ignore_files::from_origin(&base).await;
+        ignore_files.append(&mut global_ignore);
+
+        let watcher_config = WatcherConfig {
+            base,
+            ignore_files,
+            no_reload,
+            manifest_path: cargo_options.manifest_path.clone(),
+            ..Default::default()
+        };
 
         Toplevel::new()
             .start("Lambda server", move |s| {
-                start_server(s, addr, cargo_options, no_reload, local_ignore)
+                start_server(s, addr, cargo_options, watcher_config)
             })
             .catch_signals()
             .handle_shutdown_requests(Duration::from_millis(1000))
@@ -129,20 +139,12 @@ async fn start_server(
     subsys: SubsystemHandle,
     addr: SocketAddr,
     cargo_options: CargoOptions,
-    no_reload: bool,
-    ignore_files: Vec<IgnoreFile>,
+    watcher_config: WatcherConfig,
 ) -> Result<(), axum::Error> {
     let runtime_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
 
     let req_cache = RequestCache::new(runtime_addr);
-    let req_tx = init_scheduler(
-        &subsys,
-        req_cache.clone(),
-        cargo_options,
-        no_reload,
-        ignore_files,
-    )
-    .await;
+    let req_tx = init_scheduler(&subsys, req_cache.clone(), cargo_options, watcher_config).await;
     let resp_cache = ResponseCache::new();
     let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
 

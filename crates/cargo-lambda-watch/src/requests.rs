@@ -64,10 +64,6 @@ pub enum ServerError {
     #[error("failed to load ignore files")]
     #[diagnostic()]
     InvalidIgnoreFiles(#[from] ignore_files::Error),
-
-    #[error("failed to process canonical path: {0} - {1}")]
-    #[diagnostic()]
-    Canonicalize(&'static str, std::io::Error),
 }
 
 impl IntoResponse for ServerError {

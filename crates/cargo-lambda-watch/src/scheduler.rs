@@ -1,10 +1,10 @@
 use crate::{
     requests::{InvokeRequest, ServerError},
+    watcher::WatcherConfig,
     CargoOptions,
 };
 use axum::{body::Body, response::Response};
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
-use ignore_files::IgnoreFile;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::Arc,
@@ -119,13 +119,12 @@ pub(crate) async fn init_scheduler(
     subsys: &SubsystemHandle,
     req_cache: RequestCache,
     cargo_options: CargoOptions,
-    no_reload: bool,
-    ignore_files: Vec<IgnoreFile>,
+    watcher_config: WatcherConfig,
 ) -> Sender<InvokeRequest> {
     let (req_tx, req_rx) = mpsc::channel::<InvokeRequest>(100);
 
     subsys.start("lambda scheduler", move |s| async move {
-        start_scheduler(s, req_cache, cargo_options, no_reload, ignore_files, req_rx).await;
+        start_scheduler(s, req_cache, cargo_options, watcher_config, req_rx).await;
         Ok::<_, std::convert::Infallible>(())
     });
 
@@ -136,8 +135,7 @@ async fn start_scheduler(
     subsys: SubsystemHandle,
     req_cache: RequestCache,
     cargo_options: CargoOptions,
-    no_reload: bool,
-    ignore_files: Vec<IgnoreFile>,
+    watcher_config: WatcherConfig,
     mut req_rx: Receiver<InvokeRequest>,
 ) {
     let (gc_tx, mut gc_rx) = mpsc::channel::<String>(10);
@@ -148,8 +146,8 @@ async fn start_scheduler(
                 if let Some((name, api)) = req_cache.upsert(req).await {
                     let gc_tx = gc_tx.clone();
                     let cargo_options = cargo_options.clone();
-                    let ignore_files = ignore_files.clone();
-                    subsys.start("lambda runtime", move |s| start_function(s, name, api, cargo_options, no_reload, gc_tx, ignore_files));
+                    let watcher_config = watcher_config.clone();
+                    subsys.start("lambda runtime", move |s| start_function(s, name, api, cargo_options, watcher_config, gc_tx));
                 }
             },
             Some(gc) = gc_rx.recv() => {
@@ -169,29 +167,21 @@ async fn start_function(
     name: String,
     runtime_api: String,
     cargo_options: CargoOptions,
-    no_reload: bool,
+    mut watcher_config: WatcherConfig,
     gc_tx: Sender<String>,
-    ignore_files: Vec<IgnoreFile>,
 ) -> Result<(), ServerError> {
     info!(function = ?name, manifest = ?cargo_options.manifest_path, "starting lambda function");
 
     let cmd = cargo_command(&name, &cargo_options);
-    let bin_name = if is_valid_bin_name(&name) {
+    watcher_config.bin_name = if is_valid_bin_name(&name) {
         Some(name.clone())
     } else {
         None
     };
+    watcher_config.name = name.clone();
+    watcher_config.runtime_api = runtime_api;
 
-    let wx = crate::watcher::new(
-        cmd,
-        name.clone(),
-        runtime_api.clone(),
-        bin_name,
-        cargo_options.manifest_path.clone(),
-        ignore_files,
-        no_reload,
-    )
-    .await?;
+    let wx = crate::watcher::new(cmd, watcher_config).await?;
 
     tokio::select! {
         _ = wx.main() => {
