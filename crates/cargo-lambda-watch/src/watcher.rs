@@ -2,7 +2,7 @@ use crate::requests::ServerError;
 use cargo_lambda_metadata::cargo::function_environment_metadata;
 use ignore_files::{IgnoreFile, IgnoreFilter};
 use std::{convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
-use tracing::{debug, error};
+use tracing::{debug, error, trace, warn};
 use watchexec::{
     action::{Action, Outcome, PreSpawn},
     command::Command,
@@ -54,7 +54,6 @@ async fn runtime(cmd: Command, wc: WatcherConfig) -> Result<RuntimeConfig, Serve
 
     debug!(ignore_files = ?wc.ignore_files, "creating watcher config");
 
-    // let base = dunce::canonicalize(".").map_err(|e| ServerError::Canonicalize(".", e))?;
     config.pathset([wc.base.clone()]);
     config.commands(vec![cmd]);
 
@@ -141,9 +140,11 @@ async fn runtime(cmd: Command, wc: WatcherConfig) -> Result<RuntimeConfig, Serve
         let bin_name = wc.bin_name.clone();
 
         async move {
+            trace!("loading watch environment metadata");
+
             let env = function_environment_metadata(manifest_path, bin_name.as_deref())
                 .map_err(|err| {
-                    tracing::warn!(error = %err, "ignoring invalid function metadata");
+                    warn!(error = %err, "ignoring invalid function metadata");
                     err
                 })
                 .unwrap_or_default();
