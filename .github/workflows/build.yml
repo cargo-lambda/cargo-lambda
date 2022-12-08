@@ -38,6 +38,9 @@ jobs:
           toolchain: ${{ matrix.rust_version }}
       - uses: Swatinem/rust-cache@v2
 
+      - name: Build debug binary
+        run: cargo build --all-features
+
       - name: Run cargo test
         run: cargo test --all-features
 
