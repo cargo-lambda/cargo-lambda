@@ -132,7 +132,11 @@ impl New {
 
             if entry_path.is_dir() {
                 if entry_name != ".git" {
-                    create_dir_all(entry_path).into_diagnostic()?;
+                    create_dir_all(entry_path)
+                        .into_diagnostic()
+                        .wrap_err_with(|| {
+                            format!("unable to create directory: {:?}", entry_path)
+                        })?;
                 }
             } else if entry_name == "cargo-lambda-template.zip" {
                 continue;
@@ -160,7 +164,10 @@ impl New {
                 {
                     let template = parser.parse_file(entry_path).into_diagnostic()?;
 
-                    let mut file = File::create(&new_path).into_diagnostic()?;
+                    let mut file = File::create(&new_path)
+                        .into_diagnostic()
+                        .wrap_err_with(|| format!("unable to create file: {:?}", new_path))?;
+
                     template
                         .render_to(&mut file, &globals)
                         .into_diagnostic()
