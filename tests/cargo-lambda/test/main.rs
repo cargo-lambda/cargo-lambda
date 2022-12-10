@@ -3,8 +3,6 @@ use std::path::{Path, PathBuf};
 use cargo_test_support::{paths::CargoPathExt, Project};
 use snapbox::cmd::Command;
 
-const REPO_TARGET_DIR: &str = "../../../target";
-
 mod lambda_build;
 
 pub fn test_project<P: AsRef<Path>>(path: P) -> PathBuf {
@@ -19,7 +17,7 @@ pub fn test_project<P: AsRef<Path>>(path: P) -> PathBuf {
 pub fn cargo_lambda_new(project_name: &str) -> (PathBuf, Command) {
     let project = project();
 
-    let cmd = snapbox::cmd::Command::cargo_lambda()
+    let cmd = Command::cargo_lambda()
         .arg("lambda")
         .arg("new")
         .current_dir(project.root());
@@ -31,12 +29,10 @@ pub fn cargo_lambda_new(project_name: &str) -> (PathBuf, Command) {
 }
 
 pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {
-    snapbox::cmd::Command::cargo_lambda()
+    Command::cargo_lambda()
         .arg("lambda")
         .arg("build")
-        .arg("--release")
         .current_dir(path)
-        .env("CARGO_TARGET_DIR", REPO_TARGET_DIR)
 }
 
 pub fn project() -> Project {
