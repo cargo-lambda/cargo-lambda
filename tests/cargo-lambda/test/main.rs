@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use cargo_test_support::Project;
+use cargo_test_support::{paths::CargoPathExt, Project};
 use snapbox::cmd::Command;
 
 const REPO_TARGET_DIR: &str = "../../../target";
@@ -16,7 +16,7 @@ pub fn test_project<P: AsRef<Path>>(path: P) -> PathBuf {
     project.root()
 }
 
-pub fn cargo_lambda_new() -> (PathBuf, Command) {
+pub fn cargo_lambda_new(project_name: &str) -> (PathBuf, Command) {
     let project = project();
 
     let cmd = snapbox::cmd::Command::cargo_lambda()
@@ -24,7 +24,10 @@ pub fn cargo_lambda_new() -> (PathBuf, Command) {
         .arg("new")
         .current_dir(project.root());
 
-    (project.root(), cmd)
+    let project_path = project.root().join(project_name);
+    project_path.rm_rf();
+
+    (project_path, cmd)
 }
 
 pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {
