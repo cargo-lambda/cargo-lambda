@@ -34,6 +34,7 @@ pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {
     snapbox::cmd::Command::cargo_lambda()
         .arg("lambda")
         .arg("build")
+        .arg("--release")
         .current_dir(path)
         .env("CARGO_TARGET_DIR", REPO_TARGET_DIR)
 }
