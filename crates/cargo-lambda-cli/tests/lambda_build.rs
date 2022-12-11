@@ -1,7 +1,7 @@
 use cargo_test_macro::cargo_test;
 
 mod harness;
-use harness::{cargo_lambda_build, cargo_lambda_new, test_project};
+use harness::{cargo_lambda_build, cargo_lambda_new, test_project, LambdaProjectExt};
 
 #[cargo_test]
 fn test_lambda_build() {
@@ -21,7 +21,10 @@ fn test_build_basic_function() {
         .success();
 
     let project = test_project(root);
-    cargo_lambda_build(project).assert().success();
+    cargo_lambda_build(project.root()).assert().success();
+
+    let bin = project.lambda_function_bin("test-basic-function");
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 fn test_build_http_function() {
@@ -34,7 +37,10 @@ fn test_build_http_function() {
         .success();
 
     let project = test_project(root);
-    cargo_lambda_build(project).assert().success();
+    cargo_lambda_build(project.root()).assert().success();
+
+    let bin = project.lambda_function_bin("test-http-function");
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 fn test_build_basic_extension() {
@@ -46,10 +52,13 @@ fn test_build_basic_extension() {
         .success();
 
     let project = test_project(root);
-    cargo_lambda_build(project)
+    cargo_lambda_build(project.root())
         .arg("--extension")
         .assert()
         .success();
+
+    let bin = project.lambda_extension_bin("test-basic-extension");
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 fn test_build_logs_extension() {
@@ -62,10 +71,13 @@ fn test_build_logs_extension() {
         .success();
 
     let project = test_project(root);
-    cargo_lambda_build(project)
+    cargo_lambda_build(project.root())
         .arg("--extension")
         .assert()
         .success();
+
+    let bin = project.lambda_extension_bin("test-logs-extension");
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 fn test_build_telemetry_extension() {
@@ -78,8 +90,11 @@ fn test_build_telemetry_extension() {
         .success();
 
     let project = test_project(root);
-    cargo_lambda_build(project)
+    cargo_lambda_build(project.root())
         .arg("--extension")
         .assert()
         .success();
+
+    let bin = project.lambda_extension_bin("test-telemetry-extension");
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
