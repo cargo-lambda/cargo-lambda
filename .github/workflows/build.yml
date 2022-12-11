@@ -6,7 +6,7 @@ on:
 name: Build
 
 env:
-  RUST_BACKTRACE: 1
+  RUST_BACKTRACE: full
 
 jobs:
   check:
