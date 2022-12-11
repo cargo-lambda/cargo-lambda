@@ -65,10 +65,12 @@ impl LambdaProjectExt for Project {
     }
 
     fn lambda_function_bin(&self, name: &str) -> PathBuf {
-        self.lambda_dir().join(name).join("bootstrap")
+        dunce::canonicalize(self.lambda_dir().join(name).join("bootstrap"))
+            .expect("failed to canonicalize path")
     }
 
     fn lambda_extension_bin(&self, name: &str) -> PathBuf {
-        self.lambda_dir().join("extensions").join(name)
+        dunce::canonicalize(self.lambda_dir().join("extensions").join(name))
+            .expect("failed to canonicalize path")
     }
 }
