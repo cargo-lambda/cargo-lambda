@@ -5,6 +5,9 @@ on:
 
 name: Build
 
+env:
+  RUST_BACKTRACE: 1
+
 jobs:
   check:
     name: Check

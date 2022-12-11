@@ -17,11 +17,12 @@ pub fn test_project<P: AsRef<Path>>(path: P) -> PathBuf {
 pub fn cargo_lambda_new(project_name: &str) -> (PathBuf, Command) {
     let project = project();
 
+    let cwd = dunce::canonicalize(project.root()).expect("failed to create canonical path");
+
     let cmd = Command::cargo_lambda()
         .arg("lambda")
         .arg("new")
-        .env("RUST_BACKTRACE", "1")
-        .current_dir(project.root());
+        .current_dir(cwd);
 
     let project_path = project.root().join(project_name);
     project_path.rm_rf();
@@ -33,7 +34,6 @@ pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {
     Command::cargo_lambda()
         .arg("lambda")
         .arg("build")
-        .env("RUST_BACKTRACE", "1")
         .current_dir(path)
 }
 
