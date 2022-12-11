@@ -1,5 +1,7 @@
-use crate::{cargo_lambda_build, cargo_lambda_new, test_project};
 use cargo_test_macro::cargo_test;
+
+mod harness;
+use harness::{cargo_lambda_build, cargo_lambda_new, test_project};
 
 #[cargo_test]
 fn test_lambda_build() {

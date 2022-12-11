@@ -703,8 +703,12 @@ dependencies = [
  "cargo-lambda-invoke",
  "cargo-lambda-new",
  "cargo-lambda-watch",
+ "cargo-test-macro",
+ "cargo-test-support",
  "clap",
+ "dunce",
  "miette 4.7.1",
+ "snapbox",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -755,16 +759,6 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
-]
-
-[[package]]
-name = "cargo-lambda-integration"
-version = "0.1.0"
-dependencies = [
- "cargo-test-macro",
- "cargo-test-support",
- "dunce",
- "snapbox",
 ]
 
 [[package]]

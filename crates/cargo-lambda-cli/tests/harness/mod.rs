@@ -3,8 +3,6 @@ use std::path::{Path, PathBuf};
 use cargo_test_support::{paths::CargoPathExt, Project};
 use snapbox::cmd::Command;
 
-mod lambda_build;
-
 pub fn test_project<P: AsRef<Path>>(path: P) -> PathBuf {
     let project = Project::from_template(path);
     let metadata = project.read_file("Cargo.toml");

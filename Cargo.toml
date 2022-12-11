@@ -9,10 +9,10 @@ members = [
     "crates/cargo-lambda-new",
     "crates/cargo-lambda-remote",
     "crates/cargo-lambda-watch",
-    "tests/cargo-lambda",
 ]
 
 exclude = [
+    "tests/cargo-lambda",
     "tests/fixtures/single-binary-package",
     "tests/fixtures/mixed-workspace-package",
     "tests/fixtures/missing-binary-package",
