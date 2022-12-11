@@ -12,7 +12,6 @@ members = [
 ]
 
 exclude = [
-    "tests/cargo-lambda",
     "tests/fixtures/single-binary-package",
     "tests/fixtures/mixed-workspace-package",
     "tests/fixtures/missing-binary-package",
