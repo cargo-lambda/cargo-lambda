@@ -29,7 +29,7 @@ pub(crate) fn new_compiler(compiler: CompilerOptions) -> Box<dyn Compiler> {
     }
 }
 
-pub fn build_profile<'a>(profile: Option<&'a str>, release: bool) -> &'a str {
+pub fn build_profile(profile: Option<&str>, release: bool) -> &str {
     match profile {
         Some("dev" | "test") => "debug",
         Some("release" | "bench") => "release",
