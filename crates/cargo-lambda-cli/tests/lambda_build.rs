@@ -4,6 +4,14 @@ mod harness;
 use harness::{cargo_lambda_build, cargo_lambda_new, test_project, LambdaProjectExt};
 
 #[cargo_test]
+fn test_lambda_build() {
+    test_build_basic_function();
+    test_build_http_function();
+    test_build_basic_extension();
+    test_build_logs_extension();
+    test_build_telemetry_extension();
+}
+
 fn test_build_basic_function() {
     let (root, cmd) = cargo_lambda_new("test-basic-function");
 
@@ -19,7 +27,6 @@ fn test_build_basic_function() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
 fn test_build_http_function() {
     let (root, cmd) = cargo_lambda_new("test-http-function");
 
@@ -36,7 +43,6 @@ fn test_build_http_function() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
 fn test_build_basic_extension() {
     let (root, cmd) = cargo_lambda_new("test-basic-extension");
 
@@ -55,7 +61,6 @@ fn test_build_basic_extension() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
 fn test_build_logs_extension() {
     let (root, cmd) = cargo_lambda_new("test-logs-extension");
 
@@ -75,7 +80,6 @@ fn test_build_logs_extension() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
 fn test_build_telemetry_extension() {
     let (root, cmd) = cargo_lambda_new("test-telemetry-extension");
 
