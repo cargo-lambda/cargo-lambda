@@ -18,11 +18,23 @@ pub(crate) trait Compiler {
         rustc_meta: &VersionMeta,
         target_arch: &TargetArch,
     ) -> Result<Command>;
+
+    fn build_profile<'a>(&self, cargo: &'a Build) -> &'a str;
 }
 
 pub(crate) fn new_compiler(compiler: CompilerOptions) -> Box<dyn Compiler> {
     match compiler {
         CompilerOptions::CargoZigbuild => Box::new(CargoZigbuild),
         CompilerOptions::Cargo(opts) => Box::new(Cargo::new(opts)),
+    }
+}
+
+pub fn build_profile(profile: Option<&str>, release: bool) -> &str {
+    match profile {
+        Some("dev" | "test") => "debug",
+        Some("release" | "bench") => "release",
+        Some(profile) => profile,
+        None if release => "release",
+        None => "debug",
     }
 }

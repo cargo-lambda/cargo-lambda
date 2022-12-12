@@ -127,14 +127,6 @@ impl Build {
 
         self.build.target = vec![target_arch.to_string()];
 
-        let profile = match self.build.profile.as_deref() {
-            Some("dev" | "test") => "debug",
-            Some("release" | "bench") => "release",
-            Some(profile) => profile,
-            None if self.build.release => "release",
-            None => "debug",
-        };
-
         let manifest_path = self
             .build
             .manifest_path
@@ -190,6 +182,7 @@ impl Build {
         };
 
         let compiler = new_compiler(build_config.compiler);
+        let profile = compiler.build_profile(&self.build);
         let cmd = compiler
             .command(&self.build, &rustc_meta, &target_arch)
             .await;

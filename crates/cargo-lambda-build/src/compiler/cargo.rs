@@ -1,4 +1,4 @@
-use super::Compiler;
+use super::{build_profile, Compiler};
 use crate::TargetArch;
 use cargo_lambda_metadata::cargo::CargoCompilerOptions;
 use cargo_options::Build;
@@ -55,5 +55,9 @@ impl Compiler for Cargo {
             cmd.args(extra);
         }
         Ok(cmd)
+    }
+
+    fn build_profile<'a>(&self, cargo: &'a Build) -> &'a str {
+        build_profile(cargo.profile.as_deref(), cargo.release)
     }
 }

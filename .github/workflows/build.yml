@@ -5,6 +5,9 @@ on:
 
 name: Build
 
+env:
+  RUST_BACKTRACE: full
+
 jobs:
   check:
     name: Check
@@ -36,34 +39,16 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust_version }}
-      - uses: Swatinem/rust-cache@v2
+          targets: x86_64-unknown-linux-gnu
 
-      - name: Run cargo test
-        run: cargo test --all-features
-
-  integration:
-    name: Integration -- ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v3
       - uses: korandoru/setup-zig@v1
         with:
           zig-version: 0.10.0
 
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
       - uses: Swatinem/rust-cache@v2
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '2.7'
 
-      - name: Run integration tests
-        shell: bash
-        run: make run-integration
+      - name: Run cargo test
+        run: cargo test --all-features
 
   lints:
     name: Lints

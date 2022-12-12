@@ -12,15 +12,12 @@ members = [
 ]
 
 exclude = [
-    "test/fixtures/single-binary-package",
-    "test/fixtures/mixed-workspace-package",
-    "test/fixtures/missing-binary-package",
-    "test/fixtures/multi-binary-package",
-    "test/fixtures/target-dir-set-in-project",
-    "test/fixtures/workspace-package",
-    "test/integration/test-fun",
-    "test/integration/test-ext",
-    "test/integration/test-logs",
+    "tests/fixtures/single-binary-package",
+    "tests/fixtures/mixed-workspace-package",
+    "tests/fixtures/missing-binary-package",
+    "tests/fixtures/multi-binary-package",
+    "tests/fixtures/target-dir-set-in-project",
+    "tests/fixtures/workspace-package",
 ]
 
 [workspace.package]
