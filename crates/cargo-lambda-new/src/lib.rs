@@ -50,8 +50,8 @@ pub struct New {
     #[arg(long, alias = "function-name")]
     bin_name: Option<String>,
 
-    /// Don't show any prompt
-    #[arg(long)]
+    /// Apply the default template values without any prompt
+    #[arg(long, alias = "default")]
     no_interactive: bool,
 
     /// List of additional files to render with the template engine
