@@ -1,7 +1,7 @@
 use cargo_test_macro::cargo_test;
 use std::{
-    fs::{create_dir_all, File},
-    io::{read_to_string, Write},
+    fs::{create_dir_all, read_to_string, File},
+    io::Write,
 };
 
 mod harness;
@@ -146,7 +146,7 @@ fn test_init_subcommand_without_override() {
         "missing src/main.rs"
     );
 
-    let out = read_to_string(File::open(main).unwrap()).expect("failed to read main.rs file");
+    let out = read_to_string(main).expect("failed to read main.rs file");
     assert_eq!(content, out);
 
     let project = test_project(root);
