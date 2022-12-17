@@ -130,7 +130,7 @@ fn test_init_subcommand_without_override() {
     let main = src.join("main.rs");
     create_dir_all(src).expect("failed to create src directory");
 
-    let mut main_file = File::create(main).expect("failed to create main.rs file");
+    let mut main_file = File::create(&main).expect("failed to create main.rs file");
     let content = r#"""fn main() {
         println!("Hello, world!");
     }"""#;
@@ -146,7 +146,7 @@ fn test_init_subcommand_without_override() {
         "missing src/main.rs"
     );
 
-    let out = read_to_string(main_file).expect("failed to read main.rs file");
+    let out = read_to_string(File::open(main).unwrap()).expect("failed to read main.rs file");
     assert_eq!(content, out);
 
     let project = test_project(root);
