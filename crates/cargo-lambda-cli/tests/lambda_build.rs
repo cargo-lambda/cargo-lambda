@@ -131,9 +131,9 @@ fn test_init_subcommand_without_override() {
     create_dir_all(src).expect("failed to create src directory");
 
     let mut main_file = File::create(&main).expect("failed to create main.rs file");
-    let content = r#"""fn main() {
+    let content = r#"fn main() {
         println!("Hello, world!");
-    }"""#;
+    }"#;
     main_file
         .write_all(content.as_bytes())
         .expect("failed to create main content");
