@@ -56,7 +56,7 @@ where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
-    fs::create_dir(&to)?;
+    fs::create_dir_all(&to)?;
     for entry in from.as_ref().read_dir()? {
         let entry = entry?;
         let kind = entry.file_type()?;

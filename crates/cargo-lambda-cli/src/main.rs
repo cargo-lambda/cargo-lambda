@@ -4,7 +4,7 @@ use std::boxed::Box;
 use cargo_lambda_build::{Build, Zig};
 use cargo_lambda_deploy::Deploy;
 use cargo_lambda_invoke::Invoke;
-use cargo_lambda_new::New;
+use cargo_lambda_new::{Init, New};
 use cargo_lambda_watch::Watch;
 use clap::{CommandFactory, Parser, Subcommand};
 use miette::{miette, IntoDiagnostic, Result};
@@ -37,6 +37,8 @@ enum LambdaSubcommand {
     Build(Box<Build>),
     /// Deploy Lambda functions to AWS
     Deploy(Deploy),
+    /// Initialize a package in a directory that already exists
+    Init(Init),
     /// Send requests to Lambda functions running on the emulator
     Invoke(Invoke),
     /// Create a new package with a Lambda function from our Lambda Template
@@ -50,6 +52,7 @@ impl LambdaSubcommand {
         match self {
             Self::Build(mut b) => b.run().await,
             Self::Deploy(d) => d.run().await,
+            Self::Init(mut i) => i.run().await,
             Self::Invoke(i) => i.run().await,
             Self::New(mut n) => n.run().await,
             Self::Watch(w) => w.run().await,

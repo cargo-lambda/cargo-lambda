@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
 
 use cargo_lambda_interactive::error::InquireError;
 use miette::Diagnostic;
@@ -18,4 +18,10 @@ pub(crate) enum CreateError {
     InvalidEditor(String),
     #[error("invalid package name: {0}")]
     InvalidPackageName(String),
+    #[error("the path doesn't exist: {0}")]
+    MissingPath(PathBuf),
+    #[error("the path is not a directory: {0}")]
+    NotADirectoryPath(PathBuf),
+    #[error(transparent)]
+    InvalidPath(#[from] io::Error),
 }

@@ -24,7 +24,7 @@ cargo-lambda-invoke.workspace = true
 cargo-lambda-metadata.workspace = true
 chrono = "0.4.19"
 clap.workspace = true
-dunce = "1.0.3"
+dunce.workspace = true
 http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
 hyper = "0.14.18"
 ignore-files = "1.0.1"
@@ -42,7 +42,7 @@ tower-http = { version = "0.3.3", features = [
     "catch-panic",
     "request-id",
     "trace",
-    "cors"
+    "cors",
 ] }
 tracing.workspace = true
 tracing-opentelemetry = "0.17.2"

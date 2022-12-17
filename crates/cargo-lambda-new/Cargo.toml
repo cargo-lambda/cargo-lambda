@@ -19,6 +19,7 @@ description.workspace = true
 cargo-lambda-interactive.workspace = true
 cargo-lambda-metadata.workspace = true
 clap.workspace = true
+dunce.workspace = true
 liquid = "0.26.0"
 miette.workspace = true
 regex = "1.5.5"
