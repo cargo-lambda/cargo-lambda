@@ -148,10 +148,4 @@ fn test_init_subcommand_without_override() {
 
     let out = read_to_string(main).expect("failed to read main.rs file");
     assert_eq!(content, out);
-
-    let project = test_project(root);
-    cargo_lambda_build(project.root()).assert().success();
-
-    let bin = project.lambda_function_bin("test-basic-function");
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
