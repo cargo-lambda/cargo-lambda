@@ -1,2 +1,2 @@
-mod rename;
-pub use rename::*;
+mod copy;
+pub use copy::*;

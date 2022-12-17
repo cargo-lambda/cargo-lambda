@@ -1,5 +1,5 @@
 use cargo_lambda_interactive::{command::silent_command, is_user_cancellation_error};
-use cargo_lambda_metadata::fs::{copy_without_replace, rename};
+use cargo_lambda_metadata::fs::{copy_and_replace, copy_without_replace};
 use clap::Args;
 use liquid::{model::Value, Object, ParserBuilder};
 use miette::{IntoDiagnostic, Result, WrapErr};
@@ -259,7 +259,7 @@ async fn create_project<T: AsRef<Path> + Debug>(
     }
 
     let res = if replace {
-        rename(render_path, &path)
+        copy_and_replace(render_path, &path)
     } else {
         copy_without_replace(render_path, &path)
     };

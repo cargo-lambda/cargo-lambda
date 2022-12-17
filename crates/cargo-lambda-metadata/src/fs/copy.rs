@@ -30,7 +30,7 @@
 
 use std::{fs, io, path::Path};
 
-pub fn rename<P, Q>(from: P, to: Q) -> io::Result<()>
+pub fn copy_and_replace<P, Q>(from: P, to: Q) -> io::Result<()>
 where
     P: AsRef<Path>,
     Q: AsRef<Path>,
