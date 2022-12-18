@@ -15,9 +15,11 @@ use tokio::time::Duration;
 use tokio_graceful_shutdown::{SubsystemHandle, Toplevel};
 use tower_http::{
     catch_panic::CatchPanicLayer,
+    cors::CorsLayer,
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     trace::TraceLayer,
 };
+
 use tracing::{info, Subscriber};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::registry::LookupSpan;
@@ -160,7 +162,8 @@ async fn start_server(
         .layer(Extension(req_cache))
         .layer(Extension(resp_cache))
         .layer(TraceLayer::new_for_http())
-        .layer(CatchPanicLayer::new());
+        .layer(CatchPanicLayer::new())
+        .layer(CorsLayer::permissive());
 
     info!("invoke server listening on {}", addr);
     axum::Server::bind(&addr)

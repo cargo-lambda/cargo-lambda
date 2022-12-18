@@ -42,6 +42,7 @@ tower-http = { version = "0.3.3", features = [
     "catch-panic",
     "request-id",
     "trace",
+    "cors"
 ] }
 tracing.workspace = true
 tracing-opentelemetry = "0.17.2"
