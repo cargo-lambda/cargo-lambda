@@ -1,11 +1,11 @@
-ARG RUST_VERSION=1.65.0
+ARG RUST_VERSION=1.66.0
 FROM --platform=$BUILDPLATFORM rust:${RUST_VERSION}
 
 RUN set -eux; \
-    rustup target install x86_64-unknown-linux-gnu; \
-    rustup target install aarch64-unknown-linux-gnu;
+    rustup toolchain install stable; \
+    rustup target install x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu;
 
-ENTRYPOINT [ "cargo", "lambda" ]
+CMD [ "cargo", "lambda" ]
 
 ARG ZIG_VERSION=0.10.0
 RUN set -eux; \
@@ -18,7 +18,9 @@ RUN set -eux; \
     wget "$url"; \
     tar xf "zig-linux-${zigArch}-${ZIG_VERSION}.tar.xz"; \
     mv zig-linux-${zigArch}-${ZIG_VERSION} zig; \
-    rm "zig-linux-${zigArch}-${ZIG_VERSION}.tar.xz";
+    rm "zig-linux-${zigArch}-${ZIG_VERSION}.tar.xz"; \
+    mkdir /.cache; \
+    chmod a+w /.cache;
 
 ENV PATH=$PATH:/zig
 
