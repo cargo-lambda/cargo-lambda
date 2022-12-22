@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use cargo_test_support::{paths::CargoPathExt, Project};
 use snapbox::cmd::Command;
@@ -26,6 +29,22 @@ pub fn cargo_lambda_new(project_name: &str) -> (PathBuf, Command) {
     project_path.rm_rf();
 
     (project_path, cmd)
+}
+
+pub fn cargo_lambda_init(project_name: &str) -> (PathBuf, Command) {
+    let project = project();
+
+    let cwd = dunce::canonicalize(project.root()).expect("failed to create canonical path");
+    fs::create_dir_all(&cwd).expect("failed to create project directory");
+
+    let cmd = Command::cargo_lambda()
+        .arg("lambda")
+        .arg("init")
+        .arg("--name")
+        .arg(project_name)
+        .current_dir(cwd);
+
+    (project.root(), cmd)
 }
 
 pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {

@@ -1,7 +1,9 @@
 use cargo_test_macro::cargo_test;
 
 mod harness;
-use harness::{cargo_lambda_build, cargo_lambda_new, test_project, LambdaProjectExt};
+use harness::{
+    cargo_lambda_build, cargo_lambda_init, cargo_lambda_new, test_project, LambdaProjectExt,
+};
 
 #[cargo_test]
 fn test_lambda_build() {
@@ -10,6 +12,7 @@ fn test_lambda_build() {
     test_build_basic_extension();
     test_build_logs_extension();
     test_build_telemetry_extension();
+    test_init_subcommand();
 }
 
 fn test_build_basic_function() {
@@ -96,5 +99,22 @@ fn test_build_telemetry_extension() {
         .success();
 
     let bin = project.lambda_extension_bin("test-telemetry-extension");
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
+}
+
+fn test_init_subcommand() {
+    let (root, cmd) = cargo_lambda_init("test-basic-function");
+
+    cmd.arg("--no-interactive").assert().success();
+    assert!(root.join("Cargo.toml").exists(), "missing Cargo.toml");
+    assert!(
+        root.join("src").join("main.rs").exists(),
+        "missing src/main.rs"
+    );
+
+    let project = test_project(root);
+    cargo_lambda_build(project.root()).assert().success();
+
+    let bin = project.lambda_function_bin("test-basic-function");
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }

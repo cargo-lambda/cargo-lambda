@@ -812,6 +812,7 @@ dependencies = [
  "cargo-lambda-interactive",
  "cargo-lambda-metadata",
  "clap",
+ "dunce",
  "liquid",
  "miette 4.7.1",
  "regex",

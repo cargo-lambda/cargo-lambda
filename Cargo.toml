@@ -48,6 +48,7 @@ cargo-lambda-new = { version = "0.14.0", path = "crates/cargo-lambda-new" }
 cargo-lambda-remote = { version = "0.14.0", path = "crates/cargo-lambda-remote" }
 cargo-lambda-watch = { version = "0.14.0", path = "crates/cargo-lambda-watch" }
 clap = { version = "4", features = ["derive"] }
+dunce = "1.0.3"
 home = "0.5.3"
 miette = { version = "4.7.1" }
 reqwest = { version = "0.11.10", default-features = false, features = [
