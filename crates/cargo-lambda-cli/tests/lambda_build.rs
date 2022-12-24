@@ -1,4 +1,8 @@
 use cargo_test_macro::cargo_test;
+use std::{
+    fs::{create_dir_all, read_to_string, File},
+    io::Write,
+};
 
 mod harness;
 use harness::{
@@ -13,6 +17,7 @@ fn test_lambda_build() {
     test_build_logs_extension();
     test_build_telemetry_extension();
     test_init_subcommand();
+    test_init_subcommand_without_override();
 }
 
 fn test_build_basic_function() {
@@ -117,4 +122,30 @@ fn test_init_subcommand() {
 
     let bin = project.lambda_function_bin("test-basic-function");
     assert!(bin.exists(), "{:?} doesn't exist", bin);
+}
+
+fn test_init_subcommand_without_override() {
+    let (root, cmd) = cargo_lambda_init("test-basic-function");
+    let src = root.join("src");
+    let main = src.join("main.rs");
+    create_dir_all(src).expect("failed to create src directory");
+
+    let mut main_file = File::create(&main).expect("failed to create main.rs file");
+    let content = r#"fn main() {
+        println!("Hello, world!");
+    }"#;
+    main_file
+        .write_all(content.as_bytes())
+        .expect("failed to create main content");
+    main_file.flush().unwrap();
+
+    cmd.arg("--no-interactive").assert().success();
+    assert!(root.join("Cargo.toml").exists(), "missing Cargo.toml");
+    assert!(
+        root.join("src").join("main.rs").exists(),
+        "missing src/main.rs"
+    );
+
+    let out = read_to_string(main).expect("failed to read main.rs file");
+    assert_eq!(content, out);
 }

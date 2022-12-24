@@ -30,28 +30,38 @@
 
 use std::{fs, io, path::Path};
 
-pub fn rename<P, Q>(from: P, to: Q) -> io::Result<()>
+pub fn copy_and_replace<P, Q>(from: P, to: Q) -> io::Result<()>
 where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
-    copy_and_delete(from, to)
+    copy_and_delete(from, to, true)
 }
 
-fn copy_and_delete<P, Q>(from: P, to: Q) -> io::Result<()>
+pub fn copy_without_replace<P, Q>(from: P, to: Q) -> io::Result<()>
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
+    copy_and_delete(from, to, false)
+}
+
+fn copy_and_delete<P, Q>(from: P, to: Q, replace: bool) -> io::Result<()>
 where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
     let from = from.as_ref();
     if from.is_dir() {
-        copy_dir(from, to).and(remove_dir_all::remove_dir_all(from))
-    } else {
+        copy_dir(from, to, replace).and(remove_dir_all::remove_dir_all(from))
+    } else if replace || !to.as_ref().exists() {
         fs::copy(from, to).and(fs::remove_file(from))
+    } else {
+        Ok(())
     }
 }
 
-fn copy_dir<P, Q>(from: P, to: Q) -> io::Result<()>
+fn copy_dir<P, Q>(from: P, to: Q, replace: bool) -> io::Result<()>
 where
     P: AsRef<Path>,
     Q: AsRef<Path>,
@@ -64,8 +74,8 @@ where
 
         let to = to.as_ref().join(entry.file_name());
         if kind.is_dir() {
-            copy_dir(&from, &to)?;
-        } else {
+            copy_dir(&from, &to, replace)?;
+        } else if replace || !to.exists() {
             fs::copy(&from, &to)?;
         }
     }

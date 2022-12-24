@@ -1,5 +1,5 @@
 use cargo_lambda_interactive::{command::silent_command, is_user_cancellation_error};
-use cargo_lambda_metadata::fs::rename;
+use cargo_lambda_metadata::fs::{copy_and_replace, copy_without_replace};
 use clap::Args;
 use liquid::{model::Value, Object, ParserBuilder};
 use miette::{IntoDiagnostic, Result, WrapErr};
@@ -84,12 +84,12 @@ pub struct Init {
 impl Init {
     #[tracing::instrument(skip(self), target = "cargo_lambda")]
     pub async fn run(&mut self) -> Result<()> {
-        if !self.path.exists() {
-            Err(CreateError::MissingPath(self.path.to_path_buf()))?;
-        }
-
         if !self.path.is_dir() {
             Err(CreateError::NotADirectoryPath(self.path.to_path_buf()))?;
+        }
+
+        if self.path.join("Cargo.toml").is_file() {
+            Err(CreateError::InvalidPackageRoot)?;
         }
 
         let path = dunce::canonicalize(&self.path).map_err(CreateError::InvalidPath)?;
@@ -100,7 +100,7 @@ impl Init {
             .or_else(|| path.file_name().and_then(|s| s.to_str()))
             .ok_or_else(|| miette::miette!("invalid package name"))?;
 
-        new_project(name, &path, &mut self.config).await
+        new_project(name, &path, &mut self.config, false).await
     }
 }
 
@@ -118,7 +118,7 @@ pub struct New {
 impl New {
     #[tracing::instrument(skip(self), target = "cargo_lambda")]
     pub async fn run(&mut self) -> Result<()> {
-        new_project(&self.name, &self.name, &mut self.config).await
+        new_project(&self.name, &self.name, &mut self.config, true).await
     }
 }
 
@@ -126,6 +126,7 @@ async fn new_project<T: AsRef<Path> + Debug>(
     name: &str,
     path: T,
     config: &mut Config,
+    replace: bool,
 ) -> Result<()> {
     tracing::trace!(name, ?path, ?config, "creating new project");
 
@@ -149,7 +150,7 @@ async fn new_project<T: AsRef<Path> + Debug>(
         }
     }
 
-    create_project(name, &path, config).await?;
+    create_project(name, &path, config, replace).await?;
     if config.open {
         let path_ref = path.as_ref();
         let path_str = path_ref
@@ -165,6 +166,7 @@ async fn create_project<T: AsRef<Path> + Debug>(
     name: &str,
     path: T,
     config: &Config,
+    replace: bool,
 ) -> Result<()> {
     let template_option = match config.template.as_deref() {
         Some(t) => t,
@@ -256,14 +258,18 @@ async fn create_project<T: AsRef<Path> + Debug>(
         }
     }
 
-    rename(render_path, &path)
-        .into_diagnostic()
-        .wrap_err_with(|| {
-            format!(
-                "failed to move package: from {:?} to {:?}",
-                &render_path, path
-            )
-        })
+    let res = if replace {
+        copy_and_replace(render_path, &path)
+    } else {
+        copy_without_replace(render_path, &path)
+    };
+
+    res.into_diagnostic().wrap_err_with(|| {
+        format!(
+            "failed to create package: template {:?} to {:?}",
+            render_path, path
+        )
+    })
 }
 
 pub(crate) fn validate_name(name: &str) -> Result<()> {

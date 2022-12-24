@@ -18,10 +18,10 @@ pub(crate) enum CreateError {
     InvalidEditor(String),
     #[error("invalid package name: {0}")]
     InvalidPackageName(String),
-    #[error("the path doesn't exist: {0}")]
-    MissingPath(PathBuf),
     #[error("the path is not a directory: {0}")]
     NotADirectoryPath(PathBuf),
     #[error(transparent)]
     InvalidPath(#[from] io::Error),
+    #[error("`cargo lambda init` cannot be run on existing Cargo packages")]
+    InvalidPackageRoot,
 }

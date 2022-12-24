@@ -4,7 +4,7 @@ use cargo_lambda_metadata::{
         binary_targets_from_metadata, function_build_metadata, load_metadata,
         target_dir_from_metadata, CompilerOptions,
     },
-    fs::rename,
+    fs::copy_and_replace,
 };
 use cargo_options::Build as CargoBuild;
 use clap::{Args, ValueHint};
@@ -249,7 +249,7 @@ impl Build {
 
                 match self.output_format {
                     OutputFormat::Binary => {
-                        rename(binary, bootstrap_dir.join(bin_name)).into_diagnostic()?;
+                        copy_and_replace(binary, bootstrap_dir.join(bin_name)).into_diagnostic()?;
                     }
                     OutputFormat::Zip => {
                         let parent = if self.extension {
