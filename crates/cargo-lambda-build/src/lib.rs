@@ -64,10 +64,6 @@ pub struct Build {
     #[arg(long)]
     flatten: Option<String>,
 
-    #[arg(long)]
-    #[deprecated]
-    disable_zig_linker: bool,
-
     #[arg(long, default_value_t = CompilerFlag::CargoZigbuild, env = "CARGO_LAMBDA_COMPILER")]
     compiler: CompilerFlag,
 
@@ -93,12 +89,6 @@ impl Build {
     #[tracing::instrument(skip(self), target = "cargo_lambda")]
     pub async fn run(&mut self) -> Result<()> {
         tracing::trace!(options = ?self, "building project");
-
-        #[allow(deprecated)]
-        if self.disable_zig_linker {
-            warn!("the --disable-zig-linker flag is deprecated and will be removed in cargo-lambda 0.14, use `--compiler cargo` instead");
-            self.compiler = CompilerFlag::Cargo;
-        }
 
         let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
         let compatible_host_linker = TargetArch::compatible_host_linker(&rustc_meta.host);
