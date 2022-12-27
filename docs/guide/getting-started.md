@@ -97,6 +97,33 @@ A default execution role for this function will be created when you execute this
 
 Use the flag `--verbose` with any subcommand to enable tracing instrumentation. You can also enable instrumentation with the following environment variable `RUST_LOG=cargo_lambda=trace`.
 
+## Using Cargo Lambda on GitHub Actions
+
+If you want to use Cargo Lambda in a GitHub Action workflow, you can use one of the predefined actions that download release binaries from GitHub Releases.
+
+The following example shows the steps to install Rust, Zig, and Cargo Lambda on a Linux x86-64 workflow:
+
+```yaml
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+            - name: Install Zig toolchain
+              uses: korandoru/setup-zig@v1
+              with:
+                zig-version: 0.10.0
+            - name: Install Cargo Lambda
+              uses: jaxxstorm/action-install-gh-release@v1.9.0
+              with:
+                repo: cargo-lambda/cargo-lambda
+                tag: v0.14.0 # Remove this if you want to grab always the latest version
+                platform: linux # Other valid options: 'windows' or 'darwin'
+                arch: x86_64 # Other valid options for linux: 'aarch64'
+            # Add your build steps below
+```
+
 ## Rust version
 
 This project works with Rust 1.64 and above.
