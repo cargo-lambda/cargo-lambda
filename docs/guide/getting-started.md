@@ -97,7 +97,7 @@ A default execution role for this function will be created when you execute this
 
 Use the flag `--verbose` with any subcommand to enable tracing instrumentation. You can also enable instrumentation with the following environment variable `RUST_LOG=cargo_lambda=trace`.
 
-## Using Cargo Lambda on GitHub Actions
+## GitHub Actions
 
 If you want to use Cargo Lambda in a GitHub Action workflow, you can use one of the predefined actions that download release binaries from GitHub Releases.
 
@@ -123,6 +123,10 @@ jobs:
                 arch: x86_64 # Other valid options for linux: 'aarch64'
             # Add your build steps below
 ```
+
+## AWS CDK Support
+
+You can build and deploy Rust functions with Cargo Lambda and the AWS CDK with the [constructs in the Cargo Lambda CDK repository](https://github.com/cargo-lambda/cargo-lambda-cdk).
 
 ## Rust version
 
