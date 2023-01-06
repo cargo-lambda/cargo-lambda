@@ -118,7 +118,7 @@ impl Deploy {
             }
         };
 
-        let retry = RetryConfig::default()
+        let retry = RetryConfig::standard()
             .with_retry_mode(RetryMode::Adaptive)
             .with_max_attempts(3)
             .with_initial_backoff(Duration::from_secs(5));
