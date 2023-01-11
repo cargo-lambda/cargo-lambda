@@ -36,7 +36,11 @@ use watcher::WatcherConfig;
 const RUNTIME_EMULATOR_PATH: &str = "/.rt";
 
 #[derive(Args, Clone, Debug)]
-#[command(name = "watch", visible_alias = "start")]
+#[command(
+    name = "watch",
+    visible_alias = "start",
+    after_help = "Full command documentation: https://www.cargo-lambda.info/commands/watch.html"
+)]
 pub struct Watch {
     /// Avoid hot-reload
     #[arg(long)]

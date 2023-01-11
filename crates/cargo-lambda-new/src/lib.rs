@@ -68,7 +68,10 @@ struct Config {
 }
 
 #[derive(Args, Clone, Debug)]
-#[command(name = "init")]
+#[command(
+    name = "init",
+    after_help = "Full command documentation: https://www.cargo-lambda.info/commands/init.html"
+)]
 pub struct Init {
     #[command(flatten)]
     config: Config,
@@ -105,7 +108,10 @@ impl Init {
 }
 
 #[derive(Args, Clone, Debug)]
-#[command(name = "new")]
+#[command(
+    name = "new",
+    after_help = "Full command documentation: https://www.cargo-lambda.info/commands/new.html"
+)]
 pub struct New {
     #[command(flatten)]
     config: Config,

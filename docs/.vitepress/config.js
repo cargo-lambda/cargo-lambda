@@ -72,11 +72,12 @@ function sidebarCommands() {
             collapsible: true,
             items: [
                 { text: 'Supported commands', link: '/commands/introduction' },
+                { text: 'cargo lambda build', link: '/commands/build' },
+                { text: 'cargo lambda deploy', link: '/commands/deploy' },
+                { text: 'cargo lambda init', link: '/commands/init' },
+                { text: 'cargo lambda invoke', link: '/commands/invoke' },
                 { text: 'cargo lambda new', link: '/commands/new' },
                 { text: 'cargo lambda watch', link: '/commands/watch' },
-                { text: 'cargo lambda invoke', link: '/commands/invoke' },
-                { text: 'cargo lambda build', link: '/commands/build' },
-                { text: 'cargo lambda deploy', link: '/commands/deploy' }
             ]
         }
     ]

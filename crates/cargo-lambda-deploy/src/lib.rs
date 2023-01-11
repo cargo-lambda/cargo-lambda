@@ -41,7 +41,10 @@ impl std::fmt::Display for DeployResult {
 }
 
 #[derive(Args, Clone, Debug)]
-#[command(name = "deploy")]
+#[command(
+    name = "deploy",
+    after_help = "Full command documentation: https://www.cargo-lambda.info/commands/deploy.html"
+)]
 pub struct Deploy {
     #[command(flatten)]
     remote_config: RemoteConfig,

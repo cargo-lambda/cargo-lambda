@@ -27,7 +27,10 @@ use error::*;
 pub const DEFAULT_PACKAGE_FUNCTION: &str = "@package-bootstrap@";
 
 #[derive(Args, Clone, Debug)]
-#[command(name = "invoke")]
+#[command(
+    name = "invoke",
+    after_help = "Full command documentation: https://www.cargo-lambda.info/commands/invoke.html"
+)]
 pub struct Invoke {
     /// Local address host (IPv4 or IPv6) to send invoke requests
     #[arg(short = 'a', long, default_value = "127.0.0.1")]
