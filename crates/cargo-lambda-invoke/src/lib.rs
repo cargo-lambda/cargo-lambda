@@ -43,26 +43,26 @@ pub struct Invoke {
     invoke_port: u16,
 
     /// File to read the invoke payload from
-    #[arg(long, value_hint = ValueHint::FilePath)]
+    #[arg(short = 'F', long, value_hint = ValueHint::FilePath)]
     data_file: Option<PathBuf>,
 
     /// Invoke payload as a string
-    #[arg(long)]
+    #[arg(short = 'A', long)]
     data_ascii: Option<String>,
 
     /// Example payload from LegNeato/aws-lambda-events
-    #[arg(long)]
+    #[arg(short = 'E', long)]
     data_example: Option<String>,
 
     /// Invoke the function already deployed on AWS Lambda
-    #[arg(long)]
+    #[arg(short = 'R', long)]
     remote: bool,
 
     #[command(flatten)]
     remote_config: RemoteConfig,
 
     /// Format to render the output (text, or json)
-    #[arg(long, default_value_t = OutputFormat::Text)]
+    #[arg(short, long, default_value_t = OutputFormat::Text)]
     output_format: OutputFormat,
 
     /// Name of the function to invoke
