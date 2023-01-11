@@ -62,8 +62,7 @@ async fn runtime(cmd: Command, wc: WatcherConfig) -> Result<RuntimeConfig, Serve
         .map_err(ServerError::InvalidIgnoreFiles)?;
     if wc.no_reload {
         filter
-            .add_globs(&["**/*"], Some(wc.base))
-            .await
+            .add_globs(&["**/*"], Some(&wc.base))
             .map_err(ServerError::InvalidIgnoreFiles)?;
     }
     config.filterer(Arc::new(watchexec_filterer_ignore::IgnoreFilterer(filter)));
