@@ -37,10 +37,13 @@ mod toolchain;
 mod zig;
 
 #[derive(Args, Clone, Debug)]
-#[command(name = "build")]
+#[command(
+    name = "build",
+    after_help = "Full command documentation: https://www.cargo-lambda.info/commands/build.html"
+)]
 pub struct Build {
     /// The format to produce the compile Lambda into, acceptable values are [Binary, Zip]
-    #[arg(long, default_value_t = OutputFormat::Binary)]
+    #[arg(short, long, default_value_t = OutputFormat::Binary)]
     output_format: OutputFormat,
 
     /// Directory where the final lambda binaries will be located
@@ -64,7 +67,7 @@ pub struct Build {
     #[arg(long)]
     flatten: Option<String>,
 
-    #[arg(long, default_value_t = CompilerFlag::CargoZigbuild, env = "CARGO_LAMBDA_COMPILER")]
+    #[arg(short, long, default_value_t = CompilerFlag::CargoZigbuild, env = "CARGO_LAMBDA_COMPILER")]
     compiler: CompilerFlag,
 
     #[command(flatten)]

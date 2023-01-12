@@ -33,17 +33,23 @@ struct Lambda {
 
 #[derive(Clone, Debug, Subcommand)]
 enum LambdaSubcommand {
-    /// Build Lambda functions compiled with zig as the linker
+    /// `cargo lambda build` compiles AWS Lambda functions and extension natively.
+    /// It produces artifacts which you can then upload to AWS Lambda with `cargo lambda deploy`,
+    /// or use with other ecosystem tools, SAM Cli or the AWS CDK.
     Build(Box<Build>),
-    /// Deploy Lambda functions to AWS
+    /// `cargo lambda deploy` uploads functions and extensions to AWS Lambda.
+    /// You can use the same command to create new functions as well as update existent functions code.
     Deploy(Deploy),
-    /// Initialize a package in a directory that already exists
+    /// `cargo lambda init` creates Rust Lambda packages in an existent directory.
+    /// Files present in that directory will be preserved as they were before running this command.
     Init(Init),
-    /// Send requests to Lambda functions running on the emulator
+    /// `cargo lambda invoke` sends requests to the control plane emulator to test and debug interactions with your Lambda functions.
+    /// This command can also be used to send requests to remote functions once deployed on AWS Lambda.
     Invoke(Invoke),
-    /// Create a new package with a Lambda function from our Lambda Template
+    /// `cargo lambda new` creates Rust Lambda packages from a well defined template to help you start writing AWS Lambda functions in Rust.
     New(New),
-    /// Start a Lambda Runtime emulator to test and debug functions locally
+    /// `cargo lambda watch` boots a development server that emulates interactions with the AWS Lambda control plane.
+    /// This subcommand also reloads your Rust code as you work on it.
     Watch(Watch),
 }
 

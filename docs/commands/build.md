@@ -93,6 +93,13 @@ export CARGO_LAMBDA_COMPILER=cargo
 cargo lambda build
 ```
 
+Additionally, you can also add this option in your project's `Cargo.toml` metadata. Add the snippet below if you want to use Cargo without Zig as linker in your project:
+
+```
+[package.metadata.lambda.build.compiler]
+type = "cargo"
+```
+
 ### Additional compilers
 
 The concept of compilers on Cargo Lambda is an abstraction on top of different shell commands. If you want to add an additional compiler, you need to implement [Compiler](https://github.com/cargo-lambda/cargo-lambda/blob/main/crates/cargo-lambda-build/src/compiler/mod.rs#L14) trait. The command to execute needs to follow Rust compilations' convenctions, for example, if the user wants to build an Arm64 binary with the `release` profile, Cargo Lambda will expect that the resulting binary is in `target/aarch64-unknown-linux-gnu/release/`.
