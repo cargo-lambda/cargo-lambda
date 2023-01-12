@@ -46,6 +46,9 @@ jobs:
           zig-version: 0.10.0
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: cargo-lambda
+          shared-key: ${{ matrix.os }}
 
       - name: Run cargo test
         run: cargo test --all-features
