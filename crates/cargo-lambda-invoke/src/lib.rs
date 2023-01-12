@@ -25,6 +25,8 @@ use error::*;
 /// assume that the package only has one function,
 /// which is the main binary for that package.
 pub const DEFAULT_PACKAGE_FUNCTION: &str = "@package-bootstrap@";
+const EXAMPLES_URL: &str =
+    "https://github.com/calavera/aws-lambda-events/raw/main/aws_lambda_events/src/fixtures";
 
 #[derive(Args, Clone, Debug)]
 #[command(
@@ -194,7 +196,7 @@ impl Invoke {
 }
 
 async fn download_example(name: &str, cache: Option<PathBuf>) -> Result<String> {
-    let target = format!("https://github.com/LegNeato/aws-lambda-events/raw/master/aws_lambda_events/src/generated/fixtures/{name}");
+    let target = format!("{}/{}", EXAMPLES_URL, name);
 
     let response = reqwest::get(&target)
         .await
