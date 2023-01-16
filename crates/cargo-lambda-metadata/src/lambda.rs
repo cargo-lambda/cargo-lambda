@@ -46,6 +46,8 @@ impl From<Timeout> for i32 {
 pub enum Memory {
     #[strum(to_string = "128")]
     Mb128,
+    #[strum(to_string = "256")]
+    Mb256,
     #[strum(to_string = "512")]
     Mb512,
     #[strum(to_string = "1024")]
@@ -76,6 +78,7 @@ impl From<Memory> for i32 {
     fn from(m: Memory) -> i32 {
         match m {
             Memory::Mb128 => 128,
+            Memory::Mb256 => 256,
             Memory::Mb512 => 512,
             Memory::Mb1024 => 1024,
             Memory::Mb1536 => 1536,
@@ -98,6 +101,7 @@ impl TryFrom<i32> for Memory {
     fn try_from(m: i32) -> Result<Memory, Self::Error> {
         match m {
             128 => Ok(Memory::Mb128),
+            256 => Ok(Memory::Mb256),
             512 => Ok(Memory::Mb512),
             1024 => Ok(Memory::Mb1024),
             1536 => Ok(Memory::Mb1536),
