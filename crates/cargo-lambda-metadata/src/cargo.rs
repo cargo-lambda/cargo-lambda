@@ -478,7 +478,7 @@ mod tests {
         assert_eq!(Some(tags), env.tags);
         let s3_tags = env.s3_tags().unwrap();
         assert!(s3_tags.contains("organization=aws"), "{s3_tags}");
-        assert!(s3_tags.contains("team=labda"), "{s3_tags}");
+        assert!(s3_tags.contains("team=lambda"), "{s3_tags}");
     }
 
     #[test]
