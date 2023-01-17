@@ -41,7 +41,7 @@ enum FunctionAction {
     Update(Box<GetFunctionOutput>),
 }
 
-#[derive(Args, Clone, Debug)]
+#[derive(Args, Clone, Debug, Default)]
 pub struct FunctionConfig {
     /// Memory allocated for the function
     #[arg(long, alias = "memory-size")]
@@ -58,7 +58,7 @@ pub struct FunctionConfig {
     pub env_file: Option<PathBuf>,
 }
 
-#[derive(Args, Clone, Debug)]
+#[derive(Args, Clone, Debug, Default)]
 pub struct FunctionDeployConfig {
     /// Enable function URL for this function
     #[arg(long)]
@@ -172,20 +172,8 @@ async fn upsert_function(
 ) -> Result<(String, String)> {
     let current_function = client.get_function().function_name(name).send().await;
 
-    let deploy_metadata = function_deploy_metadata(manifest_path, binary_name)?;
-
-    let (environment, deploy_metadata) = match &deploy_metadata {
-        Some(base) if function_config.config.is_some() => {
-            merge_configuration(base, function_config)?
-        }
-        Some(base) => {
-            let env = function_environment(base.env.clone(), &base.env_file, &None)?;
-            (env, deploy_metadata)
-        }
-        _ => (Environment::builder().build(), deploy_metadata),
-    };
-
-    debug!(env = ?environment.variables(), metadata = ?deploy_metadata, "loaded function metadata for deployment");
+    let (environment, deploy_metadata) =
+        load_deploy_environment(manifest_path, binary_name, function_config)?;
 
     let action = match current_function {
         Ok(fun) => FunctionAction::Update(Box::new(fun)),
@@ -405,6 +393,28 @@ async fn upsert_function(
         arn.expect("missing function ARN"),
         version.expect("missing function version"),
     ))
+}
+
+fn load_deploy_environment(
+    manifest_path: &PathBuf,
+    binary_name: &str,
+    function_config: &FunctionDeployConfig,
+) -> Result<(Environment, Option<DeployConfig>)> {
+    let deploy_metadata = function_deploy_metadata(manifest_path, binary_name)?;
+
+    let (environment, deploy_metadata) = match &deploy_metadata {
+        Some(base) if function_config.config.is_some() => {
+            merge_configuration(base, function_config)?
+        }
+        Some(base) => {
+            let env = function_environment(base.env.clone(), &base.env_file, &None)?;
+            (env, deploy_metadata)
+        }
+        _ => (Environment::builder().build(), deploy_metadata),
+    };
+
+    debug!(env = ?environment.variables(), metadata = ?deploy_metadata, "loaded function metadata for deployment");
+    Ok((environment, deploy_metadata))
 }
 
 fn merge_configuration(
@@ -658,22 +668,24 @@ pub(crate) fn function_environment(
     let mut env = Environment::builder().set_variables(Some(variables));
 
     if let Some(path) = env_file {
-        let file = File::open(path)
-            .into_diagnostic()
-            .wrap_err("failed to open env file: {path}")?;
-        let reader = BufReader::new(file);
+        if path.is_file() {
+            let file = File::open(path)
+                .into_diagnostic()
+                .wrap_err(format!("failed to open env file: {:?}", path))?;
+            let reader = BufReader::new(file);
 
-        for line in reader.lines() {
-            let line = line.into_diagnostic().wrap_err("failed to read env line")?;
+            for line in reader.lines() {
+                let line = line.into_diagnostic().wrap_err("failed to read env line")?;
 
-            let mut iter = line.trim().splitn(2, '=');
-            let key = iter
-                .next()
-                .ok_or_else(|| miette::miette!("invalid env variable {var}"))?;
-            let value = iter
-                .next()
-                .ok_or_else(|| miette::miette!("invalid env variable {var}"))?;
-            env = env.variables(key, value);
+                let mut iter = line.trim().splitn(2, '=');
+                let key = iter
+                    .next()
+                    .ok_or_else(|| miette::miette!("invalid env variable {var}"))?;
+                let value = iter
+                    .next()
+                    .ok_or_else(|| miette::miette!("invalid env variable {var}"))?;
+                env = env.variables(key, value);
+            }
         }
     }
 
@@ -729,4 +741,47 @@ pub(crate) fn alias_doesnt_exist_error(err: &SdkError<GetAliasError>) -> bool {
 // we need to compare error messages and hope for the best :(
 fn is_role_cannot_be_assumed_error(err: &SdkError<CreateFunctionError>) -> bool {
     err.to_string() == "InvalidParameterValueException: The role defined for the function cannot be assumed by Lambda."
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{load_deploy_environment, *};
+    use std::path::PathBuf;
+
+    fn fixture(name: &str) -> PathBuf {
+        format!("../../tests/fixtures/{name}/Cargo.toml").into()
+    }
+
+    #[test]
+    fn test_load_deploy_environment() {
+        let (env, config) = load_deploy_environment(
+            &fixture("single-binary-package"),
+            "basic-lambda",
+            &Default::default(),
+        )
+        .unwrap();
+
+        let vars = env.variables().unwrap();
+        assert_eq!("VAL1".to_string(), vars["VAR1"]);
+        assert_eq!(Some(Memory::Mb512), config.unwrap().memory);
+    }
+
+    #[test]
+    fn test_load_deploy_environment_overriding_with_flags() {
+        let flags = FunctionDeployConfig {
+            config: Some(FunctionConfig {
+                memory: Some(Memory::Mb1024),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let (env, config) =
+            load_deploy_environment(&fixture("single-binary-package"), "basic-lambda", &flags)
+                .unwrap();
+
+        let vars = env.variables().unwrap();
+        assert_eq!("VAL1".to_string(), vars["VAR1"]);
+        assert_eq!(Some(Memory::Mb1024), config.unwrap().memory);
+    }
 }
