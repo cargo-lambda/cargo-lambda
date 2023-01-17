@@ -1,5 +1,5 @@
 use super::DeployResult;
-use crate::roles;
+use crate::{extract_tags, roles};
 use aws_sdk_s3::{types::ByteStream, Client as S3Client};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::{
@@ -770,19 +770,6 @@ pub(crate) fn alias_doesnt_exist_error(err: &SdkError<GetAliasError>) -> bool {
 // we need to compare error messages and hope for the best :(
 fn is_role_cannot_be_assumed_error(err: &SdkError<CreateFunctionError>) -> bool {
     err.to_string() == "InvalidParameterValueException: The role defined for the function cannot be assumed by Lambda."
-}
-
-fn extract_tags(tags: &Vec<String>) -> HashMap<String, String> {
-    let mut map = HashMap::new();
-
-    for var in tags {
-        let mut split = var.splitn(2, '=');
-        if let (Some(k), Some(v)) = (split.next(), split.next()) {
-            map.insert(k.to_string(), v.to_string());
-        }
-    }
-
-    map
 }
 
 #[cfg(test)]

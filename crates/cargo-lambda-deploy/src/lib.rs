@@ -10,7 +10,7 @@ use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
 use serde_json::ser::to_string_pretty;
-use std::{fs::read, path::PathBuf, time::Duration};
+use std::{collections::HashMap, fs::read, path::PathBuf, time::Duration};
 use strum_macros::{Display, EnumString};
 
 mod extensions;
@@ -132,11 +132,13 @@ impl Deploy {
         let result = if self.extension {
             extensions::deploy(
                 &name,
+                &self.manifest_path,
                 &sdk_config,
                 binary_data,
                 architecture,
                 compatible_runtimes,
                 &self.s3_bucket,
+                &self.tags,
                 &progress,
             )
             .await
@@ -213,4 +215,17 @@ impl Deploy {
         };
         Ok(arc)
     }
+}
+
+pub(crate) fn extract_tags(tags: &Vec<String>) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+
+    for var in tags {
+        let mut split = var.splitn(2, '=');
+        if let (Some(k), Some(v)) = (split.next(), split.next()) {
+            map.insert(k.to_string(), v.to_string());
+        }
+    }
+
+    map
 }
