@@ -28,6 +28,7 @@ impl std::fmt::Display for DeployOutput {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn deploy(
     name: &str,
     manifest_path: &PathBuf,
@@ -52,16 +53,21 @@ pub(crate) async fn deploy(
                 function_deploy_metadata(manifest_path, name)?.unwrap_or_default();
 
             if let Some(tags) = tags {
-                deploy_metadata.tags = Some(extract_tags(tags));
+                deploy_metadata.append_tags(extract_tags(tags));
             }
 
             let s3_client = S3Client::new(sdk_config);
-            s3_client
+            let mut operation = s3_client
                 .put_object()
                 .bucket(bucket)
                 .key(name)
-                .body(ByteStream::from(binary_data))
-                .set_tagging(deploy_metadata.s3_tags())
+                .body(ByteStream::from(binary_data));
+
+            if tags.is_some() {
+                operation = operation.set_tagging(deploy_metadata.s3_tags());
+            }
+
+            operation
                 .send()
                 .await
                 .into_diagnostic()

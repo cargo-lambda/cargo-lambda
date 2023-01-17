@@ -85,7 +85,13 @@ pub struct Deploy {
     #[arg(short, long, default_value_t = OutputFormat::Text)]
     output_format: OutputFormat,
 
-    /// Comma separated list of tags to apply to the function or extension (--tags Department=Marketing,CostCenter=1234ABCD)
+    /// Option to add one or many tags, allows multiple repetitions (--tag organization=aws --tag team=lambda)
+    /// This option overrides any values set with the --tags flag.
+    #[arg(long)]
+    tag: Option<Vec<String>>,
+
+    /// Comma separated list of tags to apply to the function or extension (--tags organization=aws,team=lambda)
+    /// This option overrides any values set with the --tag flag.
     #[arg(long, value_delimiter = ',')]
     tags: Option<Vec<String>>,
 
@@ -129,6 +135,11 @@ impl Deploy {
             .into_diagnostic()
             .wrap_err("failed to read binary archive")?;
 
+        let mut tags = self.tags.clone();
+        if tags.is_none() {
+            tags = self.tag.clone();
+        }
+
         let result = if self.extension {
             extensions::deploy(
                 &name,
@@ -138,7 +149,7 @@ impl Deploy {
                 architecture,
                 compatible_runtimes,
                 &self.s3_bucket,
-                &self.tags,
+                &tags,
                 &progress,
             )
             .await
@@ -152,7 +163,7 @@ impl Deploy {
                 &self.remote_config,
                 &sdk_config,
                 &self.s3_bucket,
-                &self.tags,
+                &tags,
                 binary_data,
                 architecture,
                 &progress,

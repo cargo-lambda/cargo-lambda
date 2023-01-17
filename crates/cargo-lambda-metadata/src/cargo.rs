@@ -97,9 +97,21 @@ pub struct DeployConfig {
 }
 
 impl DeployConfig {
+    pub fn append_tags(&mut self, tags: HashMap<String, String>) {
+        match &self.tags {
+            None => self.tags = Some(tags),
+            Some(base) => {
+                let mut new_tags = base.clone();
+                new_tags.extend(tags);
+                self.tags = Some(new_tags);
+            }
+        }
+    }
+
     pub fn s3_tags(&self) -> Option<String> {
         match &self.tags {
             None => None,
+            Some(tags) if tags.is_empty() => None,
             Some(tags) => {
                 let mut vec = Vec::new();
                 for (k, v) in tags {
@@ -460,14 +472,13 @@ mod tests {
         );
 
         let mut tags = HashMap::new();
-        tags.insert("costCenter".to_string(), "r&d".to_string());
+        tags.insert("organization".to_string(), "aws".to_string());
         tags.insert("team".to_string(), "lambda".to_string());
 
         assert_eq!(Some(tags), env.tags);
-        assert_eq!(
-            Some("costCenter=r&d,team=lambda".to_string()),
-            env.s3_tags()
-        );
+        let s3_tags = env.s3_tags().unwrap();
+        assert!(s3_tags.contains("organization=aws"), "{s3_tags}");
+        assert!(s3_tags.contains("team=labda"), "{s3_tags}");
     }
 
     #[test]

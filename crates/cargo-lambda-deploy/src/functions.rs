@@ -46,13 +46,21 @@ pub struct FunctionConfig {
     /// Memory allocated for the function
     #[arg(long, alias = "memory-size")]
     pub memory: Option<Memory>,
+
     /// How long the function can be running for, in seconds
     #[arg(long)]
     pub timeout: Option<Timeout>,
-    /// Option to add one or many environment variables, allows multiple repetitions
-    /// Use VAR_KEY=VAR_VALUE as format
+
+    /// Option to add one or many environment variables, allows multiple repetitions (--env-var KEY=VALUE --env-var OTHER=NEW-VALUE)
+    /// This option overrides any values set with the --env-vars flag.
     #[arg(long)]
     pub env_var: Option<Vec<String>>,
+
+    /// Command separated list of environment variables (--env-vars KEY=VALUE,OTHER=NEW-VALUE)
+    /// This option overrides any values set with the --env-var flag.
+    #[arg(long)]
+    pub env_vars: Option<Vec<String>>,
+
     /// Read environment variables from a file
     #[arg(long, value_hint = ValueHint::FilePath)]
     pub env_file: Option<PathBuf>,
@@ -364,14 +372,16 @@ async fn upsert_function(
             }
 
             if let Some(tags) = lambda_tags {
-                client
-                    .tag_resource()
-                    .resource(function_arn)
-                    .set_tags(Some(tags))
-                    .send()
-                    .await
-                    .into_diagnostic()
-                    .wrap_err("failed to tag function")?;
+                if !tags.is_empty() {
+                    client
+                        .tag_resource()
+                        .resource(function_arn)
+                        .set_tags(Some(tags))
+                        .send()
+                        .await
+                        .into_diagnostic()
+                        .wrap_err("failed to tag function")?;
+                }
             }
 
             let mut builder = client.update_function_code().function_name(name);
@@ -386,12 +396,16 @@ async fn upsert_function(
                     tracing::debug!(bucket = bucket, "uploading zip to S3");
 
                     let client = S3Client::new(sdk_config);
-                    client
+                    let mut operation = client
                         .put_object()
                         .bucket(bucket)
                         .key(name)
-                        .body(ByteStream::from(binary_data))
-                        .set_tagging(s3_tags)
+                        .body(ByteStream::from(binary_data));
+
+                    if s3_tags.is_some() {
+                        operation = operation.set_tagging(s3_tags);
+                    }
+                    operation
                         .send()
                         .await
                         .into_diagnostic()
@@ -449,7 +463,7 @@ fn merge_configuration(
     let mut deploy_metadata = base.clone();
 
     if let Some(tags) = tags {
-        deploy_metadata.tags = Some(extract_tags(tags));
+        deploy_metadata.append_tags(extract_tags(tags));
     }
 
     if let Some(tracing) = &function_config.tracing {
@@ -482,7 +496,12 @@ fn merge_configuration(
             if config.env_file.is_some() {
                 deploy_metadata.env_file = config.env_file.clone();
             }
-            &config.env_var
+
+            if config.env_vars.is_some() {
+                &config.env_vars
+            } else {
+                &config.env_var
+            }
         }
     };
 
@@ -798,14 +817,13 @@ mod tests {
         assert_eq!(Some(Memory::Mb512), config.memory);
 
         let mut tags = HashMap::new();
-        tags.insert("costCenter".to_string(), "r&d".to_string());
+        tags.insert("organization".to_string(), "aws".to_string());
         tags.insert("team".to_string(), "lambda".to_string());
-
         assert_eq!(Some(tags), config.tags);
     }
 
     #[test]
-    fn test_load_deploy_environment_overriding_with_flags() {
+    fn test_load_deploy_environment_appending_flags() {
         let flags = FunctionDeployConfig {
             config: Some(FunctionConfig {
                 memory: Some(Memory::Mb1024),
@@ -814,7 +832,7 @@ mod tests {
             ..Default::default()
         };
 
-        let tags = vec!["costCenter=r&d".to_string(), "team=s3".to_string()];
+        let tags = vec!["team=s3".to_string(), "subteam=storage".to_string()];
 
         let (env, config) = load_deploy_environment(
             &fixture("single-binary-package"),
@@ -831,8 +849,9 @@ mod tests {
         assert_eq!(Some(Memory::Mb1024), config.memory);
 
         let mut tags = HashMap::new();
-        tags.insert("costCenter".to_string(), "r&d".to_string());
+        tags.insert("organization".to_string(), "aws".to_string());
         tags.insert("team".to_string(), "s3".to_string());
+        tags.insert("subteam".to_string(), "storage".to_string());
 
         assert_eq!(Some(tags), config.tags);
     }

@@ -42,9 +42,15 @@ You can use the flag `--disable-function-url` if you want to disable the functio
 
 ## Environment variables
 
-You can add environment variables to a function during deployment with the flags `--env-var` and `--env-file`.
+You can use the flag `--env-vars` to add environment variables to a function. This flag supports a comma separated list of values:
 
-The flag `--env-var` allows you to pass several variables in the command like with the format `KEY=VALUE`:
+```
+cargo lambda deploy \
+  --env-vars FOO=BAR,BAZ=QUX \
+  http-lambda
+```
+
+The flag `--env-var` allows you to pass several variables in the command like with the format `KEY=VALUE`. This flag overrides the previous one, and cannot be combined.
 
 ```
 cargo lambda deploy \
@@ -60,11 +66,20 @@ cargo lambda deploy --env-file .env http-lambda
 
 ## Resource tagging
 
-You can use the flag `--tags` to add resource tags to a function or layer. If the function is deployed via S3, the tags are also applied to the S3 object:
+You can use the flag `--tags` to add resource tags to a function or layer. This flag supports a comma separated list of values. If the function is deployed via S3, the tags are also applied to the S3 object:
 
 ```
 cargo lambda deploy \
-  --tags team=lambda \
+  --tags organization=aws,team=lambda \
+  http-lambda
+```
+
+You can also use the flag `--tag` to add one or multiple tags separated by flags. This flag overrides the previous one, and cannot be combined.
+
+```
+cargo lambda deploy \
+  --tag organization=aws \
+  --tag team=lambda \
   http-lambda
 ```
 
