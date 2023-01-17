@@ -3,7 +3,7 @@ use crate::roles;
 use aws_sdk_s3::{types::ByteStream, Client as S3Client};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::{
-    cargo::function_deploy_metadata,
+    cargo::{function_deploy_metadata, DeployConfig},
     lambda::{Memory, Timeout, Tracing},
 };
 use cargo_lambda_remote::{
@@ -33,6 +33,7 @@ use std::{
     path::PathBuf,
 };
 use tokio::time::{sleep, Duration};
+use tracing::debug;
 use uuid::Uuid;
 
 enum FunctionAction {
@@ -171,47 +172,20 @@ async fn upsert_function(
 ) -> Result<(String, String)> {
     let current_function = client.get_function().function_name(name).send().await;
 
-    let (environment, deploy_metadata) = if let Some(ref config) = function_config.config {
-        let mut deploy_metadata = function_deploy_metadata(manifest_path, binary_name)?;
+    let deploy_metadata = function_deploy_metadata(manifest_path, binary_name)?;
 
-        if let Some(tracing) = &function_config.tracing {
-            if &deploy_metadata.tracing != tracing {
-                deploy_metadata.tracing = tracing.clone();
-            }
+    let (environment, deploy_metadata) = match &deploy_metadata {
+        Some(base) if function_config.config.is_some() => {
+            merge_configuration(base, function_config)?
         }
-
-        if function_config.role.is_some() {
-            deploy_metadata.iam_role = function_config.role.clone();
+        Some(base) => {
+            let env = function_environment(base.env.clone(), &base.env_file, &None)?;
+            (env, deploy_metadata)
         }
-
-        if config.memory.is_some() {
-            deploy_metadata.memory = config.memory.clone();
-        }
-
-        if let Some(timeout) = &config.timeout {
-            if !timeout.is_zero() {
-                deploy_metadata.timeout = timeout.clone()
-            }
-        }
-
-        if config.env_file.is_some() {
-            deploy_metadata.env_file = config.env_file.clone();
-        }
-
-        let environment = function_environment(
-            deploy_metadata.env.clone(),
-            &deploy_metadata.env_file,
-            &config.env_var,
-        )?;
-
-        if function_config.layer.is_some() {
-            deploy_metadata.layers = function_config.layer.clone();
-        }
-
-        (environment, Some(deploy_metadata))
-    } else {
-        (Environment::builder().build(), None)
+        _ => (Environment::builder().build(), deploy_metadata),
     };
+
+    debug!(env = ?environment.variables(), metadata = ?deploy_metadata, "loaded function metadata for deployment");
 
     let action = match current_function {
         Ok(fun) => FunctionAction::Update(Box::new(fun)),
@@ -431,6 +405,52 @@ async fn upsert_function(
         arn.expect("missing function ARN"),
         version.expect("missing function version"),
     ))
+}
+
+fn merge_configuration(
+    base: &DeployConfig,
+    function_config: &FunctionDeployConfig,
+) -> Result<(Environment, Option<DeployConfig>)> {
+    let mut deploy_metadata = base.clone();
+
+    if let Some(tracing) = &function_config.tracing {
+        if &deploy_metadata.tracing != tracing {
+            deploy_metadata.tracing = tracing.clone();
+        }
+    }
+
+    if function_config.role.is_some() {
+        deploy_metadata.iam_role = function_config.role.clone();
+    }
+
+    if function_config.layer.is_some() {
+        deploy_metadata.layers = function_config.layer.clone();
+    }
+
+    let vars = match &function_config.config {
+        None => &None,
+        Some(config) => {
+            if config.memory.is_some() {
+                deploy_metadata.memory = config.memory.clone();
+            }
+
+            if let Some(timeout) = &config.timeout {
+                if !timeout.is_zero() {
+                    deploy_metadata.timeout = timeout.clone()
+                }
+            }
+
+            if config.env_file.is_some() {
+                deploy_metadata.env_file = config.env_file.clone();
+            }
+            &config.env_var
+        }
+    };
+
+    let environment =
+        function_environment(deploy_metadata.env.clone(), &deploy_metadata.env_file, vars)?;
+
+    Ok((environment, Some(deploy_metadata)))
 }
 
 async fn wait_for_ready_state(
