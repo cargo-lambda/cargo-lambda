@@ -92,6 +92,8 @@ pub struct DeployConfig {
     pub iam_role: Option<String>,
     #[serde(default)]
     pub layers: Option<Vec<String>>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
 }
 
 /// Extract all the binary target names from a Cargo.toml file

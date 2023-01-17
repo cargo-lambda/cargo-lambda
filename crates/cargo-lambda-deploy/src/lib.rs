@@ -72,18 +72,22 @@ pub struct Deploy {
     #[arg(long)]
     pub s3_bucket: Option<String>,
 
-    /// Whether the code that you're building is a Lambda Extension
+    /// Whether the code that you're deploying is a Lambda Extension
     #[arg(long)]
     extension: bool,
 
     /// Comma separated list with compatible runtimes for the Lambda Extension (--compatible_runtimes=provided.al2,nodejs16.x)
     /// List of allowed runtimes can be found in the AWS documentation: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
     #[arg(long, value_delimiter = ',', default_value = "provided.al2")]
-    pub compatible_runtimes: Vec<String>,
+    compatible_runtimes: Vec<String>,
 
     /// Format to render the output (text, or json)
-    #[arg(long, default_value_t = OutputFormat::Text)]
+    #[arg(short, long, default_value_t = OutputFormat::Text)]
     output_format: OutputFormat,
+
+    /// Comma separated list of tags to apply to the function or extension (--tags Department=Marketing,CostCenter=1234ABCD)
+    #[arg(long, value_delimiter = ',')]
+    tags: Option<Vec<String>>,
 
     /// Name of the function or extension to deploy
     #[arg(value_name = "NAME")]
@@ -146,6 +150,7 @@ impl Deploy {
                 &self.remote_config,
                 &sdk_config,
                 &self.s3_bucket,
+                &self.tags,
                 binary_data,
                 architecture,
                 &progress,
