@@ -35,7 +35,7 @@ pub struct PackageMetadata {
     #[serde(default)]
     pub env: HashMap<String, String>,
     #[serde(default)]
-    pub deploy: DeployConfig,
+    pub deploy: Option<DeployConfig>,
     #[serde(default)]
     pub build: BuildConfig,
 }
@@ -230,7 +230,7 @@ pub fn function_environment_metadata<P: AsRef<Path> + Debug>(
 pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
     manifest_path: P,
     name: &str,
-) -> Result<DeployConfig> {
+) -> Result<Option<DeployConfig>> {
     let metadata = load_metadata(manifest_path)?;
     let ws_metadata: LambdaMetadata =
         serde_json::from_value(metadata.workspace_metadata).unwrap_or_default();
@@ -238,7 +238,13 @@ pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
     let mut config = ws_metadata.package.deploy;
 
     if let Some(package_metadata) = ws_metadata.bin.get(name) {
-        merge_deploy_config(&mut config, &package_metadata.deploy);
+        match (&config, &package_metadata.deploy) {
+            (None, Some(c)) => config = Some(c.clone()),
+            (Some(base), Some(c)) => {
+                config = Some(merge_deploy_config(base, c));
+            }
+            _ => {}
+        }
     }
 
     for pkg in &metadata.packages {
@@ -258,7 +264,13 @@ pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
                     .map_err(MetadataError::InvalidCargoMetadata)?;
                 let package_deploy = package_metadata.lambda.package.deploy;
 
-                merge_deploy_config(&mut config, &package_deploy);
+                match (&config, &package_deploy) {
+                    (None, Some(c)) => config = Some(c.clone()),
+                    (Some(base), Some(c)) => {
+                        config = Some(merge_deploy_config(base, c));
+                    }
+                    _ => {}
+                }
             }
         }
     }
@@ -314,27 +326,29 @@ pub fn root_package<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<Package>
         .expect("failed to extract the root package from the metadata"))
 }
 
-fn merge_deploy_config(base: &mut DeployConfig, package_deploy: &DeployConfig) {
+fn merge_deploy_config(base: &DeployConfig, package_deploy: &DeployConfig) -> DeployConfig {
+    let mut new_config = base.clone();
     if package_deploy.memory.is_some() {
-        base.memory = package_deploy.memory.clone();
+        new_config.memory = package_deploy.memory.clone();
     }
     if !package_deploy.timeout.is_zero() {
-        base.timeout = package_deploy.timeout.clone();
+        new_config.timeout = package_deploy.timeout.clone();
     }
-    base.env.extend(package_deploy.env.clone());
+    new_config.env.extend(package_deploy.env.clone());
     if package_deploy.env_file.is_some() && base.env_file.is_none() {
-        base.env_file = package_deploy.env_file.clone();
+        new_config.env_file = package_deploy.env_file.clone();
     }
     if package_deploy.tracing != Tracing::default() {
-        base.tracing = package_deploy.tracing.clone();
+        new_config.tracing = package_deploy.tracing.clone();
     }
     if package_deploy.iam_role.is_some() {
-        base.iam_role = package_deploy.iam_role.clone();
+        new_config.iam_role = package_deploy.iam_role.clone();
     }
     if package_deploy.layers.is_some() {
-        base.layers = package_deploy.layers.clone();
+        new_config.layers = package_deploy.layers.clone();
     }
-    tracing::debug!(ws_metadata = ?base, package_metadata = ?package_deploy, "finished merging deploy metadata");
+    tracing::debug!(ws_metadata = ?new_config, package_metadata = ?package_deploy, "finished merging deploy metadata");
+    new_config
 }
 
 fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
@@ -405,8 +419,9 @@ mod tests {
 
     #[test]
     fn test_deploy_metadata_packages() {
-        let env =
-            function_deploy_metadata(fixture("single-binary-package"), "basic-lambda").unwrap();
+        let env = function_deploy_metadata(fixture("single-binary-package"), "basic-lambda")
+            .unwrap()
+            .unwrap();
 
         let layers = [
             "arn:aws:lambda:us-east-1:xxxxxxxx:layers:layer1".to_string(),
