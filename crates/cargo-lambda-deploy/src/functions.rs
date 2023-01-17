@@ -197,12 +197,8 @@ async fn upsert_function(
         .mode(tracing.to_string().as_str().into())
         .build();
 
-    let lambda_tags = deploy_metadata
-        .as_ref()
-        .and_then(|m| m.tags.as_ref().map(extract_tags));
-    let s3_tags = deploy_metadata
-        .as_ref()
-        .and_then(|m| m.tags.as_ref().map(|t| t.join(",")));
+    let lambda_tags = deploy_metadata.as_ref().and_then(|m| m.tags.clone());
+    let s3_tags = deploy_metadata.as_ref().and_then(|m| m.s3_tags());
 
     let (arn, version) = match action {
         FunctionAction::Create => {
@@ -452,8 +448,8 @@ fn merge_configuration(
 ) -> Result<(Environment, Option<DeployConfig>)> {
     let mut deploy_metadata = base.clone();
 
-    if tags.is_some() {
-        deploy_metadata.tags = tags.clone();
+    if let Some(tags) = tags {
+        deploy_metadata.tags = Some(extract_tags(tags));
     }
 
     if let Some(tracing) = &function_config.tracing {
@@ -808,9 +804,17 @@ mod tests {
         )
         .unwrap();
 
+        let config = config.unwrap();
+
         let vars = env.variables().unwrap();
         assert_eq!("VAL1".to_string(), vars["VAR1"]);
-        assert_eq!(Some(Memory::Mb512), config.unwrap().memory);
+        assert_eq!(Some(Memory::Mb512), config.memory);
+
+        let mut tags = HashMap::new();
+        tags.insert("costCenter".to_string(), "r&d".to_string());
+        tags.insert("team".to_string(), "lambda".to_string());
+
+        assert_eq!(Some(tags), config.tags);
     }
 
     #[test]
@@ -823,16 +827,26 @@ mod tests {
             ..Default::default()
         };
 
+        let tags = vec!["costCenter=r&d".to_string(), "team=s3".to_string()];
+
         let (env, config) = load_deploy_environment(
             &fixture("single-binary-package"),
             "basic-lambda",
             &flags,
-            &None,
+            &Some(tags),
         )
         .unwrap();
 
+        let config = config.unwrap();
+
         let vars = env.variables().unwrap();
         assert_eq!("VAL1".to_string(), vars["VAR1"]);
-        assert_eq!(Some(Memory::Mb1024), config.unwrap().memory);
+        assert_eq!(Some(Memory::Mb1024), config.memory);
+
+        let mut tags = HashMap::new();
+        tags.insert("costCenter".to_string(), "r&d".to_string());
+        tags.insert("team".to_string(), "s3".to_string());
+
+        assert_eq!(Some(tags), config.tags);
     }
 }

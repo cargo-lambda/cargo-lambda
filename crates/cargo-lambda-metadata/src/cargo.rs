@@ -93,7 +93,22 @@ pub struct DeployConfig {
     #[serde(default)]
     pub layers: Option<Vec<String>>,
     #[serde(default)]
-    pub tags: Option<Vec<String>>,
+    pub tags: Option<HashMap<String, String>>,
+}
+
+impl DeployConfig {
+    pub fn s3_tags(&self) -> Option<String> {
+        match &self.tags {
+            None => None,
+            Some(tags) => {
+                let mut vec = Vec::new();
+                for (k, v) in tags {
+                    vec.push(format!("{k}={v}"));
+                }
+                Some(vec.join(","))
+            }
+        }
+    }
 }
 
 /// Extract all the binary target names from a Cargo.toml file
@@ -442,6 +457,16 @@ mod tests {
         assert_eq!(
             Some("arn:aws:lambda:us-east-1:xxxxxxxx:iam:role1".to_string()),
             env.iam_role
+        );
+
+        let mut tags = HashMap::new();
+        tags.insert("costCenter".to_string(), "r&d".to_string());
+        tags.insert("team".to_string(), "lambda".to_string());
+
+        assert_eq!(Some(tags), env.tags);
+        assert_eq!(
+            Some("costCenter=r&d,team=lambda".to_string()),
+            env.s3_tags()
         );
     }
 
