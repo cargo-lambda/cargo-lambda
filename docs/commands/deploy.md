@@ -58,6 +58,16 @@ The flag `--env-file` will read the variables from a file and add them to the fu
 cargo lambda deploy --env-file .env http-lambda
 ```
 
+## Resource tagging
+
+You can use the flag `--tags` to add resource tags to a function or layer. If the function is deployed via S3, the tags are also applied to the S3 object:
+
+```
+cargo lambda deploy \
+  --tags team=lambda \
+  http-lambda
+```
+
 ## Extensions
 
 cargo-lambda can deploy Lambda Extensions built in Rust by adding the `--extension` flag to the `deploy` command. This command requires you to build the extension first with the same `--extension` flag in the `build` command:
@@ -82,6 +92,7 @@ env = { "VAR1" = "VAL1" }      # Additional environment variables
 layers = [                     # List of layers to deploy with your function
     "layer-full-arn"
 ]
+tags = { "team" = "lambda" }   # List of AWS resource tags for this function
 ```
 
 ## Other options
