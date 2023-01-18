@@ -39,7 +39,7 @@ enum LambdaSubcommand {
     Build(Box<Build>),
     /// `cargo lambda deploy` uploads functions and extensions to AWS Lambda.
     /// You can use the same command to create new functions as well as update existent functions code.
-    Deploy(Deploy),
+    Deploy(Box<Deploy>),
     /// `cargo lambda init` creates Rust Lambda packages in an existent directory.
     /// Files present in that directory will be preserved as they were before running this command.
     Init(Init),

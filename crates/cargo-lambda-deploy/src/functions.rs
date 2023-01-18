@@ -1,5 +1,5 @@
 use super::DeployResult;
-use crate::roles;
+use crate::{extract_tags, roles};
 use aws_sdk_s3::{types::ByteStream, Client as S3Client};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::{
@@ -46,13 +46,21 @@ pub struct FunctionConfig {
     /// Memory allocated for the function
     #[arg(long, alias = "memory-size")]
     pub memory: Option<Memory>,
+
     /// How long the function can be running for, in seconds
     #[arg(long)]
     pub timeout: Option<Timeout>,
-    /// Option to add one or many environment variables, allows multiple repetitions
-    /// Use VAR_KEY=VAR_VALUE as format
+
+    /// Option to add one or many environment variables, allows multiple repetitions (--env-var KEY=VALUE --env-var OTHER=NEW-VALUE)
+    /// This option overrides any values set with the --env-vars flag.
     #[arg(long)]
     pub env_var: Option<Vec<String>>,
+
+    /// Command separated list of environment variables (--env-vars KEY=VALUE,OTHER=NEW-VALUE)
+    /// This option overrides any values set with the --env-var flag.
+    #[arg(long)]
+    pub env_vars: Option<Vec<String>>,
+
     /// Read environment variables from a file
     #[arg(long, value_hint = ValueHint::FilePath)]
     pub env_file: Option<PathBuf>,
@@ -109,6 +117,7 @@ pub(crate) async fn deploy(
     remote_config: &RemoteConfig,
     sdk_config: &SdkConfig,
     s3_bucket: &Option<String>,
+    tags: &Option<Vec<String>>,
     binary_data: Vec<u8>,
     architecture: Architecture,
     progress: &Progress,
@@ -124,6 +133,7 @@ pub(crate) async fn deploy(
         remote_config,
         sdk_config,
         s3_bucket,
+        tags,
         binary_data,
         architecture,
         progress,
@@ -166,6 +176,7 @@ async fn upsert_function(
     remote_config: &RemoteConfig,
     sdk_config: &SdkConfig,
     s3_bucket: &Option<String>,
+    tags: &Option<Vec<String>>,
     binary_data: Vec<u8>,
     architecture: Architecture,
     progress: &Progress,
@@ -173,7 +184,7 @@ async fn upsert_function(
     let current_function = client.get_function().function_name(name).send().await;
 
     let (environment, deploy_metadata) =
-        load_deploy_environment(manifest_path, binary_name, function_config)?;
+        load_deploy_environment(manifest_path, binary_name, function_config, tags)?;
 
     let action = match current_function {
         Ok(fun) => FunctionAction::Update(Box::new(fun)),
@@ -193,6 +204,9 @@ async fn upsert_function(
     let tracing_config = TracingConfig::builder()
         .mode(tracing.to_string().as_str().into())
         .build();
+
+    let lambda_tags = deploy_metadata.as_ref().and_then(|m| m.tags.clone());
+    let s3_tags = deploy_metadata.as_ref().and_then(|m| m.s3_tags());
 
     let (arn, version) = match action {
         FunctionAction::Create => {
@@ -219,6 +233,7 @@ async fn upsert_function(
                         .bucket(bucket)
                         .key(name)
                         .body(ByteStream::from(binary_data))
+                        .set_tagging(s3_tags)
                         .send()
                         .await
                         .into_diagnostic()
@@ -249,6 +264,7 @@ async fn upsert_function(
                     .tracing_config(tracing_config.clone())
                     .environment(environment.clone())
                     .set_layers(deploy_metadata.layers.clone())
+                    .set_tags(lambda_tags.clone())
                     .send()
                     .await;
 
@@ -286,6 +302,8 @@ async fn upsert_function(
             let conf = fun
                 .configuration
                 .ok_or_else(|| miette::miette!("missing function configuration"))?;
+
+            let function_arn = conf.function_arn.as_ref().expect("missing function arn");
 
             let mut wait_for_readiness = false;
             if conf.state.is_none() || conf.state == Some(State::Pending) {
@@ -353,6 +371,19 @@ async fn upsert_function(
                 progress.set_message("deploying function");
             }
 
+            if let Some(tags) = lambda_tags {
+                if !tags.is_empty() {
+                    client
+                        .tag_resource()
+                        .resource(function_arn)
+                        .set_tags(Some(tags))
+                        .send()
+                        .await
+                        .into_diagnostic()
+                        .wrap_err("failed to tag function")?;
+                }
+            }
+
             let mut builder = client.update_function_code().function_name(name);
 
             match &s3_bucket {
@@ -363,12 +394,18 @@ async fn upsert_function(
                 }
                 Some(bucket) => {
                     tracing::debug!(bucket = bucket, "uploading zip to S3");
+
                     let client = S3Client::new(sdk_config);
-                    client
+                    let mut operation = client
                         .put_object()
                         .bucket(bucket)
                         .key(name)
-                        .body(ByteStream::from(binary_data))
+                        .body(ByteStream::from(binary_data));
+
+                    if s3_tags.is_some() {
+                        operation = operation.set_tagging(s3_tags);
+                    }
+                    operation
                         .send()
                         .await
                         .into_diagnostic()
@@ -399,12 +436,13 @@ fn load_deploy_environment(
     manifest_path: &PathBuf,
     binary_name: &str,
     function_config: &FunctionDeployConfig,
+    tags: &Option<Vec<String>>,
 ) -> Result<(Environment, Option<DeployConfig>)> {
     let deploy_metadata = function_deploy_metadata(manifest_path, binary_name)?;
 
     let (environment, deploy_metadata) = match &deploy_metadata {
         Some(base) if function_config.config.is_some() => {
-            merge_configuration(base, function_config)?
+            merge_configuration(base, function_config, tags)?
         }
         Some(base) => {
             let env = function_environment(base.env.clone(), &base.env_file, &None)?;
@@ -420,8 +458,13 @@ fn load_deploy_environment(
 fn merge_configuration(
     base: &DeployConfig,
     function_config: &FunctionDeployConfig,
+    tags: &Option<Vec<String>>,
 ) -> Result<(Environment, Option<DeployConfig>)> {
     let mut deploy_metadata = base.clone();
+
+    if let Some(tags) = tags {
+        deploy_metadata.append_tags(extract_tags(tags));
+    }
 
     if let Some(tracing) = &function_config.tracing {
         if &deploy_metadata.tracing != tracing {
@@ -453,7 +496,12 @@ fn merge_configuration(
             if config.env_file.is_some() {
                 deploy_metadata.env_file = config.env_file.clone();
             }
-            &config.env_var
+
+            if config.env_vars.is_some() {
+                &config.env_vars
+            } else {
+                &config.env_var
+            }
         }
     };
 
@@ -758,16 +806,24 @@ mod tests {
             &fixture("single-binary-package"),
             "basic-lambda",
             &Default::default(),
+            &None,
         )
         .unwrap();
 
+        let config = config.unwrap();
+
         let vars = env.variables().unwrap();
         assert_eq!("VAL1".to_string(), vars["VAR1"]);
-        assert_eq!(Some(Memory::Mb512), config.unwrap().memory);
+        assert_eq!(Some(Memory::Mb512), config.memory);
+
+        let mut tags = HashMap::new();
+        tags.insert("organization".to_string(), "aws".to_string());
+        tags.insert("team".to_string(), "lambda".to_string());
+        assert_eq!(Some(tags), config.tags);
     }
 
     #[test]
-    fn test_load_deploy_environment_overriding_with_flags() {
+    fn test_load_deploy_environment_appending_flags() {
         let flags = FunctionDeployConfig {
             config: Some(FunctionConfig {
                 memory: Some(Memory::Mb1024),
@@ -776,12 +832,27 @@ mod tests {
             ..Default::default()
         };
 
-        let (env, config) =
-            load_deploy_environment(&fixture("single-binary-package"), "basic-lambda", &flags)
-                .unwrap();
+        let tags = vec!["team=s3".to_string(), "subteam=storage".to_string()];
+
+        let (env, config) = load_deploy_environment(
+            &fixture("single-binary-package"),
+            "basic-lambda",
+            &flags,
+            &Some(tags),
+        )
+        .unwrap();
+
+        let config = config.unwrap();
 
         let vars = env.variables().unwrap();
         assert_eq!("VAL1".to_string(), vars["VAR1"]);
-        assert_eq!(Some(Memory::Mb1024), config.unwrap().memory);
+        assert_eq!(Some(Memory::Mb1024), config.memory);
+
+        let mut tags = HashMap::new();
+        tags.insert("organization".to_string(), "aws".to_string());
+        tags.insert("team".to_string(), "s3".to_string());
+        tags.insert("subteam".to_string(), "storage".to_string());
+
+        assert_eq!(Some(tags), config.tags);
     }
 }

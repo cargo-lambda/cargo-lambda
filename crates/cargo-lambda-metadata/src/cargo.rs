@@ -92,6 +92,35 @@ pub struct DeployConfig {
     pub iam_role: Option<String>,
     #[serde(default)]
     pub layers: Option<Vec<String>>,
+    #[serde(default)]
+    pub tags: Option<HashMap<String, String>>,
+}
+
+impl DeployConfig {
+    pub fn append_tags(&mut self, tags: HashMap<String, String>) {
+        match &self.tags {
+            None => self.tags = Some(tags),
+            Some(base) => {
+                let mut new_tags = base.clone();
+                new_tags.extend(tags);
+                self.tags = Some(new_tags);
+            }
+        }
+    }
+
+    pub fn s3_tags(&self) -> Option<String> {
+        match &self.tags {
+            None => None,
+            Some(tags) if tags.is_empty() => None,
+            Some(tags) => {
+                let mut vec = Vec::new();
+                for (k, v) in tags {
+                    vec.push(format!("{k}={v}"));
+                }
+                Some(vec.join(","))
+            }
+        }
+    }
 }
 
 /// Extract all the binary target names from a Cargo.toml file
@@ -441,6 +470,15 @@ mod tests {
             Some("arn:aws:lambda:us-east-1:xxxxxxxx:iam:role1".to_string()),
             env.iam_role
         );
+
+        let mut tags = HashMap::new();
+        tags.insert("organization".to_string(), "aws".to_string());
+        tags.insert("team".to_string(), "lambda".to_string());
+
+        assert_eq!(Some(tags), env.tags);
+        let s3_tags = env.s3_tags().unwrap();
+        assert!(s3_tags.contains("organization=aws"), "{s3_tags}");
+        assert!(s3_tags.contains("team=lambda"), "{s3_tags}");
     }
 
     #[test]

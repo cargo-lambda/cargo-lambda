@@ -10,7 +10,7 @@ use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
 use serde_json::ser::to_string_pretty;
-use std::{fs::read, path::PathBuf, time::Duration};
+use std::{collections::HashMap, fs::read, path::PathBuf, time::Duration};
 use strum_macros::{Display, EnumString};
 
 mod extensions;
@@ -72,18 +72,28 @@ pub struct Deploy {
     #[arg(long)]
     pub s3_bucket: Option<String>,
 
-    /// Whether the code that you're building is a Lambda Extension
+    /// Whether the code that you're deploying is a Lambda Extension
     #[arg(long)]
     extension: bool,
 
     /// Comma separated list with compatible runtimes for the Lambda Extension (--compatible_runtimes=provided.al2,nodejs16.x)
     /// List of allowed runtimes can be found in the AWS documentation: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
     #[arg(long, value_delimiter = ',', default_value = "provided.al2")]
-    pub compatible_runtimes: Vec<String>,
+    compatible_runtimes: Vec<String>,
 
     /// Format to render the output (text, or json)
-    #[arg(long, default_value_t = OutputFormat::Text)]
+    #[arg(short, long, default_value_t = OutputFormat::Text)]
     output_format: OutputFormat,
+
+    /// Option to add one or many tags, allows multiple repetitions (--tag organization=aws --tag team=lambda)
+    /// This option overrides any values set with the --tags flag.
+    #[arg(long)]
+    tag: Option<Vec<String>>,
+
+    /// Comma separated list of tags to apply to the function or extension (--tags organization=aws,team=lambda)
+    /// This option overrides any values set with the --tag flag.
+    #[arg(long, value_delimiter = ',')]
+    tags: Option<Vec<String>>,
 
     /// Name of the function or extension to deploy
     #[arg(value_name = "NAME")]
@@ -125,14 +135,21 @@ impl Deploy {
             .into_diagnostic()
             .wrap_err("failed to read binary archive")?;
 
+        let mut tags = self.tags.clone();
+        if tags.is_none() {
+            tags = self.tag.clone();
+        }
+
         let result = if self.extension {
             extensions::deploy(
                 &name,
+                &self.manifest_path,
                 &sdk_config,
                 binary_data,
                 architecture,
                 compatible_runtimes,
                 &self.s3_bucket,
+                &tags,
                 &progress,
             )
             .await
@@ -146,6 +163,7 @@ impl Deploy {
                 &self.remote_config,
                 &sdk_config,
                 &self.s3_bucket,
+                &tags,
                 binary_data,
                 architecture,
                 &progress,
@@ -208,4 +226,17 @@ impl Deploy {
         };
         Ok(arc)
     }
+}
+
+pub(crate) fn extract_tags(tags: &Vec<String>) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+
+    for var in tags {
+        let mut split = var.splitn(2, '=');
+        if let (Some(k), Some(v)) = (split.next(), split.next()) {
+            map.insert(k.to_string(), v.to_string());
+        }
+    }
+
+    map
 }
