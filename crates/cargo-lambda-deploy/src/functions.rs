@@ -755,7 +755,7 @@ pub(crate) fn function_environment(
 
 pub(crate) fn function_doesnt_exist_error(err: &SdkError<GetFunctionError>) -> bool {
     match err {
-        SdkError::ServiceError { err, .. } => err.is_resource_not_found_exception(),
+        SdkError::ServiceError(e) => e.err().is_resource_not_found_exception(),
         _ => false,
     }
 }
@@ -764,7 +764,7 @@ pub(crate) fn function_url_config_doesnt_exist_error(
     err: &SdkError<GetFunctionUrlConfigError>,
 ) -> bool {
     match err {
-        SdkError::ServiceError { err, .. } => err.is_resource_not_found_exception(),
+        SdkError::ServiceError(e) => e.err().is_resource_not_found_exception(),
         _ => false,
     }
 }
@@ -773,14 +773,14 @@ pub(crate) fn delete_function_url_config_doesnt_exist_error(
     err: &SdkError<DeleteFunctionUrlConfigError>,
 ) -> bool {
     match err {
-        SdkError::ServiceError { err, .. } => err.is_resource_not_found_exception(),
+        SdkError::ServiceError(e) => e.err().is_resource_not_found_exception(),
         _ => false,
     }
 }
 
 pub(crate) fn alias_doesnt_exist_error(err: &SdkError<GetAliasError>) -> bool {
     match err {
-        SdkError::ServiceError { err, .. } => err.is_resource_not_found_exception(),
+        SdkError::ServiceError(e) => e.err().is_resource_not_found_exception(),
         _ => false,
     }
 }
