@@ -7,6 +7,7 @@ use watchexec::{
     action::{Action, Outcome, PreSpawn},
     command::Command,
     config::{InitConfig, RuntimeConfig},
+    error::RuntimeError,
     event::{Event, Priority, ProcessEnd},
     handler::SyncFnHandler,
     signal::source::MainSignal,
@@ -42,6 +43,13 @@ fn init() -> InitConfig {
         |err: ErrorHook| -> std::result::Result<(), Infallible> {
             error!(error = ?err.error, "internal error watching your project");
 
+            match err.error {
+                RuntimeError::FsWatcher { .. } | RuntimeError::EventChannelTrySend { .. } => {
+                    err.elevate()
+                }
+                _ => {}
+            }
+
             Ok(())
         },
     ));
@@ -62,7 +70,8 @@ async fn runtime(cmd: Command, wc: WatcherConfig) -> Result<RuntimeConfig, Serve
         .map_err(ServerError::InvalidIgnoreFiles)?;
     if wc.no_reload {
         filter
-            .add_globs(&["**/*"], Some(&wc.base))
+            .add_globs(&["**/*"], Some(wc.base))
+            .await
             .map_err(ServerError::InvalidIgnoreFiles)?;
     }
     config.filterer(Arc::new(watchexec_filterer_ignore::IgnoreFilterer(filter)));
