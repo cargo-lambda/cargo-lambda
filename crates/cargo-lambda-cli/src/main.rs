@@ -24,7 +24,7 @@ struct Lambda {
     #[command(subcommand)]
     subcommand: Option<Box<LambdaSubcommand>>,
     /// Enable logs in any subcommand. Use `-v` for debug logs, and `-vv` for trace logs
-    #[arg(short = 'v', long, action = clap::ArgAction::Count)]
+    #[arg(short = 'v', long, action = clap::ArgAction::Count, global = true)]
     verbose: u8,
     /// Print version information
     #[arg(short = 'V', long)]
