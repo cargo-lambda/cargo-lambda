@@ -47,11 +47,13 @@ pub fn cargo_lambda_init(project_name: &str) -> (PathBuf, Command) {
 }
 
 pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {
+    let path = path.as_ref();
     Command::cargo_lambda()
         .arg("lambda")
         .arg("build")
         .arg("-vv")
         .env("RUST_BACKTRACE", "full")
+        .env("CARGO_ZIGBUILD_CACHE_DIR", path.as_os_str())
         .current_dir(path)
 }
 
