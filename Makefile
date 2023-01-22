@@ -44,6 +44,3 @@ publish-all:
 	cargo publish --package cargo-lambda-watch
 	sleep 10
 	cd crates/cargo-lambda-cli && cargo publish
-
-run-integration: build
-	ruby test/integration.rb
