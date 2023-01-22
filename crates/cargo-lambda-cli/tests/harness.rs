@@ -50,6 +50,8 @@ pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {
     Command::cargo_lambda()
         .arg("lambda")
         .arg("build")
+        .arg("-vv")
+        .env("RUST_BACKTRACE", "full")
         .current_dir(path)
 }
 
