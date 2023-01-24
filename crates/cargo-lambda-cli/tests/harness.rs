@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use cargo_test_support::{paths::CargoPathExt, Project};
+use cargo_test_support::Project;
 use snapbox::cmd::Command;
 
 pub fn test_project<P: AsRef<Path>>(path: P) -> Project {
@@ -26,7 +26,6 @@ pub fn cargo_lambda_new(project_name: &str) -> (PathBuf, Command) {
         .current_dir(cwd);
 
     let project_path = project.root().join(project_name);
-    project_path.rm_rf();
 
     (project_path, cmd)
 }
@@ -48,9 +47,13 @@ pub fn cargo_lambda_init(project_name: &str) -> (PathBuf, Command) {
 }
 
 pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {
+    let path = path.as_ref();
     Command::cargo_lambda()
         .arg("lambda")
         .arg("build")
+        .arg("-vv")
+        .env("RUST_BACKTRACE", "full")
+        .env("CARGO_ZIGBUILD_CACHE_DIR", path.as_os_str())
         .current_dir(path)
 }
 
