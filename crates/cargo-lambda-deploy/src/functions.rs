@@ -92,6 +92,17 @@ pub struct FunctionDeployConfig {
     pub layer: Option<Vec<String>>,
 }
 
+impl FunctionDeployConfig {
+    fn to_deploy_config(&self) -> DeployConfig {
+        DeployConfig {
+            iam_role: self.role.clone(),
+            tracing: self.tracing.clone().unwrap_or_default(),
+            layers: self.layer.clone(),
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Serialize)]
 pub(crate) struct DeployOutput {
     function_arn: String,
@@ -196,21 +207,16 @@ async fn upsert_function(
         }
     };
 
-    let tracing = if let Some(tracing) = deploy_metadata.as_ref().map(|c| &c.tracing) {
-        tracing.clone()
-    } else {
-        Tracing::default()
-    };
+    let tracing = deploy_metadata.tracing.clone();
     let tracing_config = TracingConfig::builder()
         .mode(tracing.to_string().as_str().into())
         .build();
 
-    let lambda_tags = deploy_metadata.as_ref().and_then(|m| m.tags.clone());
-    let s3_tags = deploy_metadata.as_ref().and_then(|m| m.s3_tags());
+    let lambda_tags = deploy_metadata.tags.clone();
+    let s3_tags = deploy_metadata.s3_tags();
 
     let (arn, version) = match action {
         FunctionAction::Create => {
-            let deploy_metadata = deploy_metadata.unwrap_or_default();
             let (iam_role, is_new_role) = match &deploy_metadata.iam_role {
                 None => (roles::create(sdk_config, progress).await?, true),
                 Some(role) => (role.clone(), false),
@@ -324,33 +330,40 @@ async fn upsert_function(
             let mut update_config = false;
             let mut builder = client.update_function_configuration().function_name(name);
 
-            if let Some(deploy_config) = deploy_metadata {
-                if let Some(iam_role) = &deploy_config.iam_role {
+            if deploy_metadata.use_for_update {
+                if let Some(iam_role) = &deploy_metadata.iam_role {
                     builder = builder.role(iam_role);
                 }
 
-                let memory = deploy_config.memory.clone().map(Into::into);
+                let memory = deploy_metadata.memory.clone().map(Into::into);
                 if memory.is_some() && conf.memory_size != memory {
                     update_config = true;
                     builder = builder.set_memory_size(memory);
                 }
 
-                let timeout: i32 = deploy_config.timeout.clone().into();
+                let timeout: i32 = deploy_metadata.timeout.clone().into();
                 if conf.timeout.unwrap_or_default() != timeout {
                     update_config = true;
                     builder = builder.timeout(timeout);
                 }
 
-                if should_update_layers(&deploy_config.layers, &conf) {
+                if should_update_layers(&deploy_metadata.layers, &conf) {
                     update_config = true;
-                    builder = builder.set_layers(deploy_config.layers);
+                    builder = builder.set_layers(deploy_metadata.layers);
                 }
 
-                if environment.variables
-                    != conf.environment.map(|e| e.variables).unwrap_or_default()
-                {
-                    update_config = true;
-                    builder = builder.environment(environment);
+                if let Some(vars) = environment.variables() {
+                    if !vars.is_empty()
+                        && vars
+                            != &conf
+                                .environment
+                                .clone()
+                                .and_then(|e| e.variables)
+                                .unwrap_or_default()
+                    {
+                        update_config = true;
+                        builder = builder.environment(environment);
+                    }
                 }
 
                 if tracing_config.mode != conf.tracing_config.map(|t| t.mode).unwrap_or_default() {
@@ -437,19 +450,10 @@ fn load_deploy_environment(
     binary_name: &str,
     function_config: &FunctionDeployConfig,
     tags: &Option<Vec<String>>,
-) -> Result<(Environment, Option<DeployConfig>)> {
-    let deploy_metadata = function_deploy_metadata(manifest_path, binary_name)?;
-
-    let (environment, deploy_metadata) = match &deploy_metadata {
-        Some(base) if function_config.config.is_some() => {
-            merge_configuration(base, function_config, tags)?
-        }
-        Some(base) => {
-            let env = function_environment(base.env.clone(), &base.env_file, &None)?;
-            (env, deploy_metadata)
-        }
-        _ => (Environment::builder().build(), deploy_metadata),
-    };
+) -> Result<(Environment, DeployConfig)> {
+    let base = function_deploy_metadata(manifest_path, binary_name)?
+        .unwrap_or_else(|| function_config.to_deploy_config());
+    let (environment, deploy_metadata) = merge_configuration(&base, function_config, tags)?;
 
     debug!(env = ?environment.variables(), metadata = ?deploy_metadata, "loaded function metadata for deployment");
     Ok((environment, deploy_metadata))
@@ -459,7 +463,7 @@ fn merge_configuration(
     base: &DeployConfig,
     function_config: &FunctionDeployConfig,
     tags: &Option<Vec<String>>,
-) -> Result<(Environment, Option<DeployConfig>)> {
+) -> Result<(Environment, DeployConfig)> {
     let mut deploy_metadata = base.clone();
 
     if let Some(tags) = tags {
@@ -483,6 +487,8 @@ fn merge_configuration(
     let vars = match &function_config.config {
         None => &None,
         Some(config) => {
+            deploy_metadata.use_for_update = true;
+
             if config.memory.is_some() {
                 deploy_metadata.memory = config.memory.clone();
             }
@@ -508,7 +514,13 @@ fn merge_configuration(
     let environment =
         function_environment(deploy_metadata.env.clone(), &deploy_metadata.env_file, vars)?;
 
-    Ok((environment, Some(deploy_metadata)))
+    if let Some(env) = &environment.variables() {
+        if !env.is_empty() {
+            deploy_metadata.use_for_update = true;
+        }
+    }
+
+    Ok((environment, deploy_metadata))
 }
 
 async fn wait_for_ready_state(
@@ -810,8 +822,6 @@ mod tests {
         )
         .unwrap();
 
-        let config = config.unwrap();
-
         let vars = env.variables().unwrap();
         assert_eq!("VAL1".to_string(), vars["VAR1"]);
         assert_eq!(Some(Memory::Mb512), config.memory);
@@ -820,6 +830,12 @@ mod tests {
         tags.insert("organization".to_string(), "aws".to_string());
         tags.insert("team".to_string(), "lambda".to_string());
         assert_eq!(Some(tags), config.tags);
+
+        assert_eq!(
+            Some("arn:aws:lambda:us-east-1:xxxxxxxx:iam:role1".to_string()),
+            config.iam_role
+        );
+        assert!(config.use_for_update);
     }
 
     #[test]
@@ -842,8 +858,6 @@ mod tests {
         )
         .unwrap();
 
-        let config = config.unwrap();
-
         let vars = env.variables().unwrap();
         assert_eq!("VAL1".to_string(), vars["VAR1"]);
         assert_eq!(Some(Memory::Mb1024), config.memory);
@@ -854,5 +868,57 @@ mod tests {
         tags.insert("subteam".to_string(), "storage".to_string());
 
         assert_eq!(Some(tags), config.tags);
+        assert!(config.use_for_update);
+    }
+
+    #[test]
+    fn test_load_deploy_environment_empty_config() {
+        let flags = FunctionDeployConfig {
+            role: Some("role-arn".into()),
+            ..Default::default()
+        };
+
+        let tags = vec!["team=s3".to_string(), "subteam=storage".to_string()];
+
+        let (_env, config) = load_deploy_environment(
+            &fixture("multi-binary-package"),
+            "basic-lambda",
+            &flags,
+            &Some(tags),
+        )
+        .unwrap();
+
+        assert_eq!(Some("role-arn".into()), config.iam_role);
+
+        let mut tags = HashMap::new();
+        tags.insert("team".to_string(), "s3".to_string());
+        tags.insert("subteam".to_string(), "storage".to_string());
+
+        assert_eq!(Some(tags), config.tags);
+        assert!(!config.use_for_update);
+    }
+
+    #[test]
+    fn test_load_deploy_environment_empty_config_with_env_flags() {
+        let flags = FunctionDeployConfig {
+            role: Some("role-arn".into()),
+            config: Some(FunctionConfig {
+                env_var: Some(vec!["FOO=BAR".into()]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let (env, config) = load_deploy_environment(
+            &fixture("multi-binary-package"),
+            "basic-lambda",
+            &flags,
+            &None,
+        )
+        .unwrap();
+
+        assert_eq!(Some("role-arn".into()), config.iam_role);
+        assert_eq!("BAR", env.variables().unwrap()["FOO"]);
+        assert!(config.use_for_update);
     }
 }
