@@ -94,6 +94,9 @@ pub struct DeployConfig {
     pub layers: Option<Vec<String>>,
     #[serde(default)]
     pub tags: Option<HashMap<String, String>>,
+
+    #[serde(skip)]
+    pub use_for_update: bool,
 }
 
 impl DeployConfig {
