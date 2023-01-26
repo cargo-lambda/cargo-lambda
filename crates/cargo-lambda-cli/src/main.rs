@@ -1,12 +1,13 @@
 #![warn(rust_2018_idioms, unused_lifetimes, clippy::multiple_crate_versions)]
-use std::boxed::Box;
+use std::{boxed::Box, path::PathBuf};
 
 use cargo_lambda_build::{Build, Zig};
 use cargo_lambda_deploy::Deploy;
 use cargo_lambda_invoke::Invoke;
+use cargo_lambda_metadata::cargo::{load_global_metadata, PackageMetadata};
 use cargo_lambda_new::{Init, New};
 use cargo_lambda_watch::Watch;
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand, ValueHint};
 use miette::{miette, IntoDiagnostic, Result};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -29,6 +30,9 @@ struct Lambda {
     /// Print version information
     #[arg(short = 'V', long)]
     version: bool,
+    /// Location for the lambda metadata file
+    #[arg(long, value_hint = ValueHint::FilePath, global = true)]
+    metadata: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Subcommand)]
@@ -54,14 +58,14 @@ enum LambdaSubcommand {
 }
 
 impl LambdaSubcommand {
-    async fn run(self) -> Result<()> {
+    async fn run(self, metadata: PackageMetadata) -> Result<()> {
         match self {
             Self::Build(mut b) => b.run().await,
             Self::Deploy(d) => d.run().await,
             Self::Init(mut i) => i.run().await,
             Self::Invoke(i) => i.run().await,
             Self::New(mut n) => n.run().await,
-            Self::Watch(w) => w.run().await,
+            Self::Watch(w) => cargo_lambda_watch::run(metadata.watch(), w).await,
         }
     }
 }
@@ -131,5 +135,11 @@ async fn main() -> Result<()> {
         subscriber.init();
     }
 
-    subcommand.run().await
+    let global_data = if let Some(path) = lambda.metadata {
+        load_global_metadata(path)?
+    } else {
+        PackageMetadata::default()
+    };
+
+    subcommand.run(global_data).await
 }

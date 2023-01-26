@@ -1,9 +1,10 @@
 use cargo_metadata::{Metadata as CargoMetadata, Package};
-use miette::{IntoDiagnostic, Result};
+use miette::{Context, IntoDiagnostic, Result};
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
+    fs::read_to_string,
     path::{Path, PathBuf},
 };
 use tracing::{debug, trace};
@@ -38,6 +39,21 @@ pub struct PackageMetadata {
     pub deploy: Option<DeployConfig>,
     #[serde(default)]
     pub build: BuildConfig,
+    #[serde(default)]
+    watch: WatchConfig,
+}
+
+impl PackageMetadata {
+    pub fn watch(&self) -> WatchConfig {
+        if !self.env.is_empty() && self.watch.env.is_empty() {
+            tracing::warn!("the option `env` is deprecated, use `watch.env` instead");
+            let mut w = self.watch.clone();
+            w.env = self.env.clone();
+            w
+        } else {
+            self.watch.clone()
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -126,6 +142,26 @@ impl DeployConfig {
     }
 }
 
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct WatchConfig {
+    #[serde(default)]
+    pub env: HashMap<String, String>,
+}
+
+/// Load Cargo Lambda metadata from a global file, not Cargo.toml.
+/// The sections in this file are not namespaced with *.lambda
+/// because this file is specific to Cargo Lambda and no other tool.
+pub fn load_global_metadata<P: AsRef<Path> + Debug>(metadata_path: P) -> Result<PackageMetadata> {
+    let data = read_to_string(&metadata_path)
+        .into_diagnostic()
+        .wrap_err(format!("failed to read metadata file: {:?}", metadata_path))?;
+
+    toml::from_str(&data).into_diagnostic().wrap_err(format!(
+        "failed to parse metadata file: {:?}",
+        metadata_path
+    ))
+}
+
 /// Extract all the binary target names from a Cargo.toml file
 pub fn binary_targets<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<HashSet<String>> {
     let metadata = load_metadata(manifest_path)?;
@@ -202,7 +238,7 @@ pub fn load_metadata<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<CargoMe
     Ok(meta)
 }
 
-/// Create a HashMap of environment varibales from the package and workspace manifest
+/// Create a HashMap of environment variables from the package and workspace manifest
 /// See the documentation to learn about how we use this metadata:
 /// https://www.cargo-lambda.info/commands/watch.html#environment-variables
 #[tracing::instrument(target = "cargo_lambda")]
@@ -393,7 +429,7 @@ fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
+    use std::{env::temp_dir, path::PathBuf};
 
     fn fixture(name: &str) -> PathBuf {
         format!("../../tests/fixtures/{name}/Cargo.toml").into()
@@ -571,5 +607,20 @@ mod tests {
 
         let subcommand = opts.subcommand.unwrap();
         assert_eq!(vec!["brazil".to_string(), "build".to_string()], subcommand);
+    }
+
+    #[test]
+    fn test_load_global_metadata() {
+        let data = r#"[watch]
+env = { "foo" = "bar" }
+[deploy]
+memory = 512
+"#;
+        let temp = temp_dir().join("cargo-metadata.toml");
+        std::fs::write(&temp, data.as_bytes()).unwrap();
+
+        let meta = load_global_metadata(temp).unwrap();
+        assert_eq!(Memory::Mb512, meta.deploy.unwrap().memory.unwrap());
+        assert_eq!("bar", meta.watch.env["foo"]);
     }
 }

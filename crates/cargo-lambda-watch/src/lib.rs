@@ -1,4 +1,5 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
+use cargo_lambda_metadata::cargo::WatchConfig;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
@@ -20,7 +21,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-use tracing::{info, Subscriber};
+use tracing::{info, trace, Subscriber};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::registry::LookupSpan;
 
@@ -85,42 +86,43 @@ struct CargoOptions {
     release: bool,
 }
 
+#[tracing::instrument(skip(global, local), target = "cargo_lambda")]
+pub async fn run(global: WatchConfig, local: Watch) -> Result<()> {
+    trace!(options = ?local, "watching project");
+
+    let ip = IpAddr::from_str(&local.invoke_address)
+        .into_diagnostic()
+        .wrap_err("invalid invoke address")?;
+    let addr = SocketAddr::from((ip, local.invoke_port));
+    let no_reload = local.no_reload;
+    let cargo_options = local.cargo_options.clone();
+
+    let base = dunce::canonicalize(".").into_diagnostic()?;
+
+    let (mut global_ignore, _) = ignore_files::from_environment(Some("CARGO_LAMBDA")).await;
+    let (mut ignore_files, _) = ignore_files::from_origin(&base).await;
+    ignore_files.append(&mut global_ignore);
+
+    let watcher_config = WatcherConfig {
+        base,
+        ignore_files,
+        no_reload,
+        manifest_path: cargo_options.manifest_path.clone(),
+        env_vars: global.env.clone(),
+        ..Default::default()
+    };
+
+    Toplevel::new()
+        .start("Lambda server", move |s| {
+            start_server(s, addr, cargo_options, watcher_config)
+        })
+        .catch_signals()
+        .handle_shutdown_requests(Duration::from_millis(1000))
+        .await
+        .map_err(|e| miette::miette!("{}", e))
+}
+
 impl Watch {
-    #[tracing::instrument(skip(self), target = "cargo_lambda")]
-    pub async fn run(&self) -> Result<()> {
-        tracing::trace!(options = ?self, "watching project");
-
-        let ip = IpAddr::from_str(&self.invoke_address)
-            .into_diagnostic()
-            .wrap_err("invalid invoke address")?;
-        let addr = SocketAddr::from((ip, self.invoke_port));
-        let no_reload = self.no_reload;
-        let cargo_options = self.cargo_options.clone();
-
-        let base = dunce::canonicalize(".").into_diagnostic()?;
-
-        let (mut global_ignore, _) = ignore_files::from_environment(Some("CARGO_LAMBDA")).await;
-        let (mut ignore_files, _) = ignore_files::from_origin(&base).await;
-        ignore_files.append(&mut global_ignore);
-
-        let watcher_config = WatcherConfig {
-            base,
-            ignore_files,
-            no_reload,
-            manifest_path: cargo_options.manifest_path.clone(),
-            ..Default::default()
-        };
-
-        Toplevel::new()
-            .start("Lambda server", move |s| {
-                start_server(s, addr, cargo_options, watcher_config)
-            })
-            .catch_signals()
-            .handle_shutdown_requests(Duration::from_millis(1000))
-            .await
-            .map_err(|e| miette::miette!("{}", e))
-    }
-
     pub fn xray_layer<S>(&self) -> OpenTelemetryLayer<S, Tracer>
     where
         S: Subscriber + for<'span> LookupSpan<'span>,

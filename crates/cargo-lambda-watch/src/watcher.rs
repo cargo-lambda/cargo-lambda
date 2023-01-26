@@ -1,7 +1,7 @@
 use crate::requests::ServerError;
 use cargo_lambda_metadata::cargo::function_environment_metadata;
 use ignore_files::{IgnoreFile, IgnoreFilter};
-use std::{convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
 use tracing::{debug, error, trace, warn};
 use watchexec::{
     action::{Action, Outcome, PreSpawn},
@@ -23,6 +23,7 @@ pub(crate) struct WatcherConfig {
     pub manifest_path: PathBuf,
     pub ignore_files: Vec<IgnoreFile>,
     pub no_reload: bool,
+    pub env_vars: HashMap<String, String>,
 }
 
 pub(crate) async fn new(cmd: Command, wc: WatcherConfig) -> Result<Arc<Watchexec>, ServerError> {
@@ -146,6 +147,7 @@ async fn runtime(cmd: Command, wc: WatcherConfig) -> Result<RuntimeConfig, Serve
         let runtime_api = wc.runtime_api.clone();
         let manifest_path = wc.manifest_path.clone();
         let bin_name = wc.bin_name.clone();
+        let global_vars = wc.env_vars.clone();
 
         async move {
             trace!("loading watch environment metadata");
@@ -161,6 +163,7 @@ async fn runtime(cmd: Command, wc: WatcherConfig) -> Result<RuntimeConfig, Serve
                 command
                     .env("AWS_LAMBDA_FUNCTION_VERSION", "1")
                     .env("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", "4096")
+                    .envs(global_vars)
                     .envs(env)
                     .env("AWS_LAMBDA_RUNTIME_API", &runtime_api)
                     .env("AWS_LAMBDA_FUNCTION_NAME", &name);
