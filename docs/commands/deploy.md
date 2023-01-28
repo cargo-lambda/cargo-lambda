@@ -50,7 +50,7 @@ cargo lambda deploy \
   http-lambda
 ```
 
-The flag `--env-var` allows you to pass several variables in the command like with the format `KEY=VALUE`. This flag overrides the previous one, and cannot be combined.
+The flag `--env-var` allows you to pass several variables in the command line with the format `KEY=VALUE`. This flag overrides the previous one, and cannot be combined.
 
 ```
 cargo lambda deploy \
