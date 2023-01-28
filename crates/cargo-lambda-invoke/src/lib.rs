@@ -196,7 +196,7 @@ impl Invoke {
 }
 
 async fn download_example(name: &str, cache: Option<PathBuf>) -> Result<String> {
-    let target = format!("{}/{}", EXAMPLES_URL, name);
+    let target = format!("{EXAMPLES_URL}/{name}");
 
     let response = reqwest::get(&target)
         .await
@@ -226,7 +226,7 @@ fn parse_invoke_ip_address(address: &str) -> Result<String> {
 
     let invoke_address = match invoke_address {
         IpAddr::V4(address) => address.to_string(),
-        IpAddr::V6(address) => format!("[{}]", address),
+        IpAddr::V6(address) => format!("[{address}]"),
     };
 
     Ok(invoke_address)

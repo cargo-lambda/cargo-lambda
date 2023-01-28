@@ -98,7 +98,7 @@ impl std::fmt::Display for DeployOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "🔍 function arn: {}", self.function_arn)?;
         if let Some(url) = &self.function_url {
-            write!(f, "🔗 function url: {}", url)?;
+            write!(f, "🔗 function url: {url}")?;
         }
         Ok(())
     }
@@ -269,8 +269,7 @@ async fn upsert_function(
                     {
                         let backoff = attempt * 5;
                         progress.set_message(&format!(
-                            "new role not full propagated, waiting {} seconds before retrying",
-                            backoff
+                            "new role not full propagated, waiting {backoff} seconds before retrying"
                         ));
                         sleep(Duration::from_secs(backoff)).await;
                         progress.set_message("trying to deploy function again");
@@ -512,8 +511,7 @@ async fn wait_for_ready_state(
     for attempt in 2..5 {
         let backoff = attempt * attempt;
         progress.set_message(&format!(
-            "the function is not ready for updates, waiting {} seconds before checking for state changes",
-            backoff
+            "the function is not ready for updates, waiting {backoff} seconds before checking for state changes"
         ));
         sleep(Duration::from_secs(backoff)).await;
 

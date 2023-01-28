@@ -21,7 +21,7 @@ impl Progress {
         if let Some(bar) = &self.bar {
             bar.finish_with_message(msg.to_string());
         } else {
-            println!("▪▪▪▪▪ {}", msg);
+            println!("▪▪▪▪▪ {msg}");
         }
     }
 
@@ -29,7 +29,7 @@ impl Progress {
         if let Some(bar) = &self.bar {
             bar.set_message(msg.to_string());
         } else {
-            println!("▹▹▹▹▹ {}", msg);
+            println!("▹▹▹▹▹ {msg}");
         }
     }
 

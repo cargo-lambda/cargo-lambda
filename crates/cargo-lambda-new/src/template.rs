@@ -115,7 +115,7 @@ fn unzip_template(file: &Path, path: &Path) -> Result<PathBuf> {
 
     let reader = File::open(file)
         .into_diagnostic()
-        .wrap_err_with(|| format!("unable to open ZIP file: {:?}", file))?;
+        .wrap_err_with(|| format!("unable to open ZIP file: {file:?}"))?;
 
     let mut archive = ZipArchive::new(reader).into_diagnostic()?;
     archive.extract(path).into_diagnostic()?;

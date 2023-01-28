@@ -127,7 +127,6 @@ impl DeployConfig {
         }
     }
 
-    #[must_use]
     pub fn lambda_environment(&self) -> Result<Environment> {
         let base = if self.env.is_empty() {
             None
@@ -137,7 +136,6 @@ impl DeployConfig {
         lambda_environment(base, &self.env_file, None).map(|e| e.build())
     }
 
-    #[must_use]
     pub fn extend_environment(&mut self, extra: Environment) -> Result<Environment> {
         let mut env = lambda_environment(Some(&self.env), &self.env_file, None)?;
         if let Some(vars) = extra.variables() {

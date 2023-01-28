@@ -58,7 +58,7 @@ pub(crate) fn lambda_environment(
         if path.is_file() {
             let file = File::open(path)
                 .into_diagnostic()
-                .wrap_err(format!("failed to open env file: {:?}", path))?;
+                .wrap_err(format!("failed to open env file: {path:?}"))?;
             let reader = BufReader::new(file);
 
             for line in reader.lines() {

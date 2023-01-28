@@ -215,7 +215,7 @@ async fn create_project<T: AsRef<Path> + Debug>(
             if entry_name != ".git" {
                 create_dir_all(entry_path)
                     .into_diagnostic()
-                    .wrap_err_with(|| format!("unable to create directory: {:?}", entry_path))?;
+                    .wrap_err_with(|| format!("unable to create directory: {entry_path:?}"))?;
             }
         } else if entry_name == "cargo-lambda-template.zip" {
             continue;
@@ -245,7 +245,7 @@ async fn create_project<T: AsRef<Path> + Debug>(
 
                 let mut file = File::create(&new_path)
                     .into_diagnostic()
-                    .wrap_err_with(|| format!("unable to create file: {:?}", new_path))?;
+                    .wrap_err_with(|| format!("unable to create file: {new_path:?}"))?;
 
                 template
                     .render_to(&mut file, &globals)
@@ -270,12 +270,8 @@ async fn create_project<T: AsRef<Path> + Debug>(
         copy_without_replace(render_path, &path)
     };
 
-    res.into_diagnostic().wrap_err_with(|| {
-        format!(
-            "failed to create package: template {:?} to {:?}",
-            render_path, path
-        )
-    })
+    res.into_diagnostic()
+        .wrap_err_with(|| format!("failed to create package: template {render_path:?} to {path:?}"))
 }
 
 pub(crate) fn validate_name(name: &str) -> Result<()> {
