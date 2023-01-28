@@ -23,6 +23,7 @@ pub(crate) struct WatcherConfig {
     pub manifest_path: PathBuf,
     pub ignore_files: Vec<IgnoreFile>,
     pub no_reload: bool,
+    pub no_start: bool,
 }
 
 pub(crate) async fn new(cmd: Command, wc: WatcherConfig) -> Result<Arc<Watchexec>, ServerError> {

@@ -144,10 +144,12 @@ async fn start_scheduler(
         tokio::select! {
             Some(req) = req_rx.recv() => {
                 if let Some((name, api)) = req_cache.upsert(req).await {
-                    let gc_tx = gc_tx.clone();
-                    let cargo_options = cargo_options.clone();
-                    let watcher_config = watcher_config.clone();
-                    subsys.start("lambda runtime", move |s| start_function(s, name, api, cargo_options, watcher_config, gc_tx));
+                    if !watcher_config.no_start {
+                        let gc_tx = gc_tx.clone();
+                        let cargo_options = cargo_options.clone();
+                        let watcher_config = watcher_config.clone();
+                        subsys.start("lambda runtime", move |s| start_function(s, name, api, cargo_options, watcher_config, gc_tx));
+                    }
                 }
             },
             Some(gc) = gc_rx.recv() => {

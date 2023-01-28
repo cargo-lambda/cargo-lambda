@@ -46,6 +46,10 @@ pub struct Watch {
     #[arg(long)]
     no_reload: bool,
 
+    /// Do not start the function. Useful if you start (and debug) your function in your IDE
+    #[arg(long)]
+    no_start: bool,
+
     #[cfg_attr(
         target_os = "windows",
         arg(short = 'a', long, default_value = "127.0.0.1")
@@ -95,6 +99,7 @@ impl Watch {
             .wrap_err("invalid invoke address")?;
         let addr = SocketAddr::from((ip, self.invoke_port));
         let no_reload = self.no_reload;
+        let no_start = self.no_start;
         let cargo_options = self.cargo_options.clone();
 
         let base = dunce::canonicalize(".").into_diagnostic()?;
@@ -107,6 +112,7 @@ impl Watch {
             base,
             ignore_files,
             no_reload,
+            no_start,
             manifest_path: cargo_options.manifest_path.clone(),
             ..Default::default()
         };
