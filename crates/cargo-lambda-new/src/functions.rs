@@ -198,7 +198,7 @@ impl Options {
     fn event_type_triple(&self) -> Result<(Value, Value, Value)> {
         match &self.event_type {
             Some(s) if !s.is_empty() => {
-                let import = Value::scalar(format!("aws_lambda_events::event::{}", s));
+                let import = Value::scalar(format!("aws_lambda_events::event::{s}"));
                 match s.splitn(2, "::").collect::<Vec<_>>()[..] {
                     [ev_mod, ev_type] => Ok((
                         import,
@@ -217,8 +217,7 @@ fn validate_event_type(name: &str) -> Result<Validation, CustomUserError> {
     match name.is_empty() || crate::events::WELL_KNOWN_EVENTS.contains(&name) {
         true => Ok(Validation::Valid),
         false => Ok(Validation::Invalid(ErrorMessage::Custom(format!(
-            "invalid event type: {}",
-            name
+            "invalid event type: {name}"
         )))),
     }
 }

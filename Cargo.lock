@@ -848,7 +848,9 @@ dependencies = [
 name = "cargo-lambda-metadata"
 version = "0.16.1"
 dependencies = [
+ "aws-sdk-lambda",
  "cargo_metadata 0.14.2",
+ "clap",
  "miette 4.7.1",
  "remove_dir_all 0.7.0",
  "serde",

@@ -95,7 +95,7 @@ async fn furls_handler(
     let time = Utc::now();
 
     if !path.starts_with('/') {
-        path = format!("/{}", path);
+        path = format!("/{path}");
     }
 
     let request_context = ApiGatewayV2httpRequestContext {
