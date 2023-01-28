@@ -4,6 +4,7 @@ use aws_sdk_s3::{types::ByteStream, Client as S3Client};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::{
     cargo::{function_deploy_metadata, DeployConfig},
+    env::EnvOptions,
     lambda::{Memory, Timeout, Tracing},
 };
 use cargo_lambda_remote::{
@@ -23,15 +24,10 @@ use cargo_lambda_remote::{
     },
     RemoteConfig,
 };
-use clap::{Args, ValueHint};
+use clap::Args;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{BufRead, BufReader},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 use tokio::time::{sleep, Duration};
 use tracing::debug;
 use uuid::Uuid;
@@ -51,19 +47,8 @@ pub struct FunctionConfig {
     #[arg(long)]
     pub timeout: Option<Timeout>,
 
-    /// Option to add one or many environment variables, allows multiple repetitions (--env-var KEY=VALUE --env-var OTHER=NEW-VALUE)
-    /// This option overrides any values set with the --env-vars flag.
-    #[arg(long)]
-    pub env_var: Option<Vec<String>>,
-
-    /// Command separated list of environment variables (--env-vars KEY=VALUE,OTHER=NEW-VALUE)
-    /// This option overrides any values set with the --env-var flag.
-    #[arg(long)]
-    pub env_vars: Option<Vec<String>>,
-
-    /// Read environment variables from a file
-    #[arg(long, value_hint = ValueHint::FilePath)]
-    pub env_file: Option<PathBuf>,
+    #[command(flatten)]
+    pub env_options: EnvOptions,
 }
 
 #[derive(Args, Clone, Debug, Default)]
@@ -484,8 +469,8 @@ fn merge_configuration(
         deploy_metadata.layers = function_config.layer.clone();
     }
 
-    let vars = match &function_config.config {
-        None => &None,
+    let environment = match &function_config.config {
+        None => deploy_metadata.lambda_environment()?,
         Some(config) => {
             deploy_metadata.use_for_update = true;
 
@@ -499,20 +484,14 @@ fn merge_configuration(
                 }
             }
 
-            if config.env_file.is_some() {
-                deploy_metadata.env_file = config.env_file.clone();
+            if config.env_options.env_file.is_some() {
+                deploy_metadata.env_file = config.env_options.env_file.clone();
             }
 
-            if config.env_vars.is_some() {
-                &config.env_vars
-            } else {
-                &config.env_var
-            }
+            let flag_env = config.env_options.lambda_environment()?;
+            deploy_metadata.extend_environment(flag_env)?
         }
     };
-
-    let environment =
-        function_environment(deploy_metadata.env.clone(), &deploy_metadata.env_file, vars)?;
 
     if let Some(env) = &environment.variables() {
         if !env.is_empty() {
@@ -720,51 +699,6 @@ pub(crate) async fn delete_function_url_config(
     }
 }
 
-pub(crate) fn function_environment(
-    variables: HashMap<String, String>,
-    env_file: &Option<PathBuf>,
-    env_vars: &Option<Vec<String>>,
-) -> Result<Environment> {
-    let mut env = Environment::builder().set_variables(Some(variables));
-
-    if let Some(path) = env_file {
-        if path.is_file() {
-            let file = File::open(path)
-                .into_diagnostic()
-                .wrap_err(format!("failed to open env file: {:?}", path))?;
-            let reader = BufReader::new(file);
-
-            for line in reader.lines() {
-                let line = line.into_diagnostic().wrap_err("failed to read env line")?;
-
-                let mut iter = line.trim().splitn(2, '=');
-                let key = iter
-                    .next()
-                    .ok_or_else(|| miette::miette!("invalid env variable {var}"))?;
-                let value = iter
-                    .next()
-                    .ok_or_else(|| miette::miette!("invalid env variable {var}"))?;
-                env = env.variables(key, value);
-            }
-        }
-    }
-
-    if let Some(vars) = env_vars {
-        for var in vars {
-            let mut iter = var.trim().splitn(2, '=');
-            let key = iter
-                .next()
-                .ok_or_else(|| miette::miette!("invalid env variable {var}"))?;
-            let value = iter
-                .next()
-                .ok_or_else(|| miette::miette!("invalid env variable {var}"))?;
-            env = env.variables(key, value);
-        }
-    }
-
-    Ok(env.build())
-}
-
 pub(crate) fn function_doesnt_exist_error(err: &SdkError<GetFunctionError>) -> bool {
     match err {
         SdkError::ServiceError(e) => e.err().is_resource_not_found_exception(),
@@ -806,7 +740,7 @@ fn is_role_cannot_be_assumed_error(err: &SdkError<CreateFunctionError>) -> bool 
 #[cfg(test)]
 mod tests {
     use super::{load_deploy_environment, *};
-    use std::path::PathBuf;
+    use std::{collections::HashMap, path::PathBuf};
 
     fn fixture(name: &str) -> PathBuf {
         format!("../../tests/fixtures/{name}/Cargo.toml").into()
@@ -903,7 +837,10 @@ mod tests {
         let flags = FunctionDeployConfig {
             role: Some("role-arn".into()),
             config: Some(FunctionConfig {
-                env_var: Some(vec!["FOO=BAR".into()]),
+                env_options: EnvOptions {
+                    env_var: Some(vec!["FOO=BAR".into()]),
+                    ..Default::default()
+                },
                 ..Default::default()
             }),
             ..Default::default()

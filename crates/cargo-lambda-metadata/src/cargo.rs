@@ -1,3 +1,4 @@
+use aws_sdk_lambda::model::Environment;
 use cargo_metadata::{Metadata as CargoMetadata, Package};
 use miette::{IntoDiagnostic, Result};
 use serde::Deserialize;
@@ -9,6 +10,7 @@ use std::{
 use tracing::{debug, trace};
 
 use crate::{
+    env::lambda_environment,
     error::MetadataError,
     lambda::{Memory, Timeout, Tracing},
 };
@@ -123,6 +125,27 @@ impl DeployConfig {
                 Some(vec.join(","))
             }
         }
+    }
+
+    #[must_use]
+    pub fn lambda_environment(&self) -> Result<Environment> {
+        let base = if self.env.is_empty() {
+            None
+        } else {
+            Some(&self.env)
+        };
+        lambda_environment(base, &self.env_file, None).map(|e| e.build())
+    }
+
+    #[must_use]
+    pub fn extend_environment(&mut self, extra: Environment) -> Result<Environment> {
+        let mut env = lambda_environment(Some(&self.env), &self.env_file, None)?;
+        if let Some(vars) = extra.variables() {
+            for (key, value) in vars {
+                env = env.variables(key, value);
+            }
+        }
+        Ok(env.build())
     }
 }
 
@@ -571,5 +594,28 @@ mod tests {
 
         let subcommand = opts.subcommand.unwrap();
         assert_eq!(vec!["brazil".to_string(), "build".to_string()], subcommand);
+    }
+
+    #[test]
+    fn test_deploy_lambda_env() {
+        let mut d = DeployConfig::default();
+        let env = d.lambda_environment().unwrap();
+        assert_eq!(None, env.variables());
+
+        let extra = Environment::builder().variables("FOO", "BAR").build();
+        let env = d.extend_environment(extra.clone()).unwrap();
+        let vars = env.variables().unwrap();
+        assert_eq!(1, vars.len());
+        assert_eq!("BAR", vars["FOO"]);
+
+        let mut base = HashMap::new();
+        base.insert("BAZ".to_string(), "QUX".to_string());
+        d.env = base;
+
+        let env = d.extend_environment(extra).unwrap();
+        let vars = env.variables().unwrap();
+        assert_eq!(2, vars.len());
+        assert_eq!("BAR", vars["FOO"]);
+        assert_eq!("QUX", vars["BAZ"]);
     }
 }
