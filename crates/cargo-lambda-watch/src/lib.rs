@@ -162,6 +162,15 @@ async fn start_server(
 ) -> Result<(), axum::Error> {
     let runtime_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
 
+    if watcher_config.only_lambda_apis {
+        info!("flag --only_lambda_apis is active, the lambda function will not be started by cargo-lambda");
+        info!("the lambda function will depend on the following environment variables. @package-bootstrap@ is the default function name if none is provided to cargo lambda invoke");
+        info!("AWS_LAMBDA_FUNCTION_VERSION=1");
+        info!("AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096");
+        info!("AWS_LAMBDA_RUNTIME_API={}/@package-bootstrap@", &runtime_addr);
+        info!("AWS_LAMBDA_FUNCTION_NAME=@package-bootstrap@");
+    }
+
     let req_cache = RequestCache::new(runtime_addr);
     let req_tx = init_scheduler(&subsys, req_cache.clone(), cargo_options, watcher_config).await;
     let resp_cache = ResponseCache::new();
