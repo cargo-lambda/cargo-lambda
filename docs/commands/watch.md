@@ -1,6 +1,6 @@
 # cargo lambda watch
 
-The watch subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions. Use flag `--no-reload` to avoid hot compilation. Use flag `--no-start` if you want to start you function manually from your IDE and debug it using breakpoints.
+The watch subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions. Use flag `--no-reload` to avoid hot compilation. Use flag `--only-lambda-apis` if you want to start you function manually from your IDE and debug it using breakpoints.
 
 ::: warning
 This command works best with the **[Lambda Runtime version 0.5.1](https://crates.io/crates/lambda_runtime/0.5.1)**. Previous versions of the runtime are likely to crash with serialization errors.

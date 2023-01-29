@@ -49,7 +49,7 @@ pub struct Watch {
 
     /// Do not start the function. Useful if you start (and debug) your function in your IDE
     #[arg(long)]
-    no_start: bool,
+    only_lambda_apis: bool,
 
     #[cfg_attr(
         target_os = "windows",
@@ -103,7 +103,7 @@ impl Watch {
             .wrap_err("invalid invoke address")?;
         let addr = SocketAddr::from((ip, self.invoke_port));
         let no_reload = self.no_reload;
-        let no_start = self.no_start;
+        let only_lambda_apis = self.only_lambda_apis;
         let cargo_options = self.cargo_options.clone();
 
         let base = dunce::canonicalize(".").into_diagnostic()?;
@@ -118,7 +118,7 @@ impl Watch {
             base,
             ignore_files,
             no_reload,
-            no_start,
+            only_lambda_apis,
             manifest_path: cargo_options.manifest_path.clone(),
             env: env.variables().cloned().unwrap_or_default(),
             ..Default::default()

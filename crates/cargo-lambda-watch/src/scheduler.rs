@@ -144,7 +144,7 @@ async fn start_scheduler(
         tokio::select! {
             Some(req) = req_rx.recv() => {
                 if let Some((name, api)) = req_cache.upsert(req).await {
-                    if !watcher_config.no_start {
+                    if !watcher_config.only_lambda_apis {
                         let gc_tx = gc_tx.clone();
                         let cargo_options = cargo_options.clone();
                         let watcher_config = watcher_config.clone();
