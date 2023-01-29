@@ -167,7 +167,10 @@ async fn start_server(
         info!("the lambda function will depend on the following environment variables. @package-bootstrap@ is the default function name if none is provided to cargo lambda invoke");
         info!("AWS_LAMBDA_FUNCTION_VERSION=1");
         info!("AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096");
-        info!("AWS_LAMBDA_RUNTIME_API={}/@package-bootstrap@", &runtime_addr);
+        info!(
+            "AWS_LAMBDA_RUNTIME_API={}/@package-bootstrap@",
+            &runtime_addr
+        );
         info!("AWS_LAMBDA_FUNCTION_NAME=@package-bootstrap@");
     }
 
