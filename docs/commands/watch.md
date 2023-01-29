@@ -106,6 +106,32 @@ You can pass a list of features separated by comma to the `watch` command to loa
 cargo lambda watch --features feature-1,feature-2
 ```
 
+
+## Debug with breakpoints
+
+You have two options to debug your application, set breakpoints, and step through your code using a debugger like GDB or LLDB.
+
+The first option is to let `cargo-lambda` start your function and manually attach your debugger to the newly created process that hosts your function.
+Suppose the flag `--no-reload` is not set and you modify and save the function's source code.
+In that case, `cargo-lambda` automatically terminates the function's process, rebuilds the executable and restarts it.
+If the flag `--no-reload` is set, you must manually restart `cargo-lambda` watch.
+In both cases, the debugger has to be reattached to the new process.
+
+The second option is to let `cargo-lambda` provide the lambda runtime API for your function by setting the flag `--only-lambda-apis` and manually starting the lambda function from your IDE in debug mode.
+This way, the debugger is attached to the new process automatically by your IDE.
+When you modify your function's source code, let your IDE rebuild and relaunch the function and reattach the debugger to the new process.
+The drawback of the second option is that essential environment variables are not provided automatically to your function by `cargo-lambda` but have to be configured in your IDE's launch configuration.
+If you provide a function name when you invoke the function, you must replace `@package-bootstrap@` with that name.
+
+```
+ AWS_LAMBDA_FUNCTION_VERSION=1
+ AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096
+ AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt/@package-bootstrap@
+ AWS_LAMBDA_FUNCTION_NAME=@package-bootstrap@
+```
+
+These environment variables are also mentioned as info messages in the log output by `cargo-lambda`.
+
 ## Release mode
 
 You can also run your code in release mode if needed when the emulator is loaded:

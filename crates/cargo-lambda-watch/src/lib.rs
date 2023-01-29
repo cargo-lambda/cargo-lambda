@@ -47,6 +47,10 @@ pub struct Watch {
     #[arg(long)]
     no_reload: bool,
 
+    /// Do not start the function. Useful if you start (and debug) your function in your IDE
+    #[arg(long)]
+    only_lambda_apis: bool,
+
     #[cfg_attr(
         target_os = "windows",
         arg(short = 'a', long, default_value = "127.0.0.1")
@@ -99,6 +103,7 @@ impl Watch {
             .wrap_err("invalid invoke address")?;
         let addr = SocketAddr::from((ip, self.invoke_port));
         let no_reload = self.no_reload;
+        let only_lambda_apis = self.only_lambda_apis;
         let cargo_options = self.cargo_options.clone();
 
         let base = dunce::canonicalize(".").into_diagnostic()?;
@@ -113,6 +118,7 @@ impl Watch {
             base,
             ignore_files,
             no_reload,
+            only_lambda_apis,
             manifest_path: cargo_options.manifest_path.clone(),
             env: env.variables().cloned().unwrap_or_default(),
             ..Default::default()
@@ -155,6 +161,18 @@ async fn start_server(
     watcher_config: WatcherConfig,
 ) -> Result<(), axum::Error> {
     let runtime_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
+
+    if watcher_config.only_lambda_apis {
+        info!("flag --only_lambda_apis is active, the lambda function will not be started by cargo-lambda");
+        info!("the lambda function will depend on the following environment variables. @package-bootstrap@ is the default function name if none is provided to cargo lambda invoke");
+        info!("AWS_LAMBDA_FUNCTION_VERSION=1");
+        info!("AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096");
+        info!(
+            "AWS_LAMBDA_RUNTIME_API={}/@package-bootstrap@",
+            &runtime_addr
+        );
+        info!("AWS_LAMBDA_FUNCTION_NAME=@package-bootstrap@");
+    }
 
     let req_cache = RequestCache::new(runtime_addr);
     let req_tx = init_scheduler(&subsys, req_cache.clone(), cargo_options, watcher_config).await;
