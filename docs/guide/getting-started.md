@@ -1,5 +1,5 @@
 <script setup>
-import PlatformInstallation from '../components/PlatformInstallation.vue'
+import SystemMessage from '../components/SystemMessage.vue'
 </script>
 
 # Getting Started
@@ -9,7 +9,7 @@ This section will help you build a Rust function for AWS Lambda from scratch. If
 ## Step 1: Install Cargo Lambda
 
 <ClientOnly>
-<PlatformInstallation>
+<SystemMessage>
 <template v-slot:win>
 You can use <a href="https://scoop.sh/">Scoop</a> to install Cargo Lambda on Windows. Run the following commands to add our bucket, and install it:
 
@@ -33,7 +33,7 @@ You can use <a href="https://pypi.org/">PyPI</a> to install Cargo Lambda on Linu
 pip3 install cargo-lambda
 ```
 </template>
-</PlatformInstallation>
+</SystemMessage>
 </ClientOnly>
 
 See all the ways that you can use to [install Cargo Lambda](/guide/installation) in your system.

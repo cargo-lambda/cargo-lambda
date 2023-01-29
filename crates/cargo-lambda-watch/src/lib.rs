@@ -1,4 +1,5 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
+use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
 use cargo_lambda_metadata::env::EnvOptions;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
@@ -21,7 +22,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-use tracing::{info, Subscriber};
+use tracing::{info, warn, Subscriber};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::registry::LookupSpan;
 
@@ -43,11 +44,12 @@ const RUNTIME_EMULATOR_PATH: &str = "/.rt";
     after_help = "Full command documentation: https://www.cargo-lambda.info/commands/watch.html"
 )]
 pub struct Watch {
-    /// Avoid hot-reload
-    #[arg(long)]
-    no_reload: bool,
+    /// Ignore any code changes, and don't reload the function automatically
+    #[arg(long, visible_alias = "no-reload")]
+    ignore_changes: bool,
 
-    /// Do not start the function. Useful if you start (and debug) your function in your IDE
+    /// Start the Lambda runtime APIs without starting the function.
+    /// This is useful if you start (and debug) your function in your IDE.
     #[arg(long)]
     only_lambda_apis: bool,
 
@@ -102,7 +104,7 @@ impl Watch {
             .into_diagnostic()
             .wrap_err("invalid invoke address")?;
         let addr = SocketAddr::from((ip, self.invoke_port));
-        let no_reload = self.no_reload;
+        let ignore_changes = self.ignore_changes;
         let only_lambda_apis = self.only_lambda_apis;
         let cargo_options = self.cargo_options.clone();
 
@@ -117,7 +119,7 @@ impl Watch {
         let watcher_config = WatcherConfig {
             base,
             ignore_files,
-            no_reload,
+            ignore_changes,
             only_lambda_apis,
             manifest_path: cargo_options.manifest_path.clone(),
             env: env.variables().cloned().unwrap_or_default(),
@@ -163,15 +165,18 @@ async fn start_server(
     let runtime_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
 
     if watcher_config.only_lambda_apis {
-        info!("flag --only_lambda_apis is active, the lambda function will not be started by cargo-lambda");
-        info!("the lambda function will depend on the following environment variables. @package-bootstrap@ is the default function name if none is provided to cargo lambda invoke");
-        info!("AWS_LAMBDA_FUNCTION_VERSION=1");
-        info!("AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096");
-        info!(
-            "AWS_LAMBDA_RUNTIME_API={}/@package-bootstrap@",
-            &runtime_addr
+        warn!("the flag --only_lambda_apis is active, the lambda function will not be started by Cargo Lambda");
+        warn!("the lambda function will depend on the following environment variables");
+        warn!(
+            "you MUST set these variables in the environment where you're running your function:"
         );
-        info!("AWS_LAMBDA_FUNCTION_NAME=@package-bootstrap@");
+        warn!("AWS_LAMBDA_FUNCTION_VERSION=1");
+        warn!("AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096");
+        warn!(
+            "AWS_LAMBDA_RUNTIME_API={}/{}",
+            &runtime_addr, DEFAULT_PACKAGE_FUNCTION
+        );
+        warn!("AWS_LAMBDA_FUNCTION_NAME={DEFAULT_PACKAGE_FUNCTION}");
     }
 
     let req_cache = RequestCache::new(runtime_addr);

@@ -22,7 +22,7 @@ pub(crate) struct WatcherConfig {
     pub base: PathBuf,
     pub manifest_path: PathBuf,
     pub ignore_files: Vec<IgnoreFile>,
-    pub no_reload: bool,
+    pub ignore_changes: bool,
     pub only_lambda_apis: bool,
     pub env: HashMap<String, String>,
 }
@@ -70,7 +70,7 @@ async fn runtime(cmd: Command, wc: WatcherConfig) -> Result<RuntimeConfig, Serve
     let mut filter = IgnoreFilter::new(&wc.base, &wc.ignore_files)
         .await
         .map_err(ServerError::InvalidIgnoreFiles)?;
-    if wc.no_reload {
+    if wc.ignore_changes {
         filter
             .add_globs(&["**/*"], Some(wc.base))
             .await

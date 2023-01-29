@@ -199,7 +199,7 @@ async fn schedule_invocation(
     headers.insert(LAMBDA_RUNTIME_XRAY_TRACE_HEADER, xray_header);
 
     let (resp_tx, resp_rx) = oneshot::channel::<Response<Body>>();
-    let function_name = if function_name.is_empty() || function_name == "_" {
+    let function_name = if function_name.is_empty() {
         DEFAULT_PACKAGE_FUNCTION.into()
     } else {
         function_name

@@ -8,7 +8,7 @@ export default {
         }
     },
     beforeMount() {
-        const platform = (navigator.platform || '').toLowerCase();
+        const platform = (navigator?.userAgentData?.platform || navigator?.platform || '').toLowerCase();
         this.win = platform.includes('win');
         this.mac = platform.includes('mac');
         this.linux = platform.includes('linux');
