@@ -1,3 +1,7 @@
+<script setup>
+import SystemMessage from '../components/SystemMessage.vue'
+</script>
+
 # cargo lambda watch
 
 The watch subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions. Use flag `--no-reload` to avoid hot compilation.
@@ -111,24 +115,48 @@ cargo lambda watch --features feature-1,feature-2
 
 You have two options to debug your application, set breakpoints, and step through your code using a debugger like GDB or LLDB.
 
-The first option is to let `cargo-lambda` start your function and manually attach your debugger to the newly created process that hosts your function.
-Suppose the flag `--no-reload` is not set and you modify and save the function's source code.
-In that case, `cargo-lambda` automatically terminates the function's process, rebuilds the executable and restarts it.
-If the flag `--no-reload` is set, you must manually restart `cargo-lambda` watch.
-In both cases, the debugger has to be reattached to the new process.
+The first option is to let Cargo Lambda start your function and manually attach your debugger to the newly created process that hosts your function. This option automatically terminates the function's process, rebuilds the executable and restarts it when your code changes. The debugger must be reattached to the process when the function every time the function boots.
 
-The second option is to let `cargo-lambda` provide the lambda runtime API for your function by setting the flag `--only-lambda-apis` and manually starting the lambda function from your IDE in debug mode.
-This way, the debugger is attached to the new process automatically by your IDE.
-When you modify your function's source code, let your IDE rebuild and relaunch the function and reattach the debugger to the new process.
-The drawback of the second option is that essential environment variables are not provided automatically to your function by `cargo-lambda` but have to be configured in your IDE's launch configuration.
-If you provide a function name when you invoke the function, you must replace `@package-bootstrap@` with that name.
+The second option is to let Cargo Lambda provide the Lambda runtime APIs for your function by setting the flag `--only-lambda-apis`, and manually starting the lambda function from your IDE in debug mode. This way, the debugger is attached to the new process automatically by your IDE. When you modify your function's source code, let your IDE rebuild and relaunch the function and reattach the debugger to the new process.
+
+The drawback of the second option is that essential environment variables are not provided automatically to your function by Cargo Lambda, but have to be configured in your IDE's launch configuration. If you provide a function name when you invoke the function, you must replace `_` with that name.
+
+<ClientOnly>
+<SystemMessage>
+<template v-slot:win>
+In PowerShell, you can export these variables with the following commands:
 
 ```
- AWS_LAMBDA_FUNCTION_VERSION=1
- AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096
- AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt/@package-bootstrap@
- AWS_LAMBDA_FUNCTION_NAME=@package-bootstrap@
+$env:AWS_LAMBDA_FUNCTION_VERSION="1"
+$env:AWS_LAMBDA_FUNCTION_MEMORY_SIZE="4096"
+$env:AWS_LAMBDA_RUNTIME_API="http://127.0.0.1:9000/.rt/_"
+$env:AWS_LAMBDA_FUNCTION_NAME="_"
 ```
+</template>
+
+<template v-slot:mac>
+In your terminal, you can export these variables with the following commands:
+
+```
+export AWS_LAMBDA_FUNCTION_VERSION=1
+export AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096
+export AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt/_
+export AWS_LAMBDA_FUNCTION_NAME=_
+```
+</template>
+
+<template v-slot:linux>
+In your terminal, you can export these variables with the following commands:
+
+```
+export AWS_LAMBDA_FUNCTION_VERSION=1
+export AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096
+export AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt/_
+export AWS_LAMBDA_FUNCTION_NAME=_
+```
+</template>
+</SystemMessage>
+</ClientOnly>
 
 These environment variables are also mentioned as info messages in the log output by `cargo-lambda`.
 
