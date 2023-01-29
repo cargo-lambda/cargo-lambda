@@ -59,7 +59,7 @@ impl Display for TargetArch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.rustc_target_without_glibc_version)?;
         if let Some(glibc_version) = self.glibc_version.as_ref() {
-            write!(f, ".{}", glibc_version)?;
+            write!(f, ".{glibc_version}")?;
         }
         Ok(())
     }

@@ -5,7 +5,7 @@ fn main() {
 
     let build_info = if !git_commit.is_empty() {
         let git_info = if git_dirty {
-            format!("{}-dirty", git_commit)
+            format!("{git_commit}-dirty")
         } else {
             git_commit
         };
@@ -15,7 +15,7 @@ fn main() {
         format!("({build_date})")
     };
 
-    println!("cargo:rustc-env=CARGO_LAMBDA_BUILD_INFO={}", build_info);
+    println!("cargo:rustc-env=CARGO_LAMBDA_BUILD_INFO={build_info}");
     build_data::no_debug_rebuilds();
 }
 

@@ -314,7 +314,7 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
 ) -> Result<BinaryArchive> {
     let path = binary_path.as_ref();
     let dir = destination_directory.as_ref();
-    let zipped = dir.join(format!("{}.zip", name));
+    let zipped = dir.join(format!("{name}.zip"));
 
     let zipped_binary = File::create(&zipped).into_diagnostic()?;
     let binary_data = read(path).into_diagnostic()?;

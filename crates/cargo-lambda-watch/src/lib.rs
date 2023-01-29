@@ -1,4 +1,5 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
+use cargo_lambda_metadata::env::EnvOptions;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
@@ -71,6 +72,9 @@ pub struct Watch {
 
     #[command(flatten)]
     cargo_options: CargoOptions,
+
+    #[command(flatten)]
+    env_options: EnvOptions,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -108,12 +112,15 @@ impl Watch {
         let (mut ignore_files, _) = ignore_files::from_origin(&base).await;
         ignore_files.append(&mut global_ignore);
 
+        let env = self.env_options.lambda_environment()?;
+
         let watcher_config = WatcherConfig {
             base,
             ignore_files,
             no_reload,
             no_start,
             manifest_path: cargo_options.manifest_path.clone(),
+            env: env.variables().cloned().unwrap_or_default(),
             ..Default::default()
         };
 
