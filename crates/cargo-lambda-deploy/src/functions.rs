@@ -69,11 +69,11 @@ pub struct FunctionDeployConfig {
     pub tracing: Option<Tracing>,
 
     /// IAM Role associated with the function
-    #[arg(long, alias = "iam-role")]
+    #[arg(long, visible_alias = "iam-role")]
     pub role: Option<String>,
 
     /// Lambda Layer ARN to associate the deployed function with
-    #[arg(long, alias = "layer-arn")]
+    #[arg(long, visible_alias = "layer-arn")]
     pub layer: Option<Vec<String>>,
 }
 
