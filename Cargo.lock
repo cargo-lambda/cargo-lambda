@@ -914,6 +914,7 @@ dependencies = [
  "opentelemetry-aws",
  "query_map",
  "reqwest",
+ "serde",
  "serde_json",
  "tempfile",
  "thiserror",
@@ -923,6 +924,7 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
+ "uuid",
  "watchexec",
  "watchexec-filterer-ignore",
 ]

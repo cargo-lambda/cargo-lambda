@@ -1,4 +1,4 @@
-use crate::requests::ServerError;
+use crate::error::ServerError;
 use cargo_lambda_metadata::cargo::function_environment_metadata;
 use ignore_files::{IgnoreFile, IgnoreFilter};
 use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, time::Duration};

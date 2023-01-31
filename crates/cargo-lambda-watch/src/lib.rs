@@ -22,15 +22,18 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-use tracing::{info, warn, Subscriber};
+use tracing::{info, Subscriber};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::registry::LookupSpan;
 
+mod error;
 mod requests;
-mod runtime_router;
+mod runtime;
 
 mod scheduler;
 use scheduler::*;
+mod state;
+use state::*;
 mod trigger_router;
 mod watcher;
 use watcher::WatcherConfig;
@@ -165,33 +168,37 @@ async fn start_server(
     let runtime_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
 
     if watcher_config.only_lambda_apis {
-        warn!("the flag --only_lambda_apis is active, the lambda function will not be started by Cargo Lambda");
-        warn!("the lambda function will depend on the following environment variables");
-        warn!(
+        info!("the flag --only_lambda_apis is active, the lambda function will not be started by Cargo Lambda");
+        info!("the lambda function will depend on the following environment variables");
+        info!(
             "you MUST set these variables in the environment where you're running your function:"
         );
-        warn!("AWS_LAMBDA_FUNCTION_VERSION=1");
-        warn!("AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096");
-        warn!(
-            "AWS_LAMBDA_RUNTIME_API={}/{}",
-            &runtime_addr, DEFAULT_PACKAGE_FUNCTION
-        );
-        warn!("AWS_LAMBDA_FUNCTION_NAME={DEFAULT_PACKAGE_FUNCTION}");
+        info!("AWS_LAMBDA_FUNCTION_VERSION=1");
+        info!("AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096");
+        info!("AWS_LAMBDA_RUNTIME_API={}", &runtime_addr);
+        info!("AWS_LAMBDA_FUNCTION_NAME={DEFAULT_PACKAGE_FUNCTION}");
     }
 
+    let ext_cache = ExtensionCache::default();
     let req_cache = RequestCache::new(runtime_addr);
-    let req_tx = init_scheduler(&subsys, req_cache.clone(), cargo_options, watcher_config).await;
+    let runtime_state = RuntimeState {
+        req_cache: req_cache.clone(),
+        ext_cache: ext_cache.clone(),
+    };
+
+    let req_tx = init_scheduler(&subsys, runtime_state, cargo_options, watcher_config).await;
     let resp_cache = ResponseCache::new();
     let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
 
     let app = Router::new()
         .merge(trigger_router::routes())
-        .nest(RUNTIME_EMULATOR_PATH, runtime_router::routes())
+        .nest(RUNTIME_EMULATOR_PATH, runtime::routes())
         .layer(SetRequestIdLayer::new(
             x_request_id.clone(),
             MakeRequestUuid,
         ))
         .layer(PropagateRequestIdLayer::new(x_request_id))
+        .layer(Extension(ext_cache))
         .layer(Extension(req_tx.clone()))
         .layer(Extension(req_cache))
         .layer(Extension(resp_cache))

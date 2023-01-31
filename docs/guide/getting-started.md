@@ -81,6 +81,8 @@ cargo lambda build --release
 Add the flag `--arm64` if you want to use Graviton processors on AWS Lambda
 :::
 
+Check out the [build](/commands/build) subcommand docs to learn how to compile multiple functions in the same project.
+
 ## Step 6: Deploy the function on AWS Lambda
 
 Use the [deploy](/commands/deploy) subcommand to upload your function to AWS Lambda. This subcommand requires AWS credentials in your system.
