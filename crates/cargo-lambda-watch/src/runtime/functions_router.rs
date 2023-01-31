@@ -107,7 +107,7 @@ async fn process_next_request(
                 .map_err(ServerError::InvalidRequestIdHeader)?;
 
             debug!(req_id = ?req_id, function = ?function_name, "processing request");
-            let next_event: NextEvent = (req_id, &invoke).into();
+            let next_event = NextEvent::invoke(req_id, &invoke);
             ext_cache.send_event(next_event).await?;
 
             let (parts, body) = invoke.req.into_parts();

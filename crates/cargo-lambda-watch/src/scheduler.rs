@@ -1,6 +1,6 @@
 use crate::{
     error::ServerError,
-    requests::{InvokeRequest, NextEvent, ShutdownEvent},
+    requests::{InvokeRequest, NextEvent},
     state::{ExtensionCache, RuntimeState},
     watcher::WatcherConfig,
     CargoOptions,
@@ -94,10 +94,7 @@ async fn start_function(
         }
     }
 
-    let event = NextEvent::Shutdown(ShutdownEvent {
-        shutdown_reason: format!("{name} function shutting down"),
-        ..Default::default()
-    });
+    let event = NextEvent::shutdown(&format!("{name} function shutting down"));
     ext_cache.send_event(event).await
 }
 

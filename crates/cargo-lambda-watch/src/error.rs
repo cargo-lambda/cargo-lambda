@@ -41,7 +41,7 @@ pub enum ServerError {
     #[diagnostic()]
     StringBody(#[from] std::string::FromUtf8Error),
 
-    #[error("failed to serialize lambda-url event")]
+    #[error(transparent)]
     #[diagnostic()]
     SerializationError(#[from] serde_json::Error),
 

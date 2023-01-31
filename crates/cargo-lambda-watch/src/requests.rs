@@ -82,17 +82,8 @@ pub enum NextEvent {
 }
 
 impl NextEvent {
-    pub fn type_queue(&self) -> &str {
-        match self {
-            Self::Invoke(_) => "INVOKE",
-            Self::Shutdown(_) => "SHUTDOWN",
-        }
-    }
-}
-
-impl From<(&str, &InvokeRequest)> for NextEvent {
-    fn from((id, req): (&str, &InvokeRequest)) -> NextEvent {
-        let tracing_id = req
+    pub fn invoke(id: &str, event: &InvokeRequest) -> NextEvent {
+        let tracing_id = event
             .req
             .headers()
             .get(AWS_XRAY_TRACE_HEADER)
@@ -101,7 +92,7 @@ impl From<(&str, &InvokeRequest)> for NextEvent {
 
         let e = InvokeEvent {
             request_id: id.to_string(),
-            invoked_function_arn: req.function_name.clone(),
+            invoked_function_arn: event.function_name.clone(),
             tracing: Tracing {
                 r#type: AWS_XRAY_TRACE_HEADER.to_string(),
                 value: tracing_id.to_string(),
@@ -111,4 +102,45 @@ impl From<(&str, &InvokeRequest)> for NextEvent {
 
         NextEvent::Invoke(e)
     }
+
+    pub fn shutdown(reason: &str) -> NextEvent {
+        NextEvent::Shutdown(ShutdownEvent {
+            shutdown_reason: reason.into(),
+            ..Default::default()
+        })
+    }
+
+    pub fn type_queue(&self) -> &str {
+        match self {
+            Self::Invoke(_) => "INVOKE",
+            Self::Shutdown(_) => "SHUTDOWN",
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LogBuffering {
+    pub timeout_ms: usize,
+    pub max_bytes: usize,
+    pub max_items: usize,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct EventsDestination {
+    pub protocol: String,
+    #[serde(rename = "URI")]
+    pub uri: String,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct SubcribeEvent {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub types: Vec<String>,
+    pub buffering: Option<LogBuffering>,
+    pub destination: EventsDestination,
 }
