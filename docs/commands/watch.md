@@ -167,3 +167,48 @@ You can also run your code in release mode if needed when the emulator is loaded
 ```
 cargo lambda watch --release
 ```
+
+## Working with extensions
+
+You can boot extensions locally that can be associated to a function running under the `watch` command.
+
+In the terminal where your Lambda function code lives, run Cargo Lambda as usual `cargo lambda watch`.
+
+In the terminal where your Lambda extension code lives, export the runtime api endpoint as an environment variable, and run your extension with `cargo run`:
+
+<ClientOnly>
+<SystemMessage>
+<template v-slot:win>
+In PowerShell, you can do that with the following commands:
+
+```
+$env:AWS_LAMBDA_RUNTIME_API="http://127.0.0.1:9000/.rt"
+cargo run
+```
+</template>
+
+<template v-slot:mac>
+In your terminal, you can do that with the following commands:
+
+```
+export AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt
+cargo run
+```
+</template>
+
+<template v-slot:linux>
+In your terminal, you can do that with the following commands:
+
+```
+export AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt
+cargo run
+```
+</template>
+</SystemMessage>
+</ClientOnly>
+
+This will make your extension to send requests to the local runtime to register the extension and subscribe to events. If your extension subscribes to `INVOKE` events, you'll receive those events in your extension every time you invoke your function locally.
+
+::: warning
+At the moment Log and Telemetry extensions don't receive any data from the local runtime.
+:::

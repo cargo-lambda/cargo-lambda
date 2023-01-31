@@ -2,7 +2,7 @@
 
 AWS Lambda Extensions are sidecar services that can provide extra capabilities to your functions.
 
-Cargo Lambda can also help you build and deploy Lambda Extensions.
+Cargo Lambda can also help you build and deploy Lambda Extensions. If you want to learn how to run extensions locally and connect them to the local runtime, check the [watch documentation](/commands/watch#working-with-extensions)
 
 ## Step 1: Create a new project
 
