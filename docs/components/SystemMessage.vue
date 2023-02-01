@@ -4,7 +4,8 @@ export default {
         return {
             win: false,
             mac: false,
-            linux: false
+            linux: false,
+            fallback: true,
         }
     },
     beforeMount() {
@@ -12,6 +13,7 @@ export default {
         this.win = platform.includes('win');
         this.mac = platform.includes('mac');
         this.linux = platform.includes('linux');
+        this.fallback = !this.win && !this.mac && !this.linux;
     }
 }
 </script>
@@ -27,5 +29,9 @@ export default {
 
     <div v-if="linux">
         <slot name="linux"></slot>
+    </div>
+
+    <div v-if="fallback">
+        <slot name="fallback"></slot>
     </div>
 </template>
