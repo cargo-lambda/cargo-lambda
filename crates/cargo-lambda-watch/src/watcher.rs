@@ -1,4 +1,4 @@
-use crate::error::ServerError;
+use crate::{error::ServerError, requests::NextEvent, state::ExtensionCache};
 use cargo_lambda_metadata::cargo::function_environment_metadata;
 use ignore_files::{IgnoreFile, IgnoreFilter};
 use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
@@ -27,9 +27,13 @@ pub(crate) struct WatcherConfig {
     pub env: HashMap<String, String>,
 }
 
-pub(crate) async fn new(cmd: Command, wc: WatcherConfig) -> Result<Arc<Watchexec>, ServerError> {
+pub(crate) async fn new(
+    cmd: Command,
+    wc: WatcherConfig,
+    ext_cache: ExtensionCache,
+) -> Result<Arc<Watchexec>, ServerError> {
     let init = crate::watcher::init();
-    let runtime = crate::watcher::runtime(cmd, wc).await?;
+    let runtime = crate::watcher::runtime(cmd, wc, ext_cache).await?;
 
     let wx = Watchexec::new(init, runtime).map_err(ServerError::WatcherError)?;
     wx.send_event(Event::default(), Priority::Urgent)
@@ -59,7 +63,11 @@ fn init() -> InitConfig {
     config
 }
 
-async fn runtime(cmd: Command, wc: WatcherConfig) -> Result<RuntimeConfig, ServerError> {
+async fn runtime(
+    cmd: Command,
+    wc: WatcherConfig,
+    ext_cache: ExtensionCache,
+) -> Result<RuntimeConfig, ServerError> {
     let mut config = RuntimeConfig::default();
 
     debug!(ignore_files = ?wc.ignore_files, "creating watcher config");
@@ -81,8 +89,6 @@ async fn runtime(cmd: Command, wc: WatcherConfig) -> Result<RuntimeConfig, Serve
     config.action_throttle(Duration::from_secs(3));
 
     config.on_action(move |action: Action| {
-        let fut = async { Ok::<(), Infallible>(()) };
-
         let signals: Vec<MainSignal> = action.events.iter().flat_map(|e| e.signals()).collect();
         let has_paths = action
             .events
@@ -91,56 +97,76 @@ async fn runtime(cmd: Command, wc: WatcherConfig) -> Result<RuntimeConfig, Serve
             .next()
             .is_some();
 
-        debug!(action = ?action, signals = ?signals, has_paths = has_paths, "watcher action received");
+        let empty_event = action
+            .events
+            .iter()
+            .map(|e| e.is_empty())
+            .next()
+            .unwrap_or_default();
 
-        if signals.contains(&MainSignal::Terminate) {
-            action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
-            return fut;
-        }
+        debug!(
+            ?action,
+            ?signals,
+            has_paths,
+            empty_event,
+            "watcher action received"
+        );
 
-        if signals.contains(&MainSignal::Interrupt) {
-            action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
-            return fut;
-        }
+        let ext_cache = ext_cache.clone();
+        async move {
+            if signals.contains(&MainSignal::Terminate) {
+                action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
+                return Ok(());
+            }
 
-        if !has_paths {
-            if !signals.is_empty() {
-                let mut out = Outcome::DoNothing;
-                for sig in signals {
-                    out = Outcome::both(out, Outcome::Signal(sig.into()));
+            if signals.contains(&MainSignal::Interrupt) {
+                action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
+                return Ok(());
+            }
+
+            if !has_paths {
+                if !signals.is_empty() {
+                    let mut out = Outcome::DoNothing;
+                    for sig in signals {
+                        out = Outcome::both(out, Outcome::Signal(sig.into()));
+                    }
+
+                    action.outcome(out);
+                    return Ok(());
                 }
 
-                action.outcome(out);
-                return fut;
+                let completion = action.events.iter().flat_map(|e| e.completions()).next();
+                if let Some(status) = completion {
+                    match status {
+                        Some(ProcessEnd::ExitError(sig)) => {
+                            error!(code = ?sig, "command exited");
+                        }
+                        Some(ProcessEnd::ExitSignal(sig)) => {
+                            error!(code = ?sig, "command killed");
+                        }
+                        Some(ProcessEnd::ExitStop(sig)) => {
+                            error!(code = ?sig, "command stopped");
+                        }
+                        Some(ProcessEnd::Exception(sig)) => {
+                            error!(code = ?sig, "command ended by exception");
+                        }
+                        _ => {}
+                    };
+
+                    action.outcome(Outcome::DoNothing);
+                    return Ok(());
+                }
             }
 
-            let completion = action.events.iter().flat_map(|e| e.completions()).next();
-            if let Some(status) = completion {
-                match status {
-                    Some(ProcessEnd::ExitError(sig)) => {
-                        error!(code = ?sig, "command exited");
-                    }
-                    Some(ProcessEnd::ExitSignal(sig)) => {
-                        error!(code = ?sig, "command killed");
-                    }
-                    Some(ProcessEnd::ExitStop(sig)) => {
-                        error!(code = ?sig, "command stopped");
-                    }
-                    Some(ProcessEnd::Exception(sig)) => {
-                        error!(code = ?sig, "command ended by exception");
-                    }
-                    _ => {}
-                };
-
-                action.outcome(Outcome::DoNothing);
-                return fut;
+            if !empty_event {
+                let event = NextEvent::shutdown("recompiling function");
+                ext_cache.send_event(event).await?;
             }
+            let when_running = Outcome::both(Outcome::Stop, Outcome::Start);
+            action.outcome(Outcome::if_running(when_running, Outcome::Start));
+
+            Ok::<(), ServerError>(())
         }
-
-        let when_running = Outcome::both(Outcome::Stop, Outcome::Start);
-        action.outcome(Outcome::if_running(when_running, Outcome::Start));
-
-        fut
     });
 
     config.on_pre_spawn(move |prespawn: PreSpawn| {

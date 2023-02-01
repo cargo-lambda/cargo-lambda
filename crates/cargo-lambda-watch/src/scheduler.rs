@@ -81,7 +81,7 @@ async fn start_function(
     watcher_config.name = name.clone();
     watcher_config.runtime_api = runtime_api;
 
-    let wx = crate::watcher::new(cmd, watcher_config).await?;
+    let wx = crate::watcher::new(cmd, watcher_config, ext_cache.clone()).await?;
 
     tokio::select! {
         _ = wx.main() => {
