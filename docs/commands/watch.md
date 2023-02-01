@@ -155,6 +155,17 @@ export AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt
 export AWS_LAMBDA_FUNCTION_NAME=_
 ```
 </template>
+
+<template v-slot:fallback>
+In your terminal, you can export these variables with the following commands:
+
+```
+export AWS_LAMBDA_FUNCTION_VERSION=1
+export AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096
+export AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt
+export AWS_LAMBDA_FUNCTION_NAME=_
+```
+</template>
 </SystemMessage>
 </ClientOnly>
 
@@ -197,6 +208,15 @@ cargo run
 </template>
 
 <template v-slot:linux>
+In your terminal, you can do that with the following commands:
+
+```
+export AWS_LAMBDA_RUNTIME_API=http://[::]:9000/.rt
+cargo run
+```
+</template>
+
+<template v-slot:fallback>
 In your terminal, you can do that with the following commands:
 
 ```
