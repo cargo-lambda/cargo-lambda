@@ -227,7 +227,7 @@ cargo run
 </SystemMessage>
 </ClientOnly>
 
-This will make your extension to send requests to the local runtime to register the extension and subscribe to events. If your extension subscribes to `INVOKE` events, you'll receive those events in your extension every time you invoke your function locally.
+This will make your extension to send requests to the local runtime to register the extension and subscribe to events. If your extension subscribes to `INVOKE` events, it will receive an event every time you invoke your function locally. If your extension subscribes to `SHUTDOWN` events, it will receive an event every time the function is recompiled after code changes.
 
 ::: warning
 At the moment Log and Telemetry extensions don't receive any data from the local runtime.
