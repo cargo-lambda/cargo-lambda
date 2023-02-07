@@ -44,7 +44,7 @@ You can also use [Nix](https://nixos.org/manual/nix/stable/introduction.html) to
 nix-env -iA nixpkgs.cargo-lambda
 ```
 
-## Download the binary from the releases page
+## Binary releases
 
 You can also download any Cargo Lambda binary from the [Release page](https://github.com/cargo-lambda/cargo-lambda/releases).
 
