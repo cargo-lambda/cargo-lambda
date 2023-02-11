@@ -2,9 +2,9 @@ name: Absence visibility
 
 on:
   pull_request_target:
-    types: [opened]
+    types: [opened, reopened]
   issues:
-    types: [opened]
+    types: [opened, reopened]
 jobs:
   leave_offline_message:
     runs-on: ubuntu-latest
@@ -27,5 +27,5 @@ jobs:
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: context.eventName === 'issues' ? issuesMessage : prMessage,
+            body: context.eventName === 'issues' ? issueMessage : prMessage,
           });
