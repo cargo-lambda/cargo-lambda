@@ -3,34 +3,19 @@ use miette::{IntoDiagnostic, Result};
 use rustc_version::Channel;
 use std::env;
 
-/// Check if the target component is installed in the host toolchain, and add
-/// it with `rustup` as needed.
-///
-/// # Note
-/// This function calls `rustc -vV` to retrieve the host triple and the release
-/// channel name.
-#[allow(unused)]
-pub async fn check_target_component(component: &str) -> Result<()> {
-    let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
-    let host_target = &rustc_meta.host;
-    let release_channel = &rustc_meta.channel;
-
-    check_target_component_with_rustc_meta(component, host_target, release_channel).await
-}
+use crate::target_arch::TargetArch;
 
 /// Check if the target component is installed in the host toolchain, and add
 /// it with `rustup` as needed.
-pub async fn check_target_component_with_rustc_meta(
-    component: &str,
-    host: &str,
-    channel: &Channel,
-) -> Result<()> {
+pub async fn check_target_component_with_rustc_meta(target_arch: &TargetArch) -> Result<()> {
+    let component = &target_arch.rustc_target_without_glibc_version;
+
     // resolve $RUSTUP_HOME, which points to the `rustup` base directory
     // https://rust-lang.github.io/rustup/environment-variables.html#environment-variables
     let rustup_home = home::rustup_home().into_diagnostic()?;
 
     // convert `Channel` enum to a lower-cased string representation
-    let toolchain = match channel {
+    let toolchain = match target_arch.channel()? {
         Channel::Stable => "stable",
         Channel::Nightly => "nightly",
         Channel::Dev => "dev",
@@ -40,7 +25,7 @@ pub async fn check_target_component_with_rustc_meta(
     // check if the target component is installed in the host toolchain
     let target_component_is_added = rustup_home
         .join("toolchains")
-        .join(format!("{toolchain}-{host}"))
+        .join(format!("{}-{}", toolchain, &target_arch.host))
         .join("lib")
         .join("rustlib")
         .join(component)
@@ -76,6 +61,8 @@ async fn install_target_component(component: &str, toolchain: &str) -> Result<()
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     /// Check target component is installed in the host toolchain, and install
@@ -88,6 +75,7 @@ mod tests {
     #[ignore]
     async fn test_check_target_component() -> Result<()> {
         let component = "aarch64-unknown-linux-gnu";
-        check_target_component(component).await
+        let arch = TargetArch::from_str(component)?;
+        check_target_component_with_rustc_meta(&arch).await
     }
 }

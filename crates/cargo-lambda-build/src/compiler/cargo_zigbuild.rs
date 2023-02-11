@@ -3,30 +3,19 @@ use crate::TargetArch;
 use cargo_options::Build;
 use cargo_zigbuild::Build as ZigBuild;
 use miette::Result;
-use rustc_version::VersionMeta;
 use std::process::Command;
 
 pub(crate) struct CargoZigbuild;
 
 #[async_trait::async_trait]
 impl Compiler for CargoZigbuild {
-    async fn command(
-        &self,
-        cargo: &Build,
-        rustc_meta: &VersionMeta,
-        target_arch: &TargetArch,
-    ) -> Result<Command> {
+    async fn command(&self, cargo: &Build, target_arch: &TargetArch) -> Result<Command> {
         tracing::debug!("compiling with CargoZigbuild");
         crate::zig::check_installation().await?;
 
         // confirm that target component is included in host toolchain, or add
         // it with `rustup` otherwise.
-        crate::toolchain::check_target_component_with_rustc_meta(
-            &target_arch.rustc_target_without_glibc_version(),
-            &rustc_meta.host,
-            &rustc_meta.channel,
-        )
-        .await?;
+        crate::toolchain::check_target_component_with_rustc_meta(target_arch).await?;
 
         #[allow(unused_mut)]
         let mut zig_build: ZigBuild = cargo.to_owned().into();
