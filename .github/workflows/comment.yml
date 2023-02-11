@@ -15,13 +15,13 @@ jobs:
           const issueMessage = `👋 Thanks for opening this issue!
 
             @calavera is taking a break for health issues. He'll be back online in a few weeks.
-            If you're having issues building your Lambda functions, take a look at old [closed issues](https://github.com/cargo-lambda/cargo-lambda/issues?q=is%3Aissue), you might find an answer to your problem there`;
+            If you're having issues building your Lambda functions, take a look at old [closed issues](https://github.com/cargo-lambda/cargo-lambda/issues?q=is%3Aissue), you might find an answer to your problem there.`;
 
           const prMessage = `👋 Thanks for opening this contribution!
           
             @calavera is taking a break for health issues. He'll be back online in a few weeks.
             If you're trying to fix a problem you bumped into, you can keep using your fork until then.
-            Building the binary from source it as easy as running \`make install-bin\` in the root of the repository.`;
+            Building the binary from source is as easy as running \`make install-local\` in the root of the repository.`;
 
           await github.rest.issues.createComment({
             issue_number: context.issue.number,
