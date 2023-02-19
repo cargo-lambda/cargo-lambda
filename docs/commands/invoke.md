@@ -5,7 +5,7 @@ The `invoke` subcommand helps you send requests to the control plane emulator, a
 If your Rust project only includes one function, in the package's main.rs file, you can invoke it by sending the data that you want to process, without extra arguments. For example:
 
 ```
-cargo lambda invoke --data-ascii '{"command": "hi"}'
+cargo lambda invoke --data-ascii "{ \"command\": \"hi\" }"
 ```
 
 If your project includes more than one function, or the binary has a different name than the package, you must provide the name of the Lambda function that you want to invoke, and the payload that you want to send. If you don't know how to find your function's name, it can be in two places:
@@ -16,7 +16,7 @@ If your project includes more than one function, or the binary has a different n
 In the following example, `basic-lambda` is the function's name as indicated in the package's `[[bin]]` section:
 
 ```
-cargo lambda invoke basic-lambda --data-ascii '{"command": "hi"}'
+cargo lambda invoke basic-lambda --data-ascii "{ \"command\": \"hi\" }"
 ```
 
 Cargo-Lambda compiles functions on demand when they receive the first invocation. It's normal that the first invocation takes a long time if your code has not compiled with the host compiler before. After the first compilation, Cargo-Lambda will re-compile your code every time you make a change in it, without having to send any other invocation requests.
@@ -26,7 +26,7 @@ Cargo-Lambda compiles functions on demand when they receive the first invocation
 The `--data-ascii` flag allows you to send a payload directly from the command line:
 
 ```
-cargo lambda invoke basic-lambda --data-ascii '{"command": "hi"}'
+cargo lambda invoke basic-lambda --data-ascii "{ \"command\": \"hi\" }"
 ```
 
 ## File data
