@@ -2,9 +2,9 @@
 
 Cargo Lambda uses [Zig](https://ziglang.org) to link your functions for Linux systems. The installers below also install Zig for you if it's not in your system.
 
-## With Homebrew (MacOS and Linux)
+## With Homebrew (macOS and Linux)
 
-You can use [Homebrew](https://brew.sh/) to install Cargo Lambda on MacOS and Linux. Run the following commands on your terminal to add our tap, and install it:
+You can use [Homebrew](https://brew.sh/) to install Cargo Lambda on macOS and Linux. Run the following commands on your terminal to add our tap, and install it:
 
 ```sh
 brew tap cargo-lambda/cargo-lambda
@@ -61,5 +61,5 @@ cargo install --locked cargo-lambda
 ```
 
 ::: warning
-cargo-install compiles the binary in your system, which usually takes more than 10 minutes. This method doesn't install [Zig](https://ziglang.org) either, which is a requirement if you want to cross compile packages from MacOS or Windows to Lambda Linux environments.
+cargo-install compiles the binary in your system, which usually takes more than 10 minutes. This method doesn't install [Zig](https://ziglang.org) either, which is a requirement if you want to cross compile packages from macOS or Windows to Lambda Linux environments.
 :::

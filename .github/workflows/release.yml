@@ -147,7 +147,7 @@ jobs:
           make -f ../../Makefile build-release-zip tag=${{ github.ref_name }} target=windows-x64
           make -f ../../Makefile build-release-zip tag=${{ github.ref_name }} target=windows-x86
 
-      - name: Package MacOS files
+      - name: Package macOS files
         working-directory: target/github-release
         run: |
           make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=apple-darwin
