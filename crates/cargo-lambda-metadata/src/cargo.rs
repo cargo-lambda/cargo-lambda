@@ -518,6 +518,10 @@ mod tests {
                 .unwrap();
 
         assert_eq!(env.get("BAZ").unwrap(), "QUX");
+
+        let result =
+            function_environment_metadata(fixture("multi-binary-package"), Some("get-products"));
+        assert!(result.is_err());
     }
 
     #[test]

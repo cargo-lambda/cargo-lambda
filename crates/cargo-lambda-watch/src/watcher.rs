@@ -2,7 +2,7 @@ use crate::{error::ServerError, requests::NextEvent, state::ExtensionCache};
 use cargo_lambda_metadata::cargo::function_environment_metadata;
 use ignore_files::{IgnoreFile, IgnoreFilter};
 use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, trace};
 use watchexec::{
     action::{Action, Outcome, PreSpawn},
     command::Command,
@@ -181,7 +181,7 @@ async fn runtime(
 
             let env = function_environment_metadata(manifest_path, bin_name.as_deref())
                 .map_err(|err| {
-                    warn!(error = %err, "ignoring invalid function metadata");
+                    error!(error = %err, "invalid function metadata");
                     err
                 })
                 .unwrap_or_default();
