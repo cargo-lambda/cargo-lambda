@@ -15,7 +15,7 @@ use opentelemetry::{
 use opentelemetry_aws::trace::XrayPropagator;
 use std::{
     net::{IpAddr, SocketAddr},
-    path::PathBuf,
+    path::{PathBuf, Path},
     str::FromStr,
 };
 use tokio::time::Duration;
@@ -27,7 +27,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-use tracing::{info, Subscriber};
+use tracing::{info, Subscriber, trace};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::registry::LookupSpan;
 
@@ -117,10 +117,7 @@ impl Watch {
         let cargo_options = self.cargo_options.clone();
 
         let base = dunce::canonicalize(".").into_diagnostic()?;
-
-        let (mut global_ignore, _) = ignore_files::from_environment(Some("CARGO_LAMBDA")).await;
-        let (mut ignore_files, _) = ignore_files::from_origin(&base).await;
-        ignore_files.append(&mut global_ignore);
+        let ignore_files = discover_ignore_files(&base).await;
 
         let env = self.env_options.lambda_environment()?;
 
@@ -162,6 +159,28 @@ impl Watch {
         };
         tracing_opentelemetry::layer().with_tracer(tracer)
     }
+}
+
+/// we discover ignore files from the `CARGO_LAMBDA_IGNORE_FILES` environment variable,
+/// the current directory, and any parent directories that represent project roots
+async fn discover_ignore_files(base: &Path) -> Vec<ignore_files::IgnoreFile> {
+    let mut ignore_files = Vec::new();
+
+    let (mut env_ignore, env_ignore_errs) = ignore_files::from_environment(Some("CARGO_LAMBDA")).await;
+    trace!(ignore_files = ?env_ignore, errors = ?env_ignore_errs, "discovered ignore files from environment variable");
+    ignore_files.append(&mut env_ignore);
+
+    let (mut origin_ignore, origin_ignore_errs) = ignore_files::from_origin(base).await;
+    trace!(ignore_files = ?origin_ignore, errors = ?origin_ignore_errs, "discovered ignore files from origin");
+    ignore_files.append(&mut origin_ignore);
+
+    for parent in project_origins::origins(base).await {
+        let (mut parent_ignore, parent_ignore_errs) = ignore_files::from_origin(&parent).await;
+        trace!(parent = ?parent, ignore_files = ?parent_ignore, errors = ?parent_ignore_errs, "discovered ignore files from parent origin");
+        ignore_files.append(&mut parent_ignore);
+    }
+
+    ignore_files
 }
 
 async fn start_server(
