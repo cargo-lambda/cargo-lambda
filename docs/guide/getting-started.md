@@ -19,7 +19,7 @@ scoop install cargo-lambda/cargo-lambda
 ```
 </template>
 <template v-slot:mac>
-You can use <a href="https://brew.sh/">Homebrew</a> to install Cargo Lambda on MacOS and Linux. Run the following commands on your terminal to add our tap, and install it:
+You can use <a href="https://brew.sh/">Homebrew</a> to install Cargo Lambda on macOS and Linux. Run the following commands on your terminal to add our tap, and install it:
 
 ```sh
 brew tap cargo-lambda/cargo-lambda

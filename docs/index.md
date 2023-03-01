@@ -18,9 +18,9 @@ hero:
 
 features:
   - title: Rust functions on AWS Lambda made simple
-    details: Cross compilate your Rust functions for Linux and ARM processors from MacOS, Windows, and Linux. Powered by Zig.
+    details: Cross compile your Rust functions for Linux and ARM processors from macOS, Windows, and Linux. Powered by Zig.
   - title: Native Developer Experience
     details: Run and test your functions locally without Docker, VMs, or any other additional tools.
   - title: From zero to production with one single tool
-    details: Organize your work around common workflows. Cargo Lambda helps you start your projects and take them to production when they are ready.
+    details: Organize your work-around common workflows. Cargo Lambda helps you start your projects and take them to production when they are ready.
 ---
