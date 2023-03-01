@@ -64,7 +64,7 @@ cargo lambda watch
 The [invoke](/commands/invoke) subcommand can send payloads to the function running locally:
 
 ```sh
-cargo lambda invoke --data-ascii '{"command": "hi"}'
+cargo lambda invoke --data-ascii "{ \"command\": \"hi\" }"
 ```
 
 If you're testing an HTTP function, you can access it with your browser from the local endpoint: `http://localhost:9000/lambda-url/new-lambda-project`.
