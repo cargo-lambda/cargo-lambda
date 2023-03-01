@@ -59,7 +59,8 @@ function sidebarGuide() {
                 { text: 'Installation', link: '/guide/installation' },
                 { text: 'Getting Started', link: '/guide/getting-started' },
                 { text: 'Lambda Extensions', link: '/guide/lambda-extensions' },
-                { text: 'Screencasts', link: '/guide/screencasts' }
+                { text: 'Screencasts', link: '/guide/screencasts' },
+                { text: 'Automating deployments', link: '/guide/automating-deployments' }
             ]
         }
     ]
