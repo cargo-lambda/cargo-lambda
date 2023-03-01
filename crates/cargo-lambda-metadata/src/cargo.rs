@@ -521,6 +521,13 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_metadata() {
+        let result =
+            function_environment_metadata(fixture("missing-binary-package"), Some("get-products"));
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_metadata_workspace_packages() {
         let env =
             function_environment_metadata(fixture("workspace-package"), Some("basic-lambda-1"))

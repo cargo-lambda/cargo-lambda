@@ -11,3 +11,7 @@ serde = "1.0.136"
 tokio = { version = "1.17.0", features = ["full"] }
 tracing = "0.1.32"
 tracing-subscriber = "0.3.9"
+
+[package.metadata.lambda.bin.basic-lambda.env]
+AWS_REGION = "us-west-2"
+RUST_BACKTRACE = 1

@@ -10,7 +10,7 @@ use opentelemetry::{
 use opentelemetry_aws::trace::XrayPropagator;
 use std::{
     net::{IpAddr, SocketAddr},
-    path::{PathBuf, Path},
+    path::{Path, PathBuf},
     str::FromStr,
 };
 use tokio::time::Duration;
@@ -22,7 +22,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-use tracing::{info, Subscriber, trace};
+use tracing::{info, trace, Subscriber};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::registry::LookupSpan;
 
@@ -161,7 +161,8 @@ impl Watch {
 async fn discover_ignore_files(base: &Path) -> Vec<ignore_files::IgnoreFile> {
     let mut ignore_files = Vec::new();
 
-    let (mut env_ignore, env_ignore_errs) = ignore_files::from_environment(Some("CARGO_LAMBDA")).await;
+    let (mut env_ignore, env_ignore_errs) =
+        ignore_files::from_environment(Some("CARGO_LAMBDA")).await;
     trace!(ignore_files = ?env_ignore, errors = ?env_ignore_errs, "discovered ignore files from environment variable");
     ignore_files.append(&mut env_ignore);
 
