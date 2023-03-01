@@ -15,8 +15,8 @@ export default {
         nav: nav(),
 
         sidebar: {
-            '/guide/': sidebarGuide(),
-            '/commands/': sidebarCommands()
+            '/guide/': sidebar(),
+            '/commands/': sidebar()
         },
 
         editLink: {
@@ -49,7 +49,7 @@ function nav() {
     ]
 }
 
-function sidebarGuide() {
+function sidebar() {
     return [
         {
             text: 'Introduction',
@@ -62,12 +62,7 @@ function sidebarGuide() {
                 { text: 'Screencasts', link: '/guide/screencasts' },
                 { text: 'Automating deployments', link: '/guide/automating-deployments' }
             ]
-        }
-    ]
-}
-
-function sidebarCommands() {
-    return [
+        },
         {
             text: 'Commands',
             collapsible: true,
