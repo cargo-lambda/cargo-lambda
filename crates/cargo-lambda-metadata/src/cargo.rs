@@ -518,9 +518,12 @@ mod tests {
                 .unwrap();
 
         assert_eq!(env.get("BAZ").unwrap(), "QUX");
+    }
 
+    #[test]
+    fn test_invalid_metadata() {
         let result =
-            function_environment_metadata(fixture("multi-binary-package"), Some("get-products"));
+            function_environment_metadata(fixture("missing-binary-package"), Some("get-products"));
         assert!(result.is_err());
     }
 

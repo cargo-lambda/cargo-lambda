@@ -71,7 +71,3 @@ FOO = "BAR"
 
 [package.metadata.lambda.bin.delete-product.env]
 BAZ = "QUX"
-
-[package.metadata.lambda.bin.get-products.env]
-AWS_REGION = "us-west-2"
-RUST_BACKTRACE = 1
