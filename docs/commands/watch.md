@@ -75,23 +75,19 @@ These behave in the same way, package environment variables will override worksp
 You can also use the flag `--env-vars` to add environment variables. This flag supports a comma separated list of values:
 
 ```
-cargo lambda watch \
-  --env-vars FOO=BAR,BAZ=QUX \
-  http-lambda
+cargo lambda watch --env-vars FOO=BAR,BAZ=QUX
 ```
 
 The flag `--env-var` allows you to pass several variables in the command line with the format `KEY=VALUE`. This flag overrides the previous one, and cannot be combined.
 
 ```
-cargo lambda watch \
-  --env-var FOO=BAR --env-var BAZ=QUX \
-  http-lambda
+cargo lambda watch --env-var FOO=BAR --env-var BAZ=QUX
 ```
 
 The flag `--env-file` will read the variables from a file and add them to the function during the deploy. Each variable in the file must be in a new line with the same `KEY=VALUE` format:
 
 ```
-cargo lambda watch --env-file .env http-lambda
+cargo lambda watch --env-file .env
 ```
 
 ## Function URLs
