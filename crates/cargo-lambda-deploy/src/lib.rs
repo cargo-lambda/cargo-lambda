@@ -1,7 +1,7 @@
 use aws_smithy_types::retry::{RetryConfig, RetryMode};
 use cargo_lambda_build::{find_binary_archive, zip_binary, BinaryArchive};
 use cargo_lambda_interactive::progress::Progress;
-use cargo_lambda_metadata::cargo::root_package;
+use cargo_lambda_metadata::cargo::main_binary;
 use cargo_lambda_remote::{
     aws_sdk_lambda::model::{Architecture, Runtime},
     RemoteConfig,
@@ -216,7 +216,7 @@ impl Deploy {
             None => {
                 let name = match &self.name {
                     Some(name) => name.clone(),
-                    None => root_package(&self.manifest_path)?.name,
+                    None => main_binary(&self.manifest_path)?,
                 };
                 let binary_name = self.binary_name.as_deref().unwrap_or(&name);
 
