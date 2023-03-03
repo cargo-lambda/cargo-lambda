@@ -1,5 +1,5 @@
 use aws_sdk_lambda::model::Environment;
-use cargo_metadata::{Metadata as CargoMetadata, Package};
+use cargo_metadata::Metadata as CargoMetadata;
 use miette::{IntoDiagnostic, Result};
 use serde::Deserialize;
 use std::{
@@ -360,23 +360,22 @@ pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig> 
     Ok(config)
 }
 
-/// Load the main package in the project.
-/// It returns an error if the project includes from than one package.
+/// Load the main binary in the project.
+/// It returns an error if the project includes from than one binary.
 /// Use this function when the user didn't provide any funcion name
-/// assuming that there is only one package in the project
-pub fn root_package<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<Package> {
-    let metadata = load_metadata(manifest_path)?;
-    if metadata.packages.len() > 1 {
-        Err(MetadataError::MultiplePackagesInProject)?;
-    } else if metadata.packages.is_empty() {
-        Err(MetadataError::MissingPackageInProject)?;
+/// assuming that there is only one binary in the project
+pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String> {
+    let targets = binary_targets(manifest_path)?;
+    if targets.len() > 1 {
+        Err(MetadataError::MultipleBinariesInProject)?;
+    } else if targets.is_empty() {
+        Err(MetadataError::MissingBinaryInProject)?;
     }
 
-    Ok(metadata
-        .packages
+    targets
         .into_iter()
         .next()
-        .expect("failed to extract the root package from the metadata"))
+        .ok_or_else(|| MetadataError::MissingBinaryInProject.into())
 }
 
 fn merge_deploy_config(base: &DeployConfig, package_deploy: &DeployConfig) -> DeployConfig {
@@ -622,5 +621,30 @@ mod tests {
         assert_eq!(2, vars.len());
         assert_eq!("BAR", vars["FOO"]);
         assert_eq!("QUX", vars["BAZ"]);
+    }
+
+    #[test]
+    fn test_main_binary_with_package_name() {
+        let manifest_path = fixture("single-binary-package");
+        let name = main_binary(manifest_path).unwrap();
+        assert_eq!("basic-lambda", name);
+    }
+
+    #[test]
+    fn test_main_binary_with_binary_name() {
+        let manifest_path = fixture("single-binary-different-name");
+        let name = main_binary(manifest_path).unwrap();
+        assert_eq!("basic-lambda-binary", name);
+    }
+
+    #[test]
+    fn test_main_binary_multi_binaries() {
+        let manifest_path = fixture("multi-binary-package");
+        let err = main_binary(manifest_path).unwrap_err();
+        let err: MetadataError = err.downcast().unwrap();
+        assert_eq!(
+            "there are more than one binary in the project, you must specify a binary name",
+            err.to_string()
+        );
     }
 }

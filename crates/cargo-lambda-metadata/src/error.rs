@@ -17,12 +17,12 @@ pub enum MetadataError {
     #[error("invalid tracing option `{0}`")]
     #[diagnostic()]
     InvalidTracing(String),
-    #[error("there are more than one package in the project, you must specify a function name")]
+    #[error("there are more than one binary in the project, you must specify a binary name")]
     #[diagnostic()]
-    MultiplePackagesInProject,
-    #[error("there are no packages in this project")]
+    MultipleBinariesInProject,
+    #[error("there are no binaries in this project")]
     #[diagnostic()]
-    MissingPackageInProject,
+    MissingBinaryInProject,
     #[error("invalid environment variable `{0}`")]
     #[diagnostic()]
     InvalidEnvVar(String),
