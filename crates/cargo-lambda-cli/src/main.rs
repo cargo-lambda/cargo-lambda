@@ -1,6 +1,4 @@
 #![warn(rust_2018_idioms, unused_lifetimes, clippy::multiple_crate_versions)]
-use std::boxed::Box;
-
 use cargo_lambda_build::{Build, Zig};
 use cargo_lambda_deploy::Deploy;
 use cargo_lambda_invoke::Invoke;
@@ -8,6 +6,7 @@ use cargo_lambda_new::{Init, New};
 use cargo_lambda_watch::Watch;
 use clap::{CommandFactory, Parser, Subcommand};
 use miette::{miette, IntoDiagnostic, Result};
+use std::{boxed::Box, env, path::PathBuf};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
@@ -93,6 +92,20 @@ fn print_help() -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let mut args = env::args();
+    let program_path = PathBuf::from(args.next().expect("missing program path"));
+    let program_name = program_path.file_stem().expect("missing program name");
+    if program_name.eq_ignore_ascii_case("ar") {
+        let zig = Zig::Ar {
+            args: args.collect(),
+        };
+        zig.execute().map_err(|e| miette!(e))
+    } else {
+        run_subcommand().await
+    }
+}
+
+async fn run_subcommand() -> Result<()> {
     let app = App::parse();
 
     let lambda = match app {
