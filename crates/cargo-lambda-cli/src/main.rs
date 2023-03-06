@@ -92,6 +92,10 @@ fn print_help() -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Zig might try to execute the same program again with "ar" as the name
+    // to link specific static native libraries. We need to check
+    // the program name before executing any operation to ensure
+    // that the static linking works correctly.
     let mut args = env::args();
     let program_path = PathBuf::from(args.next().expect("missing program path"));
     let program_name = program_path.file_stem().expect("missing program name");
