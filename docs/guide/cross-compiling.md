@@ -2,7 +2,7 @@
 
 AWS Lambda functions run on Linux sandboxes. These sandboxes only include the bare minimum functionality for Rust binaries to work. It's important to understand that if your function depends on native libraries, like `libpq` for example, it's unlikely that it'll work on AWS Lambda out of the box.
 
-Cargo Lambda compiles your code for Linux targets using several techniques, regardless of whether you work on a Linux, Windows, Or MacOS machine. Cargo Lambda also compiles for ARM64 and X86-64 architectures, regardless of your host's architecture.
+Cargo Lambda compiles your code for Linux targets using several techniques, regardless of whether you work on a Linux, Windows, Or macOS machine. Cargo Lambda also compiles for ARM64 and X86-64 architectures, regardless of your host's architecture.
 
 ## Cross Compiling with the Zig toolchain
 
