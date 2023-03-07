@@ -33,6 +33,8 @@ mod error;
 use error::BuildError;
 
 mod target_arch;
+use target_arch::validate_linux_target;
+
 mod toolchain;
 mod zig;
 
@@ -115,7 +117,10 @@ impl Build {
         } else {
             let build_target = self.build.target.get(0);
             match build_target {
-                Some(target) => TargetArch::from_str(target)?,
+                Some(target) => {
+                    validate_linux_target(target)?;
+                    TargetArch::from_str(target)?
+                }
                 None => TargetArch::from_host()?,
             }
         };
@@ -140,7 +145,7 @@ impl Build {
             if target_arch.compatible_host_linker() {
                 target_arch.set_al2_glibc_version();
             } else {
-                return Err(BuildError::InvalidLinkerOption.into());
+                return Err(BuildError::InvalidCompilerOption.into());
             }
         }
 

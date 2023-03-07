@@ -8,16 +8,24 @@ const TARGET_X86_64: &str = "x86_64-unknown-linux-gnu";
 const AL2_GLIBC: &str = "2.26";
 
 #[derive(Debug, Default, PartialEq)]
-enum Arch {
+pub enum Arch {
     #[default]
     X86_64,
     ARM64,
 }
 
+impl Arch {
+    pub fn target_cpu(&self) -> String {
+        match self {
+            Arch::ARM64 => "neoverse-n1".to_string(),
+            Arch::X86_64 => "haswell".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct TargetArch {
     pub host: String,
-    arch: Arch,
     pub rustc_target_without_glibc_version: String,
     glibc_version: Option<String>,
     channel: Option<Channel>,
@@ -28,7 +36,6 @@ impl TargetArch {
         Self {
             host: TARGET_ARM.into(),
             rustc_target_without_glibc_version: TARGET_ARM.into(),
-            arch: Arch::ARM64,
             ..Default::default()
         }
     }
@@ -37,7 +44,6 @@ impl TargetArch {
         Self {
             host: TARGET_X86_64.into(),
             rustc_target_without_glibc_version: TARGET_X86_64.into(),
-            arch: Arch::X86_64,
             ..Default::default()
         }
     }
@@ -52,11 +58,16 @@ impl TargetArch {
         Ok(target)
     }
 
-    pub fn target_cpu(&self) -> String {
-        match self.arch {
-            Arch::ARM64 => "neoverse-n1".to_string(),
-            Arch::X86_64 => "haswell".to_string(),
+    pub fn arch(&self) -> Arch {
+        if self.host.starts_with("aarch64-unknown-linux") {
+            Arch::ARM64
+        } else {
+            Arch::X86_64
         }
+    }
+
+    pub fn target_cpu(&self) -> String {
+        self.arch().target_cpu()
     }
 
     pub fn set_al2_glibc_version(&mut self) {
@@ -92,12 +103,9 @@ impl FromStr for TargetArch {
     type Err = miette::Report;
 
     fn from_str(host: &str) -> Result<Self, Self::Err> {
-        // Validate that the build target is supported in AWS Lambda
-        let arch = check_build_target(host)?;
         let mut target = Self {
             host: host.into(),
             rustc_target_without_glibc_version: host.into(),
-            arch,
             ..Default::default()
         };
         if let Some((rustc_target_without_glibc_version, glibc_version)) = host.split_once('.') {
@@ -108,18 +116,16 @@ impl FromStr for TargetArch {
     }
 }
 
-/// Validate that the build target is supported in AWS Lambda
+/// Validate that the build target is supported in AWS Lambda.
 ///
 /// Here we use *starts with* instead of an exact match because:
 ///   - the target could also also be a *musl* variant: `x86_64-unknown-linux-musl`
 ///   - the target could also [specify a glibc version], which `cargo-zigbuild` supports
 ///
 /// [specify a glibc version]: https://github.com/messense/cargo-zigbuild#specify-glibc-version
-fn check_build_target(target: &str) -> Result<Arch> {
-    if target.starts_with("aarch64-unknown-linux") {
-        Ok(Arch::ARM64)
-    } else if target.starts_with("x86_64-unknown-linux") {
-        Ok(Arch::X86_64)
+pub(crate) fn validate_linux_target(target: &str) -> Result<()> {
+    if target.starts_with("aarch64-unknown-linux") || target.starts_with("x86_64-unknown-linux") {
+        Ok(())
     } else {
         Err(BuildError::UnsupportedTarget(target.into()).into())
     }
@@ -155,19 +161,25 @@ mod test {
     #[test]
     fn test_target_arch_arch() {
         let t = TargetArch::from_str("x86_64-unknown-linux-gnu.2.27").unwrap();
-        assert_eq!(Arch::X86_64, t.arch);
+        assert_eq!(Arch::X86_64, t.arch());
 
         let t = TargetArch::from_str("aarch64-unknown-linux-gnu.2.27").unwrap();
-        assert_eq!(Arch::ARM64, t.arch);
+        assert_eq!(Arch::ARM64, t.arch());
     }
 
     #[test]
-    fn test_check_build_target() {
-        let arch = check_build_target("x86_64-unknown-linux-gnu.2.27").unwrap();
-        assert_eq!(Arch::X86_64, arch);
+    fn test_validate_linux_target() {
+        let res = validate_linux_target("x86_64-unknown-linux-gnu.2.27");
+        assert!(res.is_ok());
 
-        let arch = check_build_target("aarch64-unknown-linux-gnu.2.27").unwrap();
-        assert_eq!(Arch::ARM64, arch);
+        let res = validate_linux_target("aarch64-unknown-linux-gnu.2.27");
+        assert!(res.is_ok());
+
+        let err = validate_linux_target("aarch64-unknown-darwin").unwrap_err();
+        assert_eq!(
+            "invalid or unsupported target for AWS Lambda: aarch64-unknown-darwin",
+            err.to_string()
+        );
     }
 
     #[test]
