@@ -13,7 +13,8 @@ use aws_lambda_events::{
 use axum::{
     body::Body,
     extract::{Extension, Path},
-    http::{HeaderValue, Request},
+    handler::Handler,
+    http::{HeaderValue, Request, Uri},
     response::Response,
     routing::{any, post},
     Router,
@@ -38,13 +39,30 @@ pub(crate) fn routes() -> Router {
             post(invoke_handler),
         )
         .route("/lambda-url/:function_name/*path", any(furls_handler))
+        .fallback(furls_handler.into_service())
 }
 
 async fn furls_handler(
+    uri: Uri,
     Extension(cmd_tx): Extension<Sender<InvokeRequest>>,
-    Path((function_name, mut path)): Path<(String, String)>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
+    let mut path = uri.path().to_string();
+    let mut function_name = DEFAULT_PACKAGE_FUNCTION.to_string();
+    let mut comp = path.split('/');
+    comp.next();
+    if let Some(c) = comp.next() {
+        if c == "lambda-url" {
+            if let Some(f) = comp.next() {
+                function_name = f.to_string();
+                let l = format!("/lambda-url/{}", function_name);
+                if path.contains(&l) {
+                    path = path.replace(&l, "");
+                }
+            }
+        }
+    }
+
     let (parts, body) = req.into_parts();
     let uri = &parts.uri;
     let headers = &parts.headers;
