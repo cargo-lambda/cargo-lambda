@@ -21,17 +21,26 @@ pub async fn check_target_component_with_rustc_meta(target_arch: &TargetArch) ->
         Channel::Dev => "dev",
         Channel::Beta => "beta",
     };
+    let toolchain_target = format!("{}-{}", toolchain, &target_arch.host);
 
     // check if the target component is installed in the host toolchain
-    let target_component_is_added = rustup_home
+    let target_component_exists = rustup_home
         .join("toolchains")
-        .join(format!("{}-{}", toolchain, &target_arch.host))
+        .join(&toolchain_target)
         .join("lib")
         .join("rustlib")
         .join(component)
         .exists();
 
-    if !target_component_is_added {
+    tracing::trace!(
+        toolchain_target,
+        target_component_exists,
+        rustup_home = ?rustup_home,
+        target_arch = ?target_arch,
+        "checking target toolchain installation"
+    );
+
+    if !target_component_exists {
         // install target component using `rustup`
         let pb = Progress::start(format_args!("Installing target component `{component}`..."));
 
@@ -51,12 +60,14 @@ pub async fn check_target_component_with_rustc_meta(target_arch: &TargetArch) ->
 /// Install target component in the host toolchain, using `rustup target add`
 async fn install_target_component(component: &str, toolchain: &str) -> Result<()> {
     let cmd = env::var("RUSTUP").unwrap_or_else(|_| "rustup".to_string());
+    let args = [&format!("+{toolchain}"), "target", "add", component];
+    tracing::trace!(
+        cmd = ?cmd,
+        args = ?args,
+        "installing target component"
+    );
 
-    silent_command(
-        &cmd,
-        &[&format!("+{toolchain}"), "target", "add", component],
-    )
-    .await
+    silent_command(&cmd, &args).await
 }
 
 #[cfg(test)]
