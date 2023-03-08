@@ -6,10 +6,6 @@ import SystemMessage from '../components/SystemMessage.vue'
 
 The watch subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions. Use flag `--no-reload` to avoid hot compilation.
 
-::: warning
-This command works best with the **[Lambda Runtime version 0.5.1](https://crates.io/crates/lambda_runtime/0.5.1)**. Previous versions of the runtime are likely to crash with serialization errors.
-:::
-
 ```
 cargo lambda watch
 ```
@@ -97,6 +93,10 @@ The emulator server includes support for [Lambda function URLs](https://docs.aws
 You can create functions compatible with this feature by running `cargo lambda new --http FUNCTION_NAME`.
 
 To access a function via its HTTP endpoint, start the watch subcommand `cargo lambda watch`, then send requests to the endpoint `http://localhost:9000/lambda-url/FUNCTION_NAME`. You can add any additional path after the function name, or any query parameters.
+
+::: warning
+Your function MUST have the `apigw_http` feature enabled in the `lambda_http` dependency for Function URLs to work. The payload that AWS sends is only compatible with the `apigw_http` format, not with the `apigw_rest` format.
+:::
 
 ## Enabling features
 
