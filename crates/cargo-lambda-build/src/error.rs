@@ -8,8 +8,8 @@ pub(crate) enum BuildError {
         "invalid options: --arm64, --x86-64, and --target cannot be specified at the same time"
     )]
     InvalidTargetOptions,
-    #[error("invalid options: --disable-zig-linker is only allowed on Linux")]
-    InvalidLinkerOption,
+    #[error("invalid options: --compiler=cargo is only allowed on Linux")]
+    InvalidCompilerOption,
     #[error("install Zig and run cargo-lambda again")]
     ZigMissing,
     #[error("binary target is missing from this project: {0}")]

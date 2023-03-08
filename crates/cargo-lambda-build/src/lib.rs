@@ -33,6 +33,8 @@ mod error;
 use error::BuildError;
 
 mod target_arch;
+use target_arch::validate_linux_target;
+
 mod toolchain;
 mod zig;
 
@@ -86,6 +88,7 @@ enum OutputFormat {
 enum CompilerFlag {
     CargoZigbuild,
     Cargo,
+    Cross,
 }
 
 impl Build {
@@ -93,8 +96,15 @@ impl Build {
     pub async fn run(&mut self) -> Result<()> {
         tracing::trace!(options = ?self, "building project");
 
-        let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
-        let compatible_host_linker = TargetArch::compatible_host_linker(&rustc_meta.host);
+        let manifest_path = self
+            .build
+            .manifest_path
+            .as_deref()
+            .unwrap_or_else(|| Path::new("Cargo.toml"));
+
+        let metadata = load_metadata(manifest_path)?;
+        let mut build_config = function_build_metadata(&metadata)?;
+        build_config.compiler = CompilerOptions::from(self.compiler.to_string());
 
         if (self.arm64 || self.x86_64) && !self.build.target.is_empty() {
             Err(BuildError::InvalidTargetOptions)?;
@@ -107,26 +117,16 @@ impl Build {
         } else {
             let build_target = self.build.target.get(0);
             match build_target {
-                Some(target) => TargetArch::from_str(target)?,
-                // No explicit target, but build host same as target host
-                None if compatible_host_linker => {
-                    // Set the target explicitly, so it's easier to find the binaries later
-                    TargetArch::from_str(&rustc_meta.host)?
+                Some(target) => {
+                    validate_linux_target(target)?;
+                    TargetArch::from_str(target)?
                 }
-                // No explicit target, and build host not compatible with Lambda hosts
-                None => TargetArch::x86_64(),
+                None => TargetArch::from_host()?,
             }
         };
 
         self.build.target = vec![target_arch.to_string()];
 
-        let manifest_path = self
-            .build
-            .manifest_path
-            .as_deref()
-            .unwrap_or_else(|| Path::new("Cargo.toml"));
-
-        let metadata = load_metadata(manifest_path)?;
         let binaries = binary_targets_from_metadata(&metadata)?;
         debug!(binaries = ?binaries, "found new target binaries to build");
 
@@ -138,16 +138,14 @@ impl Build {
             }
         }
 
-        let mut build_config = function_build_metadata(&metadata)?;
-        if self.compiler == CompilerFlag::Cargo && build_config.is_zig_enabled() {
-            build_config.compiler = CompilerOptions::from(self.compiler.to_string());
+        if build_config.is_local_compiler() && !build_config.is_zig_enabled() {
             // This check only makes sense when the build host is local.
             // If the build host was ever going to be remote, like in a container,
-            // this check would need to go away.
-            if compatible_host_linker {
+            // this is not checked
+            if target_arch.compatible_host_linker() {
                 target_arch.set_al2_glibc_version();
             } else {
-                return Err(BuildError::InvalidLinkerOption.into());
+                return Err(BuildError::InvalidCompilerOption.into());
             }
         }
 
@@ -176,9 +174,7 @@ impl Build {
 
         let compiler = new_compiler(build_config.compiler);
         let profile = compiler.build_profile(&self.build);
-        let cmd = compiler
-            .command(&self.build, &rustc_meta, &target_arch)
-            .await;
+        let cmd = compiler.command(&self.build, &target_arch).await;
 
         let mut cmd = match cmd {
             Ok(cmd) => cmd,
@@ -213,7 +209,7 @@ impl Build {
         };
 
         let base = target_dir
-            .join(target_arch.rustc_target_without_glibc_version())
+            .join(target_arch.rustc_target_without_glibc_version)
             .join(profile);
 
         let mut found_binaries = false;

@@ -51,6 +51,10 @@ impl BuildConfig {
     pub fn is_zig_enabled(&self) -> bool {
         self.compiler == CompilerOptions::CargoZigbuild
     }
+
+    pub fn is_local_compiler(&self) -> bool {
+        self.compiler != CompilerOptions::Cross
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
@@ -59,12 +63,14 @@ pub enum CompilerOptions {
     #[default]
     CargoZigbuild,
     Cargo(CargoCompilerOptions),
+    Cross,
 }
 
 impl From<String> for CompilerOptions {
     fn from(s: String) -> Self {
         match s.to_lowercase().as_str() {
             "cargo" => Self::Cargo(CargoCompilerOptions::default()),
+            "cross" => Self::Cross,
             _ => Self::CargoZigbuild,
         }
     }

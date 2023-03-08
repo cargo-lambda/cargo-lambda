@@ -47,3 +47,6 @@ publish-all:
 
 make docs-dev:
 	cd docs && pnpm docs:dev
+
+clippy:
+	cargo clippy --all-features -- -D warnings

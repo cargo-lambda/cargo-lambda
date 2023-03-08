@@ -1,9 +1,8 @@
-use super::{build_profile, Compiler};
+use super::Compiler;
 use crate::TargetArch;
 use cargo_lambda_metadata::cargo::CargoCompilerOptions;
 use cargo_options::Build;
 use miette::Result;
-use rustc_version::VersionMeta;
 use std::{collections::VecDeque, env, ffi::OsStr, process::Command};
 
 pub(crate) struct Cargo {
@@ -28,12 +27,7 @@ impl Cargo {
 
 #[async_trait::async_trait]
 impl Compiler for Cargo {
-    async fn command(
-        &self,
-        cargo: &Build,
-        _rustc_meta: &VersionMeta,
-        _target_arch: &TargetArch,
-    ) -> Result<Command> {
+    async fn command(&self, cargo: &Build, _target_arch: &TargetArch) -> Result<Command> {
         tracing::debug!("compiling with Cargo");
 
         let mut cmd = if let Some(subcommand) = &self.compiler.subcommand {
@@ -55,9 +49,5 @@ impl Compiler for Cargo {
             cmd.args(extra);
         }
         Ok(cmd)
-    }
-
-    fn build_profile<'a>(&self, cargo: &'a Build) -> &'a str {
-        build_profile(cargo.profile.as_deref(), cargo.release)
     }
 }
