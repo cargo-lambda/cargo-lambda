@@ -33,3 +33,5 @@ As mentioned earlier, AWS Lambda uses Linux sandboxes to run your functions. Tho
 This is a list of non-exhaustive problems that you might bump into if you try to build your Rust application to work on AWS Lambda:
 
 - `reqwest` uses OpenSSL as TLS backend by default. If you want to use `reqwest` in your application, you can enable the `native-tls-vendored` or the `rustls` features to include the TLS backend in your application.
+
+- `ring` and any other crates that depend on `cc-rs` have compile-time requirements. Look at [their documentation](https://github.com/rust-lang/cc-rs#compile-time-requirements) to see those requirements depending on your platform.
