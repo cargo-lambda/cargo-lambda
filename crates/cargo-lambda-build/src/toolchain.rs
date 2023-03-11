@@ -1,7 +1,10 @@
-use cargo_lambda_interactive::{command::silent_command, progress::Progress};
-use miette::{IntoDiagnostic, Result};
+use cargo_lambda_interactive::{
+    command::{new_command, silent_command},
+    progress::Progress,
+};
+use miette::{IntoDiagnostic, Result, WrapErr};
 use rustc_version::Channel;
-use std::env;
+use std::{env, str};
 
 use crate::target_arch::TargetArch;
 
@@ -10,10 +13,6 @@ use crate::target_arch::TargetArch;
 pub async fn check_target_component_with_rustc_meta(target_arch: &TargetArch) -> Result<()> {
     let component = &target_arch.rustc_target_without_glibc_version;
 
-    // resolve $RUSTUP_HOME, which points to the `rustup` base directory
-    // https://rust-lang.github.io/rustup/environment-variables.html#environment-variables
-    let rustup_home = home::rustup_home().into_diagnostic()?;
-
     // convert `Channel` enum to a lower-cased string representation
     let toolchain = match target_arch.channel()? {
         Channel::Stable => "stable",
@@ -21,24 +20,30 @@ pub async fn check_target_component_with_rustc_meta(target_arch: &TargetArch) ->
         Channel::Dev => "dev",
         Channel::Beta => "beta",
     };
-    let toolchain_target = format!("{}-{}", toolchain, &target_arch.host);
 
-    // check if the target component is installed in the host toolchain
-    let target_component_exists = rustup_home
-        .join("toolchains")
-        .join(&toolchain_target)
-        .join("lib")
-        .join("rustlib")
-        .join(component)
-        .exists();
+    let cmd = rustup_cmd();
+    let args = [&format!("+{toolchain}"), "target", "list", "--installed"];
 
     tracing::trace!(
-        toolchain_target,
-        target_component_exists,
-        rustup_home = ?rustup_home,
+        cmd = ?cmd,
+        args = ?args,
         target_arch = ?target_arch,
         "checking target toolchain installation"
     );
+
+    let output = new_command(&cmd)
+        .args(args)
+        .output()
+        .await
+        .into_diagnostic()
+        .wrap_err_with(|| format!("Failed to run `{} {}`", cmd, args.join(" ")))?;
+
+    let out = str::from_utf8(&output.stdout)
+        .into_diagnostic()
+        .wrap_err("failed to read rustup output")?;
+    let target_component_exists = out.lines().any(|line| line == component);
+
+    tracing::trace!(target_component_exists, "completed target search");
 
     if !target_component_exists {
         // install target component using `rustup`
@@ -59,7 +64,7 @@ pub async fn check_target_component_with_rustc_meta(target_arch: &TargetArch) ->
 
 /// Install target component in the host toolchain, using `rustup target add`
 async fn install_target_component(component: &str, toolchain: &str) -> Result<()> {
-    let cmd = env::var("RUSTUP").unwrap_or_else(|_| "rustup".to_string());
+    let cmd = rustup_cmd();
     let args = [&format!("+{toolchain}"), "target", "add", component];
     tracing::trace!(
         cmd = ?cmd,
@@ -68,6 +73,10 @@ async fn install_target_component(component: &str, toolchain: &str) -> Result<()
     );
 
     silent_command(&cmd, &args).await
+}
+
+fn rustup_cmd() -> String {
+    env::var("RUSTUP").unwrap_or_else(|_| "rustup".to_string())
 }
 
 #[cfg(test)]
