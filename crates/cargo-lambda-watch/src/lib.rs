@@ -176,6 +176,11 @@ async fn discover_ignore_files(base: &Path) -> Vec<ignore_files::IgnoreFile> {
     ignore_files.append(&mut origin_ignore);
 
     for parent in project_origins::origins(base).await {
+        let types = project_origins::types(&parent).await;
+        if !types.contains(&project_origins::ProjectType::Cargo) {
+            break;
+        }
+
         let (mut parent_ignore, parent_ignore_errs) = ignore_files::from_origin(&parent).await;
         trace!(parent = ?parent, ignore_files = ?parent_ignore, errors = ?parent_ignore_errs, "discovered ignore files from parent origin");
         ignore_files.append(&mut parent_ignore);
