@@ -47,13 +47,19 @@ fn init() -> InitConfig {
     let mut config = InitConfig::default();
     config.on_error(SyncFnHandler::from(
         |err: ErrorHook| -> std::result::Result<(), Infallible> {
-            error!(error = ?err.error, "internal error watching your project");
-
             match err.error {
+                RuntimeError::IoError {
+                    // according to watchexec's documentation, this errors can be ignored.
+                    // see: https://github.com/watchexec/watchexec/blob/e06dc0dd16f8aa88a1556583eafbd985ca2c4eea/crates/lib/src/error/runtime.rs#L13-L15
+                    about: "waiting on process group",
+                    ..
+                } => {}
                 RuntimeError::FsWatcher { .. } | RuntimeError::EventChannelTrySend { .. } => {
                     err.elevate()
                 }
-                _ => {}
+                e => {
+                    error!(error = ?e, "internal error watching your project");
+                }
             }
 
             Ok(())
@@ -80,8 +86,7 @@ async fn runtime(
         .map_err(ServerError::InvalidIgnoreFiles)?;
     if wc.ignore_changes {
         filter
-            .add_globs(&["**/*"], Some(wc.base))
-            .await
+            .add_globs(&["**/*"], Some(&wc.base))
             .map_err(ServerError::InvalidIgnoreFiles)?;
     }
     config.filterer(Arc::new(watchexec_filterer_ignore::IgnoreFilterer(filter)));
@@ -128,7 +133,7 @@ async fn runtime(
                 if !signals.is_empty() {
                     let mut out = Outcome::DoNothing;
                     for sig in signals {
-                        out = Outcome::both(out, Outcome::Signal(sig.into()));
+                        out = Outcome::both(out, Outcome::Signal(sig));
                     }
 
                     action.outcome(out);

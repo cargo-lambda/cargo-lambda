@@ -27,7 +27,7 @@ clap.workspace = true
 dunce.workspace = true
 http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
 hyper = "0.14.18"
-ignore-files = "=1.0.1"
+ignore-files = "=1.2.0"
 project-origins = "1.2.0"
 miette.workspace = true
 opentelemetry = "0.17.0"
@@ -50,5 +50,5 @@ tracing.workspace = true
 tracing-opentelemetry = "0.17.2"
 tracing-subscriber.workspace = true
 uuid.workspace = true
-watchexec = "=2.0.2"
+watchexec = "=2.2.0"
 watchexec-filterer-ignore = "1.0.0"
