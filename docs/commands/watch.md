@@ -92,11 +92,15 @@ The emulator server includes support for [Lambda function URLs](https://docs.aws
 
 You can create functions compatible with this feature by running `cargo lambda new --http FUNCTION_NAME`.
 
-To access a function via its HTTP endpoint, start the watch subcommand `cargo lambda watch`, then send requests to the endpoint `http://localhost:9000/lambda-url/FUNCTION_NAME`. You can add any additional path after the function name, or any query parameters.
+To access a function via its HTTP endpoint, start the watch subcommand `cargo lambda watch`, then send requests to the endpoint `http://localhost:9000`. You can add any additional path, or any query parameters.
 
 ::: warning
 Your function MUST have the `apigw_http` feature enabled in the `lambda_http` dependency for Function URLs to work. The payload that AWS sends is only compatible with the `apigw_http` format, not with the `apigw_rest` format.
 :::
+
+### Multi-function projects
+
+If your project includes several functions under the same package, you can access them using the function's name as the prefix in the request path `http://localhost:9000/lambda-url/FUNCTION_NAME`. You can also add any additional path after the function name, or any query parameters.
 
 ## Enabling features
 

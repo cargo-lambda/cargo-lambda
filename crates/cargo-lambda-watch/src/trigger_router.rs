@@ -32,6 +32,8 @@ use query_map::QueryMap;
 use std::collections::HashMap;
 use tokio::sync::{mpsc::Sender, oneshot};
 
+const LAMBDA_URL_PREFIX: &str = "lambda-url";
+
 pub(crate) fn routes() -> Router {
     Router::new()
         .route(
@@ -50,15 +52,14 @@ async fn furls_handler(
     let mut path = uri.path().to_string();
     let mut function_name = DEFAULT_PACKAGE_FUNCTION.to_string();
     let mut comp = path.split('/');
+
     comp.next();
-    if let Some(c) = comp.next() {
-        if c == "lambda-url" {
-            if let Some(f) = comp.next() {
-                function_name = f.to_string();
-                let l = format!("/lambda-url/{}", function_name);
-                if path.contains(&l) {
-                    path = path.replace(&l, "");
-                }
+    if let (Some(prefix), Some(fun_name)) = (comp.next(), comp.next()) {
+        if prefix == LAMBDA_URL_PREFIX {
+            function_name = fun_name.to_string();
+            let l = format!("/{prefix}/{function_name}");
+            if path.starts_with(&l) {
+                path = path.replace(&l, "");
             }
         }
     }
