@@ -14,7 +14,7 @@ use axum::{
     body::Body,
     extract::{Extension, Path},
     handler::Handler,
-    http::{HeaderValue, Request, Uri},
+    http::{HeaderValue, Request},
     response::Response,
     routing::{any, post},
     Router,
@@ -45,27 +45,14 @@ pub(crate) fn routes() -> Router {
 }
 
 async fn furls_handler(
-    uri: Uri,
     Extension(cmd_tx): Extension<Sender<InvokeRequest>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
-    let mut path = uri.path().to_string();
-    let mut function_name = DEFAULT_PACKAGE_FUNCTION.to_string();
-    let mut comp = path.split('/');
-
-    comp.next();
-    if let (Some(prefix), Some(fun_name)) = (comp.next(), comp.next()) {
-        if prefix == LAMBDA_URL_PREFIX {
-            function_name = fun_name.to_string();
-            let l = format!("/{prefix}/{function_name}");
-            if path.starts_with(&l) {
-                path = path.replace(&l, "");
-            }
-        }
-    }
-
     let (parts, body) = req.into_parts();
     let uri = &parts.uri;
+
+    let (function_name, mut path) = extract_path_parameters(uri.path());
+
     let headers = &parts.headers;
 
     let body = to_bytes(body)
@@ -242,4 +229,63 @@ async fn schedule_invocation(
     );
 
     Ok(resp)
+}
+
+fn extract_path_parameters(path: &str) -> (String, String) {
+    let mut comp = path.split('/');
+
+    comp.next();
+    if let (Some(prefix), Some(fun_name)) = (comp.next(), comp.next()) {
+        if prefix == LAMBDA_URL_PREFIX {
+            let l = format!("/{prefix}/{fun_name}");
+            let mut new_path = path.replace(&l, "");
+            if !new_path.starts_with('/') {
+                new_path = format!("/{new_path}");
+            }
+            return (fun_name.to_string(), new_path);
+        }
+    }
+
+    (DEFAULT_PACKAGE_FUNCTION.to_string(), path.to_string())
+}
+
+#[cfg(test)]
+mod test {
+    use super::extract_path_parameters;
+    use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
+
+    #[test]
+    fn test_extract_path_parameters() {
+        let (func, path) = extract_path_parameters("");
+        assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
+        assert_eq!("", path);
+
+        let (func, path) = extract_path_parameters("/");
+        assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
+        assert_eq!("/", path);
+
+        let (func, path) = extract_path_parameters("/foo");
+        assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
+        assert_eq!("/foo", path);
+
+        let (func, path) = extract_path_parameters("/foo/");
+        assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
+        assert_eq!("/foo/", path);
+
+        let (func, path) = extract_path_parameters("/lambda-url/func-name");
+        assert_eq!("func-name", func);
+        assert_eq!("/", path);
+
+        let (func, path) = extract_path_parameters("/lambda-url/func-name/");
+        assert_eq!("func-name", func);
+        assert_eq!("/", path);
+
+        let (func, path) = extract_path_parameters("/lambda-url/func-name/foo");
+        assert_eq!("func-name", func);
+        assert_eq!("/foo", path);
+
+        let (func, path) = extract_path_parameters("/lambda-url/func-name/foo/");
+        assert_eq!("func-name", func);
+        assert_eq!("/foo/", path);
+    }
 }
