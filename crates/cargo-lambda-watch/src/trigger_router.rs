@@ -238,13 +238,11 @@ fn extract_path_parameters(path: &str) -> (String, String) {
     if let (Some(prefix), Some(fun_name)) = (comp.next(), comp.next()) {
         if prefix == LAMBDA_URL_PREFIX {
             let l = format!("/{prefix}/{fun_name}");
-            if path.starts_with(&l) {
-                let mut new_path = path.replace(&l, "");
-                if !new_path.starts_with('/') {
-                    new_path = format!("/{new_path}");
-                }
-                return (fun_name.to_string(), new_path);
+            let mut new_path = path.replace(&l, "");
+            if !new_path.starts_with('/') {
+                new_path = format!("/{new_path}");
             }
+            return (fun_name.to_string(), new_path);
         }
     }
 
