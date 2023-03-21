@@ -58,9 +58,9 @@ function sidebar() {
                 { text: 'What is Cargo Lambda?', link: '/guide/what-is-cargo-lambda' },
                 { text: 'Installation', link: '/guide/installation' },
                 { text: 'Getting Started', link: '/guide/getting-started' },
-                { text: 'Cross Compiling', link: '/guide/cross-compiling' }
+                { text: 'Cross Compiling', link: '/guide/cross-compiling' },
                 { text: 'Lambda Extensions', link: '/guide/lambda-extensions' },
-                { text: 'Automating deployments', link: '/guide/automating-deployments' }
+                { text: 'Automating deployments', link: '/guide/automating-deployments' },
                 { text: 'Screencasts', link: '/guide/screencasts' },
             ]
         },
