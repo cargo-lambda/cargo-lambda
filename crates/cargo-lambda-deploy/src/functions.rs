@@ -38,20 +38,6 @@ enum FunctionAction {
 }
 
 #[derive(Args, Clone, Debug, Default)]
-pub struct FunctionConfig {
-    /// Memory allocated for the function
-    #[arg(long, alias = "memory-size")]
-    pub memory: Option<Memory>,
-
-    /// How long the function can be running for, in seconds
-    #[arg(long)]
-    pub timeout: Option<Timeout>,
-
-    #[command(flatten)]
-    pub env_options: EnvOptions,
-}
-
-#[derive(Args, Clone, Debug, Default)]
 pub struct FunctionDeployConfig {
     /// Enable function URL for this function
     #[arg(long)]
@@ -61,8 +47,16 @@ pub struct FunctionDeployConfig {
     #[arg(long)]
     pub disable_function_url: bool,
 
+    /// Memory allocated for the function
+    #[arg(long, alias = "memory-size")]
+    pub memory: Option<Memory>,
+
+    /// How long the function can be running for, in seconds
+    #[arg(long)]
+    pub timeout: Option<Timeout>,
+
     #[command(flatten)]
-    pub config: Option<FunctionConfig>,
+    pub env_options: Option<EnvOptions>,
 
     /// Tracing mode with X-Ray
     #[arg(long)]
@@ -468,26 +462,26 @@ fn merge_configuration(
         deploy_metadata.layers = function_config.layer.clone();
     }
 
-    let environment = match &function_config.config {
+    if function_config.memory.is_some() {
+        deploy_metadata.memory = function_config.memory.clone();
+    }
+
+    if let Some(timeout) = &function_config.timeout {
+        if !timeout.is_zero() {
+            deploy_metadata.timeout = timeout.clone()
+        }
+    }
+
+    let environment = match &function_config.env_options {
         None => deploy_metadata.lambda_environment()?,
         Some(config) => {
             deploy_metadata.use_for_update = true;
 
-            if config.memory.is_some() {
-                deploy_metadata.memory = config.memory.clone();
+            if config.env_file.is_some() {
+                deploy_metadata.env_file = config.env_file.clone();
             }
 
-            if let Some(timeout) = &config.timeout {
-                if !timeout.is_zero() {
-                    deploy_metadata.timeout = timeout.clone()
-                }
-            }
-
-            if config.env_options.env_file.is_some() {
-                deploy_metadata.env_file = config.env_options.env_file.clone();
-            }
-
-            let flag_env = config.env_options.lambda_environment()?;
+            let flag_env = config.lambda_environment()?;
             deploy_metadata.extend_environment(flag_env)?
         }
     };
@@ -773,10 +767,8 @@ mod tests {
     #[test]
     fn test_load_deploy_environment_appending_flags() {
         let flags = FunctionDeployConfig {
-            config: Some(FunctionConfig {
-                memory: Some(Memory::Mb1024),
-                ..Default::default()
-            }),
+            memory: Some(Memory::Mb1024),
+
             ..Default::default()
         };
 
@@ -834,11 +826,8 @@ mod tests {
     fn test_load_deploy_environment_empty_config_with_env_flags() {
         let flags = FunctionDeployConfig {
             role: Some("role-arn".into()),
-            config: Some(FunctionConfig {
-                env_options: EnvOptions {
-                    env_var: Some(vec!["FOO=BAR".into()]),
-                    ..Default::default()
-                },
+            env_options: Some(EnvOptions {
+                env_var: Some(vec!["FOO=BAR".into()]),
                 ..Default::default()
             }),
             ..Default::default()
