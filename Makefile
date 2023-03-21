@@ -46,7 +46,7 @@ publish-all:
 	cd crates/cargo-lambda-cli && cargo publish
 
 make docs-dev:
-	cd docs && pnpm docs:dev
+	cd docs && pnpm install && pnpm docs:dev
 
 clippy:
 	cargo clippy --all-features -- -D warnings
