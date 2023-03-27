@@ -4,13 +4,17 @@ import SystemMessage from '../components/SystemMessage.vue'
 
 # cargo lambda watch
 
-The watch subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions. Use flag `--no-reload` to avoid hot compilation.
+The watch subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions.
 
 ```
 cargo lambda watch
 ```
 
 The function is not compiled until the first time that you try to execute it. See the [invoke](/commands/invoke) command to learn how to execute a function. Cargo will run the command `cargo run --bin FUNCTION_NAME` to try to compile the function. `FUNCTION_NAME` can be either the name of the package if the package has only one binary, or the binary name in the `[[bin]]` section if the package includes more than one binary.
+
+The following video shows how you can use this subcommand to develop functions locally:
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/Rf1VewhIrqM" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
 ## Environment variables
 
@@ -110,7 +114,6 @@ You can pass a list of features separated by comma to the `watch` command to loa
 cargo lambda watch --features feature-1,feature-2
 ```
 
-
 ## Debug with breakpoints
 
 You have two options to debug your application, set breakpoints, and step through your code using a debugger like GDB or LLDB.
@@ -170,6 +173,14 @@ export AWS_LAMBDA_FUNCTION_NAME=_
 </ClientOnly>
 
 These environment variables are also mentioned as info messages in the log output by `cargo-lambda`.
+
+## Ignore changes
+
+If you want to run the emulator without hot reloading the function every time there is a change in the code, you can use the flag `--ignore-changes`:
+
+```
+cargo lambda watch --ignore-changes
+```
 
 ## Release mode
 
@@ -232,3 +243,7 @@ This will make your extension to send requests to the local runtime to register 
 ::: warning
 At the moment Log and Telemetry extensions don't receive any data from the local runtime.
 :::
+
+The following video shows you how to use the watch subcommand with Lambda extensions:
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/z2sv41ukHTE" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>

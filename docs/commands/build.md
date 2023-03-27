@@ -1,8 +1,6 @@
 # cargo lambda build
 
-Within a Rust project that includes a `Cargo.toml` file, run the `cargo lambda build` command to natively compile your Lambda functions in the project.
-The resulting artifacts such as binaries or zips, will be placed in the `target/lambda` directory.
-This is an example of the output produced by this command:
+Within a Rust project that includes a `Cargo.toml` file, run the `cargo lambda build` command to natively cross-compile your Lambda functions in the project to Linux. The resulting artifacts such as binaries or zips, will be placed in the `target/lambda` directory. This is an example of the output produced by this command:
 
 ```
 ❯ tree target/lambda
@@ -20,6 +18,12 @@ target/lambda
 
 5 directories, 5 files
 ```
+
+The following video shows you how to use this subcommand:
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/ICUSfTorBnI" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
+If you want to learn more abour cross-compiling Rust Lambda functions, checkout the [Cross Compiling Guide](/guide/cross-compiling).
 
 ## Output Format
 
@@ -79,6 +83,10 @@ Cargo Lambda has an internal abstraction to work with different ways to compile 
 The default compiler is `cargo-zigbuild`. This compiler uses [Zig](https://ziglang.org) to cross compile any Rust project to a Linux target on your own OS, without the need to a virtual machine or a Linux container. If Zig is not installed in your host machine, the first time that your run Cargo Lambda, it will guide you through some installation options. If you run Cargo Lambda in a non-interactive shell, the build process will fail until you install that dependency.
 
 Cargo Lambda also supports building Rust projects without Zig as the target linker. This compiler is identifed as just `cargo`. A disadvantage of this is that it's up to you to guarantee that the binary works on Linux. An advantage is that if you always build functions on Linux, you don't need to install Zig to use Cargo Lambda.
+
+Cargo Lambda supports building Rust projects with [cross](https://crates.io/crates/cross) as well. Read the [Cross Compiling reference](/guide/cross-compiling.html#cross-compiling-with-cross) to learn more abour using cross as the Lambda compiler.
+
+### Switching compilers
 
 To switch compilers, you can use the flag `--compiler` with the name of the compiler to use when you run `cargo lambda build`. For example:
 

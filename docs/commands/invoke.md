@@ -1,12 +1,26 @@
 # cargo lambda invoke
 
-The `invoke` subcommand helps you send requests to the control plane emulator, as well as remote functions.
+The `invoke` subcommand helps you send requests to the local Lambda emulator, as well as remote functions. Before you use this command, you need to start the local emulator in a different terminal by calling the [Watch subcommand](/commands/watch).
+
+The `invoke` subcommand sends raw JSON payloads to your Rust functions. The Rust Runtime for Lambda transforms those payloads into the Rust struct that your function receives. If the payload doesn't match the layout of the defined struct, the runtime will return a Serde deserialization error.
+
+Rust functions implemented with `lambda_http` require the HTTP calls to be wrapped into the right JSON payloads. This is because AWS Lambda doesn't support HTTP calls natively. Services like Amazon API Gateway, Amazon Load Balancer, or Lambda Function URLs, receive the incoming HTTP calls and translate them to JSON payloads. `lambda_http` performs the opposite translation, so you can work with HTTP primitives.
+
+You can find many examples of JSON paylaods in the [AWS Lambda Events repository](https://github.com/calavera/aws-lambda-events/tree/main/src/fixtures). You can copy them directly, or use the [--data-example flag](/commands/invoke.html#example-data) to load them on demand.
+
+The following video shows you how to use this subcommand:
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/2MAuMihVlO0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
+## Basic JSON calls
 
 If your Rust project only includes one function, in the package's main.rs file, you can invoke it by sending the data that you want to process, without extra arguments. For example:
 
 ```
 cargo lambda invoke --data-ascii "{ \"command\": \"hi\" }"
 ```
+
+## Multi function support
 
 If your project includes more than one function, or the binary has a different name than the package, you must provide the name of the Lambda function that you want to invoke, and the payload that you want to send. If you don't know how to find your function's name, it can be in two places:
 
