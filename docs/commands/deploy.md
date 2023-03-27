@@ -12,6 +12,10 @@ The example below deploys a function that has already been compiled with the def
 cargo lambda deploy
 ```
 
+The following video shows you how to use this subcommand:
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/ICUSfTorBnI" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
 ## IAM Roles
 
 If you run this command without any flags, Cargo Lambda will try to create an execution role with Lambda's default service role policy `AWSLambdaBasicExecutionRole`.
