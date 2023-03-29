@@ -25,8 +25,7 @@ use error::*;
 /// assume that the package only has one function,
 /// which is the main binary for that package.
 pub const DEFAULT_PACKAGE_FUNCTION: &str = "_";
-const EXAMPLES_URL: &str =
-    "https://github.com/calavera/aws-lambda-events/raw/main/aws_lambda_events/src/fixtures";
+const EXAMPLES_URL: &str = "https://github.com/calavera/aws-lambda-events/raw/main/src/fixtures";
 
 #[derive(Args, Clone, Debug)]
 #[command(
