@@ -7,7 +7,7 @@ use std::{
     fmt::Debug,
     path::{Path, PathBuf},
 };
-use tracing::{debug, trace};
+use tracing::{debug, enabled, trace, Level};
 
 use crate::{
     env::lambda_environment,
@@ -203,6 +203,7 @@ pub fn load_metadata<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<CargoMe
     trace!("loading Cargo metadata");
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
     metadata_cmd.no_deps();
+    metadata_cmd.verbose(enabled!(target: "cargo_lambda", Level::TRACE));
 
     // try to split manifest path and assign current_dir to enable parsing a project-specific
     // cargo config
@@ -223,9 +224,9 @@ pub fn load_metadata<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<CargoMe
         }
     }
 
+    trace!(metadata = ?metadata_cmd, "loading cargo metadata");
     let meta = metadata_cmd.exec().into_diagnostic()?;
-
-    trace!(metadata = ?meta, "loaded metadata");
+    trace!(metadata = ?meta, "loaded cargo metadata");
     Ok(meta)
 }
 
