@@ -5,6 +5,7 @@ use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
+    fs,
     path::{Path, PathBuf},
 };
 use tracing::{debug, enabled, trace, Level};
@@ -208,14 +209,11 @@ pub fn load_metadata<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<CargoMe
     // try to split manifest path and assign current_dir to enable parsing a project-specific
     // cargo config
     let manifest_ref = manifest_path.as_ref();
-    let parent = manifest_ref.parent().map(|p| p.to_path_buf());
-    match (parent, manifest_ref.file_name()) {
-        (Some(mut project_dir), Some(manifest_file)) => {
-            if !project_dir.is_dir() {
-                project_dir = std::env::current_dir().into_diagnostic()?;
-            }
-            metadata_cmd.current_dir(project_dir);
-            metadata_cmd.manifest_path(manifest_file);
+
+    match (manifest_ref.parent(), manifest_ref.file_name()) {
+        (Some(project), Some(manifest)) if is_project_metadata_ok(project) => {
+            metadata_cmd.current_dir(project);
+            metadata_cmd.manifest_path(manifest);
         }
         _ => {
             // fall back to using the manifest_path without changing the dir
@@ -415,6 +413,10 @@ fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
         base.compiler = package_build.compiler.clone();
     }
     tracing::debug!(ws_metadata = ?base, package_metadata = ?package_build, "finished merging build metadata");
+}
+
+fn is_project_metadata_ok(path: &Path) -> bool {
+    path.is_dir() && fs::metadata(path).is_ok()
 }
 
 #[cfg(test)]
