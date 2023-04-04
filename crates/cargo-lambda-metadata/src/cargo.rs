@@ -103,9 +103,12 @@ pub struct DeployConfig {
     pub layers: Option<Vec<String>>,
     #[serde(default)]
     pub tags: Option<HashMap<String, String>>,
-
     #[serde(skip)]
     pub use_for_update: bool,
+    #[serde(default)]
+    pub subnet_ids: Option<Vec<String>>,
+    #[serde(default)]
+    pub security_group_ids: Option<Vec<String>>,
 }
 
 impl DeployConfig {
@@ -403,6 +406,12 @@ fn merge_deploy_config(base: &DeployConfig, package_deploy: &DeployConfig) -> De
     }
     if package_deploy.layers.is_some() {
         new_config.layers = package_deploy.layers.clone();
+    }
+    if package_deploy.subnet_ids.is_some() {
+        new_config.subnet_ids = package_deploy.subnet_ids.clone();
+    }
+    if package_deploy.security_group_ids.is_some() {
+        new_config.security_group_ids = package_deploy.security_group_ids.clone();
     }
     tracing::debug!(ws_metadata = ?new_config, package_metadata = ?package_deploy, "finished merging deploy metadata");
     new_config
