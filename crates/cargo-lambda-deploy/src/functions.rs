@@ -16,7 +16,7 @@ use cargo_lambda_remote::{
         },
         model::{
             Architecture, Environment, FunctionCode, FunctionConfiguration, FunctionUrlAuthType,
-            LastUpdateStatus, Runtime, State, TracingConfig,
+            LastUpdateStatus, Runtime, State, TracingConfig, VpcConfig,
         },
         output::GetFunctionOutput,
         types::{Blob, SdkError},
@@ -69,6 +69,14 @@ pub struct FunctionDeployConfig {
     /// Lambda Layer ARN to associate the deployed function with
     #[arg(long, visible_alias = "layer-arn")]
     pub layer: Option<Vec<String>>,
+
+    /// Subnet IDs to associate the deployed function with a VPC
+    #[arg(long, value_delimiter = ',')]
+    pub subnet_ids: Option<Vec<String>>,
+
+    /// Security Group IDs to associate the deployed function
+    #[arg(long, value_delimiter = ',')]
+    pub security_group_ids: Option<Vec<String>>,
 }
 
 impl FunctionDeployConfig {
@@ -77,6 +85,8 @@ impl FunctionDeployConfig {
             iam_role: self.role.clone(),
             tracing: self.tracing.clone().unwrap_or_default(),
             layers: self.layer.clone(),
+            subnet_ids: self.subnet_ids.clone(),
+            security_group_ids: self.security_group_ids.clone(),
             ..Default::default()
         }
     }
@@ -237,6 +247,12 @@ async fn upsert_function(
 
                 let result = client
                     .create_function()
+                    .vpc_config(
+                        VpcConfig::builder()
+                            .set_security_group_ids(deploy_metadata.security_group_ids.clone())
+                            .set_subnet_ids(deploy_metadata.subnet_ids.clone())
+                            .build(),
+                    )
                     .runtime(Runtime::Providedal2)
                     .handler("bootstrap")
                     .function_name(name)
