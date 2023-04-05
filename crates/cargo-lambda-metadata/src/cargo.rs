@@ -45,17 +45,8 @@ pub struct PackageMetadata {
 
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct BuildConfig {
-    pub compiler: CompilerOptions,
-}
-
-impl BuildConfig {
-    pub fn is_zig_enabled(&self) -> bool {
-        self.compiler == CompilerOptions::CargoZigbuild
-    }
-
-    pub fn is_local_compiler(&self) -> bool {
-        self.compiler != CompilerOptions::Cross
-    }
+    pub compiler: Option<CompilerOptions>,
+    pub target: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
@@ -74,6 +65,12 @@ impl From<String> for CompilerOptions {
             "cross" => Self::Cross,
             _ => Self::CargoZigbuild,
         }
+    }
+}
+
+impl CompilerOptions {
+    pub fn is_local_cargo(&self) -> bool {
+        matches!(self, CompilerOptions::Cargo(_))
     }
 }
 
@@ -412,6 +409,9 @@ fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
     if package_build.compiler != base.compiler {
         base.compiler = package_build.compiler.clone();
     }
+    if package_build.target != base.target {
+        base.target = package_build.target.clone();
+    }
     tracing::debug!(ws_metadata = ?base, package_metadata = ?package_build, "finished merging build metadata");
 }
 
@@ -600,7 +600,7 @@ mod tests {
 
         let env = function_build_metadata(&metadata).unwrap();
 
-        let opts = match env.compiler {
+        let opts = match env.compiler.unwrap() {
             CompilerOptions::Cargo(opts) => opts,
             other => panic!("unexpected compiler: {:?}", other),
         };

@@ -69,8 +69,8 @@ pub struct Build {
     #[arg(long)]
     flatten: Option<String>,
 
-    #[arg(short, long, default_value_t = CompilerFlag::CargoZigbuild, env = "CARGO_LAMBDA_COMPILER")]
-    compiler: CompilerFlag,
+    #[arg(short, long, env = "CARGO_LAMBDA_COMPILER")]
+    compiler: Option<CompilerFlag>,
 
     #[command(flatten)]
     build: CargoBuild,
@@ -103,8 +103,12 @@ impl Build {
             .unwrap_or_else(|| Path::new("Cargo.toml"));
 
         let metadata = load_metadata(manifest_path)?;
-        let mut build_config = function_build_metadata(&metadata)?;
-        build_config.compiler = CompilerOptions::from(self.compiler.to_string());
+        let build_config = function_build_metadata(&metadata)?;
+        let compiler_option = match (&build_config.compiler, &self.compiler) {
+            (None, None) => CompilerOptions::default(),
+            (_, Some(c)) => CompilerOptions::from(c.to_string()),
+            (Some(c), _) => c.clone(),
+        };
 
         if (self.arm64 || self.x86_64) && !self.build.target.is_empty() {
             Err(BuildError::InvalidTargetOptions)?;
@@ -115,7 +119,7 @@ impl Build {
         } else if self.x86_64 {
             TargetArch::x86_64()
         } else {
-            let build_target = self.build.target.get(0);
+            let build_target = self.build.target.get(0).or(build_config.target.as_ref());
             match build_target {
                 Some(target) => {
                     validate_linux_target(target)?;
@@ -138,7 +142,7 @@ impl Build {
             }
         }
 
-        if build_config.is_local_compiler() && !build_config.is_zig_enabled() {
+        if compiler_option.is_local_cargo() {
             // This check only makes sense when the build host is local.
             // If the build host was ever going to be remote, like in a container,
             // this is not checked
@@ -172,7 +176,7 @@ impl Build {
             None
         };
 
-        let compiler = new_compiler(build_config.compiler);
+        let compiler = new_compiler(compiler_option);
         let profile = compiler.build_profile(&self.build);
         let cmd = compiler.command(&self.build, &target_arch).await;
 

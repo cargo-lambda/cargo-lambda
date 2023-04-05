@@ -20,7 +20,9 @@ pub(crate) trait Compiler {
     }
 }
 
+#[tracing::instrument(target = "cargo_lambda")]
 pub(crate) fn new_compiler(compiler: CompilerOptions) -> Box<dyn Compiler> {
+    tracing::trace!("initializing Lambda compiler");
     match compiler {
         CompilerOptions::CargoZigbuild => Box::new(CargoZigbuild),
         CompilerOptions::Cargo(opts) => Box::new(Cargo::new(opts)),
