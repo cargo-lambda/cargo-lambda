@@ -482,6 +482,14 @@ fn merge_configuration(
         deploy_metadata.memory = function_config.memory.clone();
     }
 
+    if function_config.subnet_ids.is_some() {
+        deploy_metadata.subnet_ids = function_config.subnet_ids.clone();
+    }
+
+    if function_config.security_group_ids.is_some() {
+        deploy_metadata.security_group_ids = function_config.security_group_ids.clone();
+    }
+
     if let Some(timeout) = &function_config.timeout {
         if !timeout.is_zero() {
             deploy_metadata.timeout = timeout.clone()
