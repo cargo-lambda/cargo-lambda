@@ -33,7 +33,7 @@ pip3 install cargo-lambda
 You can run Cargo Lambda directly from our official Docker image:
 
 ```sh
-docker pull calavera/cargo-lambda
+docker pull ghcr.io/cargo-lambda/cargo-lambda
 ```
 
 ## With Nix
