@@ -35,3 +35,5 @@ This is a list of non-exhaustive problems that you might bump into if you try to
 - `reqwest` uses OpenSSL as TLS backend by default. If you want to use `reqwest` in your application, you can enable the `native-tls-vendored` or the `rustls` features to include the TLS backend in your application.
 
 - `ring` and any other crates that depend on `cc-rs` have compile-time requirements. Look at [their documentation](https://github.com/rust-lang/cc-rs#compile-time-requirements) to see those requirements depending on your platform.
+
+- `diesel` uses native dependencies to connect to Postgres and MySQL. Use [diesel-async](https://crates.io/crates/diesel-async) instead to have a better integration with the Rust Runtime for Lambda. See the [example in the runtime's repository](https://github.com/awslabs/aws-lambda-rust-runtime/commit/cd0a19cbceb0d340299b25b7957be0e7be85bf73).
