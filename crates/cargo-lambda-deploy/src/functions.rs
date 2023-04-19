@@ -336,7 +336,7 @@ async fn upsert_function(
                 }
 
                 if let Some(timeout) = deploy_metadata.timeout {
-                    let timeout: i32 = timeout.clone().into();
+                    let timeout: i32 = timeout.into();
                     if conf.timeout.unwrap_or_default() != timeout {
                         update_config = true;
                         builder = builder.timeout(timeout);
