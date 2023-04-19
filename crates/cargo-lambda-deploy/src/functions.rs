@@ -243,7 +243,7 @@ async fn upsert_function(
             let mut output = None;
             for attempt in 2..5 {
                 let memory = deploy_metadata.memory.clone().map(Into::into);
-                let timeout = deploy_metadata.timeout.clone().into();
+                let timeout = deploy_metadata.timeout.clone().unwrap_or_default().into();
 
                 let result = client
                     .create_function()
@@ -335,10 +335,12 @@ async fn upsert_function(
                     builder = builder.set_memory_size(memory);
                 }
 
-                let timeout: i32 = deploy_metadata.timeout.clone().into();
-                if conf.timeout.unwrap_or_default() != timeout {
-                    update_config = true;
-                    builder = builder.timeout(timeout);
+                if let Some(timeout) = deploy_metadata.timeout {
+                    let timeout: i32 = timeout.into();
+                    if conf.timeout.unwrap_or_default() != timeout {
+                        update_config = true;
+                        builder = builder.timeout(timeout);
+                    }
                 }
 
                 if should_update_layers(&deploy_metadata.layers, &conf) {
@@ -492,7 +494,7 @@ fn merge_configuration(
 
     if let Some(timeout) = &function_config.timeout {
         if !timeout.is_zero() {
-            deploy_metadata.timeout = timeout.clone()
+            deploy_metadata.timeout = Some(timeout.clone())
         }
     }
 

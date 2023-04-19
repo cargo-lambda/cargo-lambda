@@ -87,7 +87,7 @@ pub struct DeployConfig {
     #[serde(default)]
     pub memory: Option<Memory>,
     #[serde(default)]
-    pub timeout: Timeout,
+    pub timeout: Option<Timeout>,
     #[serde(default)]
     pub env: HashMap<String, String>,
     #[serde(default)]
@@ -388,8 +388,10 @@ fn merge_deploy_config(base: &DeployConfig, package_deploy: &DeployConfig) -> De
     if package_deploy.memory.is_some() {
         new_config.memory = package_deploy.memory.clone();
     }
-    if !package_deploy.timeout.is_zero() {
-        new_config.timeout = package_deploy.timeout.clone();
+    if let Some(package_timeout) = &package_deploy.timeout {
+        if !package_timeout.is_zero() {
+            new_config.timeout = Some(package_timeout.clone());
+        }
     }
     new_config.env.extend(package_deploy.env.clone());
     if package_deploy.env_file.is_some() && base.env_file.is_none() {
@@ -502,7 +504,7 @@ mod tests {
         vars.insert("VAR1".to_string(), "VAL1".to_string());
 
         assert_eq!(Some(Memory::Mb512), env.memory);
-        assert_eq!(Timeout::new(60), env.timeout);
+        assert_eq!(Some(Timeout::new(60)), env.timeout);
         assert_eq!(Some(Path::new(".env.production")), env.env_file.as_deref());
         assert_eq!(Some(layers.to_vec()), env.layers);
         assert_eq!(Tracing::Active, env.tracing);
