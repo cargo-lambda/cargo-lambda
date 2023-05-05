@@ -1,12 +1,7 @@
-use axum::{
-    extract::Extension,
-    http::{header::HeaderName, HeaderValue},
-    Router,
-};
+use axum::{extract::Extension, http::header::HeaderName, Router};
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
 use cargo_lambda_metadata::env::EnvOptions;
 use clap::{Args, ValueHint};
-use hyper::Method;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
     global,
@@ -234,35 +229,7 @@ async fn start_server(
         .layer(Extension(resp_cache))
         .layer(TraceLayer::new_for_http())
         .layer(CatchPanicLayer::new())
-        .layer(
-            // This manually allows all possible localhost ports
-            // Access-Control-Allow-Origin wildcard '*' is blocked in browsers
-            CorsLayer::new()
-                .allow_origin(
-                    (0..=65535)
-                        .map(|port| format!("http://localhost:{}", port).parse().unwrap())
-                        .collect::<Vec<HeaderValue>>(),
-                )
-                .allow_credentials(true)
-                .allow_methods(vec![
-                    Method::OPTIONS,
-                    Method::GET,
-                    Method::POST,
-                    Method::PUT,
-                    Method::DELETE,
-                    Method::HEAD,
-                    Method::TRACE,
-                    Method::CONNECT,
-                    Method::PATCH,
-                ])
-                .allow_headers(vec![
-                    "content-type".parse().unwrap(),
-                    "authorization".parse().unwrap(),
-                    "x-amz-date".parse().unwrap(),
-                    "x-api-key".parse().unwrap(),
-                    "x-amz-security-token".parse().unwrap(),
-                ]),
-        );
+        .layer(CorsLayer::very_permissive());
 
     info!("invoke server listening on {}", addr);
     axum::Server::bind(&addr)
