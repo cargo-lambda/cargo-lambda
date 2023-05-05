@@ -759,7 +759,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "build-data",
  "cargo-lambda-build",
@@ -780,7 +780,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-build"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "async-trait",
  "cargo-lambda-interactive",
@@ -804,7 +804,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-deploy"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "aws-sdk-iam",
  "aws-sdk-s3",
@@ -827,7 +827,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-interactive"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "indicatif",
  "inquire",
@@ -838,7 +838,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-invoke"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "cargo-lambda-remote",
  "clap",
@@ -856,7 +856,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-metadata"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "aws-sdk-lambda",
  "cargo_metadata",
@@ -873,7 +873,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-new"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "cargo-lambda-interactive",
  "cargo-lambda-metadata",
@@ -894,7 +894,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-remote"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "aws-config",
  "aws-credential-types",
@@ -906,7 +906,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-watch"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "aws_lambda_events",
  "axum",
