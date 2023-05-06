@@ -29,7 +29,11 @@ pub struct RemoteConfig {
 }
 
 impl RemoteConfig {
-    pub async fn sdk_config(&self, retry: Option<RetryConfig>) -> SdkConfig {
+    pub async fn sdk_config_custom_endpoint(
+        &self,
+        retry: Option<RetryConfig>,
+        endpoint_url: Option<String>,
+    ) -> SdkConfig {
         let explicit_region = self.region.clone().map(Region::new);
 
         let region_provider = RegionProviderChain::first_try(explicit_region.clone())
@@ -38,9 +42,16 @@ impl RemoteConfig {
 
         let retry =
             retry.unwrap_or_else(|| RetryConfig::standard().with_max_attempts(self.retry_attempts));
-        let mut config_loader = aws_config::from_env()
-            .region(region_provider)
-            .retry_config(retry);
+        let mut config_loader = if let Some(endpoint_url) = endpoint_url {
+            aws_config::from_env()
+                .endpoint_url(endpoint_url)
+                .region(region_provider)
+                .retry_config(retry)
+        } else {
+            aws_config::from_env()
+                .region(region_provider)
+                .retry_config(retry)
+        };
 
         if let Some(profile) = &self.profile {
             let profile_region = ProfileFileRegionProvider::builder()
@@ -64,6 +75,10 @@ impl RemoteConfig {
         }
 
         config_loader.load().await
+    }
+
+    pub async fn sdk_config(&self, retry: Option<RetryConfig>) -> SdkConfig {
+        Self::sdk_config_custom_endpoint(self, retry, None).await
     }
 }
 
