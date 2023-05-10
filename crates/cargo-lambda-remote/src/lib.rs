@@ -33,10 +33,7 @@ pub struct RemoteConfig {
 }
 
 impl RemoteConfig {
-    pub async fn sdk_config(
-        &self,
-        retry: Option<RetryConfig>,
-    ) -> SdkConfig {
+    pub async fn sdk_config(&self, retry: Option<RetryConfig>) -> SdkConfig {
         let explicit_region = self.region.clone().map(Region::new);
 
         let region_provider = RegionProviderChain::first_try(explicit_region.clone())

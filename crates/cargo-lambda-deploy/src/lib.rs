@@ -123,10 +123,7 @@ impl Deploy {
             .with_max_attempts(3)
             .with_initial_backoff(Duration::from_secs(5));
 
-        let sdk_config = self
-            .remote_config
-            .sdk_config(Some(retry))
-            .await;
+        let sdk_config = self.remote_config.sdk_config(Some(retry)).await;
         let architecture = Architecture::from(archive.architecture.as_str());
         let compatible_runtimes = self
             .compatible_runtimes
