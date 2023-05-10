@@ -115,6 +115,7 @@ mod tests {
             region: None,
             alias: None,
             retry_attempts: 1,
+            endpoint_url: None,
         };
 
         let config = args.sdk_config(None).await;
@@ -141,6 +142,7 @@ mod tests {
             region: None,
             alias: None,
             retry_attempts: 1,
+            endpoint_url: None,
         };
 
         let config = args.sdk_config(None).await;
@@ -168,6 +170,7 @@ mod tests {
             region: None,
             alias: None,
             retry_attempts: 1,
+            endpoint_url: None,
         };
 
         let config = args.sdk_config(None).await;
@@ -195,6 +198,7 @@ mod tests {
             region: None,
             alias: None,
             retry_attempts: 1,
+            endpoint_url: None,
         };
 
         let config = args.sdk_config(None).await;
@@ -222,6 +226,7 @@ mod tests {
             region: None,
             alias: None,
             retry_attempts: 1,
+            endpoint_url: None,
         };
 
         let config = args.sdk_config(None).await;
