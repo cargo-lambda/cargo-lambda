@@ -26,13 +26,16 @@ pub struct RemoteConfig {
     /// Number of attempts to try failed operations
     #[arg(long, default_value = "1")]
     retry_attempts: u32,
+
+    /// Custom endpoint URL to target
+    #[arg(long)]
+    pub endpoint_url: Option<String>,
 }
 
 impl RemoteConfig {
-    pub async fn sdk_config_custom_endpoint(
+    pub async fn sdk_config(
         &self,
         retry: Option<RetryConfig>,
-        endpoint_url: Option<String>,
     ) -> SdkConfig {
         let explicit_region = self.region.clone().map(Region::new);
 
@@ -42,7 +45,7 @@ impl RemoteConfig {
 
         let retry =
             retry.unwrap_or_else(|| RetryConfig::standard().with_max_attempts(self.retry_attempts));
-        let mut config_loader = if let Some(endpoint_url) = endpoint_url {
+        let mut config_loader = if let Some(ref endpoint_url) = self.endpoint_url {
             aws_config::from_env()
                 .endpoint_url(endpoint_url)
                 .region(region_provider)
@@ -75,10 +78,6 @@ impl RemoteConfig {
         }
 
         config_loader.load().await
-    }
-
-    pub async fn sdk_config(&self, retry: Option<RetryConfig>) -> SdkConfig {
-        Self::sdk_config_custom_endpoint(self, retry, None).await
     }
 }
 

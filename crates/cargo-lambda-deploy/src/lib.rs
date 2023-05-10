@@ -98,10 +98,6 @@ pub struct Deploy {
     /// Name of the function or extension to deploy
     #[arg(value_name = "NAME")]
     name: Option<String>,
-
-    /// Custom endpoint URL to target
-    #[arg(long)]
-    endpoint_url: Option<String>,
 }
 
 impl Deploy {
@@ -129,7 +125,7 @@ impl Deploy {
 
         let sdk_config = self
             .remote_config
-            .sdk_config_custom_endpoint(Some(retry), self.endpoint_url.clone())
+            .sdk_config(Some(retry))
             .await;
         let architecture = Architecture::from(archive.architecture.as_str());
         let compatible_runtimes = self
