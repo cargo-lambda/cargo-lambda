@@ -1,6 +1,6 @@
 # cargo lambda deploy
 
-This subcommand uploads functions to AWS Lambda. You can use the same command to create new functions as well as update existent functions code. This command assumes that your AWS account has permissions to call several lambda operations, like `lambda:getFunction`, `lambda:createFunction`, and `lambda:updateFunctionCode`. This subcommand also requires an IAM role with privileges in AWS Lambda.
+This subcommand uploads functions to AWS Lambda. You can use the same command to create new functions as well as update existent functions code. This command assumes that your AWS account has permissions to call several lambda operations, like `lambda:getFunction`, `lambda:createFunction`, and `lambda:updateFunctionCode`. If you are using layers, you must also add `lambda:GetLayerVersion`. This subcommand also requires an IAM role with privileges in AWS Lambda.
 
 When you call this subcommand, the function binary must have been created with the [Build](/commands/build) subcommand ahead of time. The command will fail if it cannot find the binary file.
 
