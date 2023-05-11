@@ -2,7 +2,7 @@ use crate::{error::ServerError, requests::NextEvent, state::ExtensionCache};
 use cargo_lambda_metadata::cargo::function_environment_metadata;
 use ignore_files::{IgnoreFile, IgnoreFilter};
 use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
-use tracing::{debug, error, trace};
+use tracing::{debug, error, info, trace};
 use watchexec::{
     action::{Action, Outcome, PreSpawn},
     command::Command,
@@ -119,6 +119,7 @@ async fn runtime(
 
         let ext_cache = ext_cache.clone();
         async move {
+            info!(signals = ?signals, "searching signals");
             if signals.contains(&MainSignal::Terminate) {
                 action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
                 return Ok(());
@@ -168,6 +169,7 @@ async fn runtime(
                 ext_cache.send_event(event).await?;
             }
             let when_running = Outcome::both(Outcome::Stop, Outcome::Start);
+            info!("setting outcome to running");
             action.outcome(Outcome::if_running(when_running, Outcome::Start));
 
             Ok::<(), ServerError>(())
