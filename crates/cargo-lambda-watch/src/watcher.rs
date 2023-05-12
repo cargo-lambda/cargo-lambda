@@ -2,6 +2,7 @@ use crate::{error::ServerError, requests::NextEvent, state::ExtensionCache};
 use cargo_lambda_metadata::cargo::function_environment_metadata;
 use ignore_files::{IgnoreFile, IgnoreFilter};
 use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
+use tokio::sync::{mpsc::Receiver, Mutex};
 use tracing::{debug, error, info, trace};
 use watchexec::{
     action::{Action, Outcome, PreSpawn},
@@ -31,9 +32,10 @@ pub(crate) async fn new(
     cmd: Command,
     wc: WatcherConfig,
     ext_cache: ExtensionCache,
+    function_rx: Arc<Mutex<Receiver<Command>>>,
 ) -> Result<Arc<Watchexec>, ServerError> {
     let init = crate::watcher::init();
-    let runtime = crate::watcher::runtime(cmd, wc, ext_cache).await?;
+    let runtime = crate::watcher::runtime(cmd, wc, ext_cache, function_rx).await?;
 
     let wx = Watchexec::new(init, runtime).map_err(ServerError::WatcherError)?;
     wx.send_event(Event::default(), Priority::Urgent)
@@ -73,6 +75,7 @@ async fn runtime(
     cmd: Command,
     wc: WatcherConfig,
     ext_cache: ExtensionCache,
+    function_rx: Arc<Mutex<Receiver<Command>>>,
 ) -> Result<RuntimeConfig, ServerError> {
     let mut config = RuntimeConfig::default();
 
@@ -118,7 +121,24 @@ async fn runtime(
         );
 
         let ext_cache = ext_cache.clone();
+        let function_rx = function_rx.clone();
         async move {
+            let mut requested = vec![];
+            let mut function_rx = function_rx.lock().await;
+            while let Some(function) = function_rx.recv().await {
+                requested.push(function);
+            }
+
+            // Start up new functions
+            for cmd in requested {
+                info!(cmd = ?cmd, "starting function process");
+                action
+                    .start_process(cmd, watchexec::action::EventSet::All)
+                    .await;
+            }
+
+            let function_events: HashMap<String, Vec<Event>> = HashMap::new();
+
             info!(signals = ?signals, "searching signals");
             if signals.contains(&MainSignal::Terminate) {
                 action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
@@ -185,6 +205,7 @@ async fn runtime(
 
         async move {
             trace!("loading watch environment metadata");
+            info!("loading watch environment metadata");
 
             let env = function_environment_metadata(manifest_path, bin_name.as_deref())
                 .map_err(|err| {
