@@ -4,7 +4,7 @@ use crate::{
     error::ServerError,
     requests::{InvokeRequest, NextEvent},
     state::{ExtensionCache, RuntimeState},
-    watcher::WatcherConfig,
+    watcher::{FunctionData, WatcherConfig},
     CargoOptions,
 };
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
@@ -39,9 +39,24 @@ async fn start_scheduler(
     mut req_rx: Receiver<InvokeRequest>,
 ) -> Result<(), ServerError> {
     let (gc_tx, mut gc_rx) = mpsc::channel::<String>(10);
-    let (function_tx, function_rx) = mpsc::channel::<Command>(10);
+    let (function_tx, function_rx) = mpsc::channel::<FunctionData>(10);
     let function_rx = Arc::new(Mutex::new(function_rx));
-    let mut wx: Option<Arc<Watchexec>> = None;
+    let wx: Arc<Watchexec> = create_watcher(
+        cargo_options.clone(),
+        watcher_config.clone(),
+        state.ext_cache.clone(),
+        function_rx.clone(),
+    )
+    .await
+    .expect("watcher to start");
+
+    {
+        let wx = wx.clone();
+        let gc_tx = gc_tx.clone();
+        subsys.start("lambda runtime", move |s| {
+            start_watcher(s, wx.clone(), gc_tx.clone(), state.ext_cache.clone())
+        });
+    }
 
     loop {
         tokio::select! {
@@ -49,31 +64,10 @@ async fn start_scheduler(
                 let result = state.req_cache.upsert(req).await?;
                 if let Some((name, api)) = result {
                     if !watcher_config.only_lambda_apis {
-                        if let Some(wx) = wx.as_ref().cloned() {
-                            info!(function = name, "starting new lambda");
-                            let cmd = cargo_command(&name, &cargo_options);
-                            _ = function_tx.send(cmd).await;
-                            _ = wx.send_event(Event::default(), watchexec::event::Priority::Urgent).await;
-                        } else {
-                            let gc_tx = gc_tx.clone();
-                            let cargo_options = cargo_options.clone();
-                            let watcher_config = watcher_config.clone();
-                            let ext_cache = state.ext_cache.clone();
-                            let function_rx = function_rx.clone();
-                            let Ok(new_wx) = create_watcher(
-                                name,
-                                api,
-                                cargo_options,
-                                watcher_config,
-                                ext_cache.clone(),
-                                function_rx
-                            ).await else {
-                                continue;
-                            };
-                            wx = Some(new_wx.clone());
-
-                            subsys.start("lambda runtime", move |s| start_watcher(s, new_wx, gc_tx, ext_cache));
-                        }
+                        info!(function = name, "starting new lambda");
+                        let function_data = function_data(name, api, cargo_options.clone());
+                        _ = function_tx.send(function_data).await;
+                        _ = wx.send_event(Event::default(), watchexec::event::Priority::Urgent).await;
                     }
                 }
             },
@@ -90,25 +84,29 @@ async fn start_scheduler(
 }
 
 async fn create_watcher(
-    name: String,
-    runtime_api: String,
     cargo_options: CargoOptions,
-    mut watcher_config: WatcherConfig,
+    watcher_config: WatcherConfig,
     ext_cache: ExtensionCache,
-    function_rx: Arc<Mutex<Receiver<Command>>>,
+    function_rx: Arc<Mutex<Receiver<FunctionData>>>,
 ) -> Result<Arc<Watchexec>, ServerError> {
-    info!(function = ?name, manifest = ?cargo_options.manifest_path, "starting lambda function");
+    info!(manifest = ?cargo_options.manifest_path, "starting watcher");
+    crate::watcher::new(watcher_config, ext_cache.clone(), function_rx).await
+}
 
+fn function_data(name: String, runtime_api: String, cargo_options: CargoOptions) -> FunctionData {
     let cmd = cargo_command(&name, &cargo_options);
-    watcher_config.bin_name = if is_valid_bin_name(&name) {
+    let bin_name = if is_valid_bin_name(&name) {
         Some(name.clone())
     } else {
         None
     };
-    watcher_config.name = name.clone();
-    watcher_config.runtime_api = runtime_api;
 
-    crate::watcher::new(cmd, watcher_config, ext_cache.clone(), function_rx).await
+    FunctionData {
+        cmd,
+        name,
+        runtime_api,
+        bin_name,
+    }
 }
 
 async fn start_watcher(

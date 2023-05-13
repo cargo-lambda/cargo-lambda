@@ -5,7 +5,7 @@ use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, t
 use tokio::sync::{mpsc::Receiver, Mutex};
 use tracing::{debug, error, info, trace};
 use watchexec::{
-    action::{Action, Outcome, PreSpawn},
+    action::{Action, Outcome, PreSpawn, ProcessId},
     command::Command,
     config::{InitConfig, RuntimeConfig},
     error::RuntimeError,
@@ -17,9 +17,6 @@ use watchexec::{
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct WatcherConfig {
-    pub runtime_api: String,
-    pub name: String,
-    pub bin_name: Option<String>,
     pub base: PathBuf,
     pub manifest_path: PathBuf,
     pub ignore_files: Vec<IgnoreFile>,
@@ -29,13 +26,12 @@ pub(crate) struct WatcherConfig {
 }
 
 pub(crate) async fn new(
-    cmd: Command,
     wc: WatcherConfig,
     ext_cache: ExtensionCache,
-    function_rx: Arc<Mutex<Receiver<Command>>>,
+    function_rx: Arc<Mutex<Receiver<FunctionData>>>,
 ) -> Result<Arc<Watchexec>, ServerError> {
     let init = crate::watcher::init();
-    let runtime = crate::watcher::runtime(cmd, wc, ext_cache, function_rx).await?;
+    let runtime = crate::watcher::runtime(wc, ext_cache, function_rx).await?;
 
     let wx = Watchexec::new(init, runtime).map_err(ServerError::WatcherError)?;
     wx.send_event(Event::default(), Priority::Urgent)
@@ -71,18 +67,27 @@ fn init() -> InitConfig {
     config
 }
 
+#[derive(Debug)]
+pub(crate) struct FunctionData {
+    pub cmd: Command,
+    pub name: String,
+    pub runtime_api: String,
+    pub bin_name: Option<String>,
+}
+
 async fn runtime(
-    cmd: Command,
     wc: WatcherConfig,
     ext_cache: ExtensionCache,
-    function_rx: Arc<Mutex<Receiver<Command>>>,
+    function_rx: Arc<Mutex<Receiver<FunctionData>>>,
 ) -> Result<RuntimeConfig, ServerError> {
     let mut config = RuntimeConfig::default();
+    let function_cache: Arc<Mutex<HashMap<ProcessId, FunctionData>>> =
+        Arc::new(Mutex::new(HashMap::new()));
 
     debug!(ignore_files = ?wc.ignore_files, "creating watcher config");
 
     config.pathset([wc.base.clone()]);
-    config.commands(vec![cmd]);
+    config.commands(vec![]);
 
     let mut filter = IgnoreFilter::new(&wc.base, &wc.ignore_files)
         .await
@@ -96,114 +101,129 @@ async fn runtime(
 
     config.action_throttle(Duration::from_secs(3));
 
-    config.on_action(move |action: Action| {
-        let signals: Vec<MainSignal> = action.events.iter().flat_map(|e| e.signals()).collect();
-        let has_paths = action
-            .events
-            .iter()
-            .flat_map(|e| e.paths())
-            .next()
-            .is_some();
+    {
+        let function_cache = function_cache.clone();
+        config.on_action(move |action: Action| {
+            let signals: Vec<MainSignal> = action.events.iter().flat_map(|e| e.signals()).collect();
+            let has_paths = action
+                .events
+                .iter()
+                .flat_map(|e| e.paths())
+                .next()
+                .is_some();
 
-        let empty_event = action
-            .events
-            .iter()
-            .map(|e| e.is_empty())
-            .next()
-            .unwrap_or_default();
+            let empty_event = action
+                .events
+                .iter()
+                .map(|e| e.is_empty())
+                .next()
+                .unwrap_or_default();
 
-        debug!(
-            ?action,
-            ?signals,
-            has_paths,
-            empty_event,
-            "watcher action received"
-        );
+            debug!(
+                ?action,
+                ?signals,
+                has_paths,
+                empty_event,
+                "watcher action received"
+            );
 
-        let ext_cache = ext_cache.clone();
-        let function_rx = function_rx.clone();
-        async move {
-            let mut requested = vec![];
-            let mut function_rx = function_rx.lock().await;
-            while let Some(function) = function_rx.recv().await {
-                requested.push(function);
-            }
+            let ext_cache = ext_cache.clone();
+            let function_rx = function_rx.clone();
+            let function_cache = function_cache.clone();
+            async move {
+                let mut requested = vec![];
+                let mut function_rx = function_rx.lock().await;
+                while let Some(function) = function_rx.recv().await {
+                    requested.push(function);
+                }
+                drop(function_rx);
 
-            // Start up new functions
-            for cmd in requested {
-                info!(cmd = ?cmd, "starting function process");
-                action
-                    .start_process(cmd, watchexec::action::EventSet::All)
-                    .await;
-            }
+                // Start up new functions
+                for function in requested {
+                    info!(function = ?function, "starting function process");
+                    let process = action
+                        .start_process(function.cmd.clone(), watchexec::action::EventSet::All)
+                        .await;
+                    function_cache.lock().await.insert(process, function);
+                }
+                drop(function_cache);
 
-            let function_events: HashMap<String, Vec<Event>> = HashMap::new();
+                // TODO filter events
+                // let function_events: HashMap<String, Vec<Event>> = HashMap::new();
 
-            info!(signals = ?signals, "searching signals");
-            if signals.contains(&MainSignal::Terminate) {
-                action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
-                return Ok(());
-            }
+                info!(signals = ?signals, "searching signals");
+                if signals.contains(&MainSignal::Terminate) {
+                    action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
+                    return Ok(());
+                }
 
-            if signals.contains(&MainSignal::Interrupt) {
-                action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
-                return Ok(());
-            }
+                if signals.contains(&MainSignal::Interrupt) {
+                    action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
+                    return Ok(());
+                }
 
-            if !has_paths {
-                if !signals.is_empty() {
-                    let mut out = Outcome::DoNothing;
-                    for sig in signals {
-                        out = Outcome::both(out, Outcome::Signal(sig));
+                if !has_paths {
+                    if !signals.is_empty() {
+                        let mut out = Outcome::DoNothing;
+                        for sig in signals {
+                            out = Outcome::both(out, Outcome::Signal(sig));
+                        }
+
+                        action.outcome(out);
+                        return Ok(());
                     }
 
-                    action.outcome(out);
-                    return Ok(());
+                    let completion = action.events.iter().flat_map(|e| e.completions()).next();
+                    if let Some(status) = completion {
+                        match status {
+                            Some(ProcessEnd::ExitError(sig)) => {
+                                error!(code = ?sig, "command exited");
+                            }
+                            Some(ProcessEnd::ExitSignal(sig)) => {
+                                error!(code = ?sig, "command killed");
+                            }
+                            Some(ProcessEnd::ExitStop(sig)) => {
+                                error!(code = ?sig, "command stopped");
+                            }
+                            Some(ProcessEnd::Exception(sig)) => {
+                                error!(code = ?sig, "command ended by exception");
+                            }
+                            _ => {}
+                        };
+
+                        action.outcome(Outcome::DoNothing);
+                        return Ok(());
+                    }
                 }
 
-                let completion = action.events.iter().flat_map(|e| e.completions()).next();
-                if let Some(status) = completion {
-                    match status {
-                        Some(ProcessEnd::ExitError(sig)) => {
-                            error!(code = ?sig, "command exited");
-                        }
-                        Some(ProcessEnd::ExitSignal(sig)) => {
-                            error!(code = ?sig, "command killed");
-                        }
-                        Some(ProcessEnd::ExitStop(sig)) => {
-                            error!(code = ?sig, "command stopped");
-                        }
-                        Some(ProcessEnd::Exception(sig)) => {
-                            error!(code = ?sig, "command ended by exception");
-                        }
-                        _ => {}
-                    };
-
-                    action.outcome(Outcome::DoNothing);
-                    return Ok(());
+                if !empty_event {
+                    let event = NextEvent::shutdown("recompiling function");
+                    ext_cache.send_event(event).await?;
                 }
-            }
+                let when_running = Outcome::both(Outcome::Stop, Outcome::Start);
+                info!("setting outcome to running");
+                action.outcome(Outcome::if_running(when_running, Outcome::Start));
 
-            if !empty_event {
-                let event = NextEvent::shutdown("recompiling function");
-                ext_cache.send_event(event).await?;
+                Ok::<(), ServerError>(())
             }
-            let when_running = Outcome::both(Outcome::Stop, Outcome::Start);
-            info!("setting outcome to running");
-            action.outcome(Outcome::if_running(when_running, Outcome::Start));
-
-            Ok::<(), ServerError>(())
-        }
-    });
+        });
+    }
 
     config.on_pre_spawn(move |prespawn: PreSpawn| {
-        let name = wc.name.clone();
-        let runtime_api = wc.runtime_api.clone();
+        let function_cache = function_cache.clone();
         let manifest_path = wc.manifest_path.clone();
-        let bin_name = wc.bin_name.clone();
         let base_env = wc.env.clone();
 
         async move {
+            let function_cache = function_cache.clone().lock_owned().await;
+            let pid = prespawn.process();
+            let FunctionData {
+                cmd: _,
+                name,
+                runtime_api,
+                bin_name,
+            } = function_cache.get(&pid).expect("process to be registered");
+
             trace!("loading watch environment metadata");
             info!("loading watch environment metadata");
 
