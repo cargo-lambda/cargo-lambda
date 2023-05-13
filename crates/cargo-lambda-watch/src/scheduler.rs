@@ -117,6 +117,7 @@ async fn start_watcher(
 ) -> Result<(), ServerError> {
     tokio::select! {
         _ = wx.main() => {
+            info!("watcher main finished");
             if let Err(err) = gc_tx.send("watcher".to_string()).await {
                 error!(error = %err, "failed to send message to cleanup dead watcher");
             }

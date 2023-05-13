@@ -225,7 +225,10 @@ async fn runtime(
             } = function_cache.get(&pid).expect("process to be registered");
 
             trace!("loading watch environment metadata");
-            info!("loading watch environment metadata");
+            info!(
+                name = name,
+                "loading watch environment metadata for function"
+            );
 
             let env = function_environment_metadata(manifest_path, bin_name.as_deref())
                 .map_err(|err| {
