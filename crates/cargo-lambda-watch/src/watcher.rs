@@ -193,6 +193,9 @@ async fn runtime(
                 })
                 .unwrap_or_default();
 
+            println!("base env: {base_env:?}");
+            println!("env: {env:?}");
+
             if let Some(mut command) = prespawn.command().await {
                 command
                     .env("AWS_LAMBDA_FUNCTION_VERSION", "1")
