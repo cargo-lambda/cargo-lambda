@@ -204,6 +204,8 @@ async fn runtime(
                     .envs(env)
                     .env("AWS_LAMBDA_RUNTIME_API", &runtime_api)
                     .env("AWS_LAMBDA_FUNCTION_NAME", &name);
+
+                println!("command with ENV: {command:?}");
             }
 
             Ok::<(), Infallible>(())
