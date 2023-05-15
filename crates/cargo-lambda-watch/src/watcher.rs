@@ -5,7 +5,7 @@ use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, t
 use tokio::sync::{mpsc::Receiver, Mutex};
 use tracing::{debug, error, info, trace};
 use watchexec::{
-    action::{Action, Outcome, PreSpawn, ProcessId},
+    action::{Action, Outcome, PreSpawn, SupervisorId},
     command::Command,
     config::{InitConfig, RuntimeConfig},
     error::RuntimeError,
@@ -81,7 +81,7 @@ async fn runtime(
     function_rx: Arc<Mutex<Receiver<FunctionData>>>,
 ) -> Result<RuntimeConfig, ServerError> {
     let mut config = RuntimeConfig::default();
-    let function_cache: Arc<Mutex<HashMap<ProcessId, FunctionData>>> =
+    let function_cache: Arc<Mutex<HashMap<SupervisorId, FunctionData>>> =
         Arc::new(Mutex::new(HashMap::new()));
 
     debug!(ignore_files = ?wc.ignore_files, "creating watcher config");
