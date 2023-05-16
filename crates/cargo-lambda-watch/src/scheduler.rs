@@ -53,8 +53,9 @@ async fn start_scheduler(
     {
         let wx = wx.clone();
         let gc_tx = gc_tx.clone();
+        let ext_cache = state.ext_cache.clone();
         subsys.start("lambda runtime", move |s| {
-            start_watcher(s, wx.clone(), gc_tx.clone(), state.ext_cache.clone())
+            start_watcher(s, wx, gc_tx, ext_cache)
         });
     }
 
@@ -76,7 +77,6 @@ async fn start_scheduler(
             },
             _ = subsys.on_shutdown_requested() => {
                 info!("terminating lambda scheduler");
-                return Ok(());
             },
 
         };
@@ -126,7 +126,6 @@ async fn start_watcher(
             info!("terminating watcher");
         }
     }
-
     let event = NextEvent::shutdown(&format!("watcher shutting down"));
     ext_cache.send_event(event).await
 }

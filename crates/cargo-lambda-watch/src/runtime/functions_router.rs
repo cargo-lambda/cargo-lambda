@@ -101,10 +101,15 @@ async fn process_next_request(
         .header(LAMBDA_RUNTIME_AWS_REQUEST_ID, req_id)
         .header(LAMBDA_RUNTIME_DEADLINE_MS, 600_000_u32)
         .header(LAMBDA_RUNTIME_FUNCTION_ARN, "function-arn");
+    println!("received next request");
 
     let resp = match req_cache.pop(function_name).await {
-        None => builder.status(StatusCode::NO_CONTENT).body(Body::empty()),
+        None => {
+            println!("found function");
+            builder.status(StatusCode::NO_CONTENT).body(Body::empty())
+        }
         Some(invoke) => {
+            println!("found function");
             let req_id = req_id
                 .to_str()
                 .map_err(ServerError::InvalidRequestIdHeader)?;
