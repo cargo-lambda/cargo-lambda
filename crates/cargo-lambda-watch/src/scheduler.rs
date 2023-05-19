@@ -77,6 +77,7 @@ async fn start_scheduler(
             },
             _ = subsys.on_shutdown_requested() => {
                 info!("terminating lambda scheduler");
+                return;
             },
 
         };
