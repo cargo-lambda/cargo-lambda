@@ -199,10 +199,11 @@ async fn runtime(
                 if !empty_event {
                     let event = NextEvent::shutdown("recompiling function");
                     ext_cache.send_event(event).await?;
-                    let when_running = Outcome::both(Outcome::Stop, Outcome::Start);
-                    info!("setting outcome to running");
-                    action.outcome(Outcome::if_running(when_running, Outcome::Start));
                 }
+
+                let when_running = Outcome::both(Outcome::Stop, Outcome::Start);
+                info!("setting outcome to running");
+                action.outcome(Outcome::if_running(when_running, Outcome::Start));
 
                 Ok::<(), ServerError>(())
             }
