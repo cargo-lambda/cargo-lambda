@@ -5,8 +5,8 @@ use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, t
 use tokio::sync::{mpsc::Receiver, Mutex};
 use tracing::{debug, error, info, trace};
 use watchexec::{
-    action::{Action, Outcome, PreSpawn, SupervisorId},
-    command::Command,
+    action::{Action, Outcome, PreSpawn},
+    command::{Command, SupervisorId},
     config::{InitConfig, RuntimeConfig},
     error::RuntimeError,
     event::{Event, Priority, ProcessEnd},

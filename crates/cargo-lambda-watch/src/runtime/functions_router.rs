@@ -103,7 +103,10 @@ async fn process_next_request(
         .header(LAMBDA_RUNTIME_FUNCTION_ARN, "function-arn");
     println!("received next request");
 
-    let resp = match req_cache.pop(function_name).await {
+    let resp = match req_cache.pop(function_name).await.map(|req| {
+        println!("req: {req:?}");
+        req
+    }) {
         None => {
             println!("found function");
             builder.status(StatusCode::NO_CONTENT).body(Body::empty())
