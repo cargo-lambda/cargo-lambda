@@ -1,3 +1,5 @@
+use std::println;
+
 use crate::{
     error::ServerError,
     requests::*,
@@ -100,7 +102,10 @@ async fn process_next_request(
         .header(LAMBDA_RUNTIME_DEADLINE_MS, 600_000_u32)
         .header(LAMBDA_RUNTIME_FUNCTION_ARN, "function-arn");
 
-    let resp = match req_cache.pop(function_name).await {
+    let resp = match req_cache.pop(function_name).await.map(|req| {
+        println!("recieved req: {req:?}");
+        req
+    }) {
         None => builder.status(StatusCode::NO_CONTENT).body(Body::empty()),
         Some(invoke) => {
             let req_id = req_id
