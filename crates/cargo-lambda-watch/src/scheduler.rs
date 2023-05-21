@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     error::ServerError,
     requests::{InvokeRequest, NextEvent},
-    state::{ExtensionCache, RuntimeState},
+    state::{self, ExtensionCache, RuntimeState},
     watcher::{FunctionData, WatcherConfig},
     CargoOptions,
 };
@@ -41,23 +41,29 @@ async fn start_scheduler(
     let (gc_tx, mut gc_rx) = mpsc::channel::<String>(10);
     let (function_tx, function_rx) = mpsc::channel::<FunctionData>(10);
     let function_rx = Arc::new(Mutex::new(function_rx));
-    let wx: Arc<Watchexec> = create_watcher(
-        cargo_options.clone(),
-        watcher_config.clone(),
-        state.ext_cache.clone(),
-        function_rx.clone(),
-    )
-    .await
-    .expect("watcher to start");
+    let (wx_tx, wx_rx): (_, tokio::sync::oneshot::Receiver<Arc<Watchexec>>) =
+        tokio::sync::oneshot::channel();
 
     {
-        let wx = wx.clone();
         let gc_tx = gc_tx.clone();
+        let cargo_options = cargo_options.clone();
+        let watcher_config = watcher_config.clone();
         let ext_cache = state.ext_cache.clone();
-        subsys.start("lambda runtime", move |s| {
-            start_watcher(s, wx, gc_tx, ext_cache)
+        let function_rx = function_rx.clone();
+        subsys.start("watcher system", move |s| {
+            start_watcher(
+                s,
+                wx_tx,
+                gc_tx,
+                cargo_options,
+                watcher_config,
+                function_rx,
+                ext_cache,
+            )
         });
     }
+
+    let wx = wx_rx.await.expect("expect watcher to start");
 
     loop {
         tokio::select! {
@@ -112,10 +118,23 @@ fn function_data(name: String, runtime_api: String, cargo_options: CargoOptions)
 
 async fn start_watcher(
     subsys: SubsystemHandle,
-    wx: Arc<Watchexec>,
+    wx_tx: tokio::sync::oneshot::Sender<Arc<Watchexec>>,
     gc_tx: Sender<String>,
+    cargo_options: CargoOptions,
+    watcher_config: WatcherConfig,
+    function_rx: Arc<Mutex<Receiver<FunctionData>>>,
     ext_cache: ExtensionCache,
 ) -> Result<(), ServerError> {
+    let wx = create_watcher(
+        cargo_options,
+        watcher_config,
+        ext_cache.clone(),
+        function_rx,
+    )
+    .await?;
+
+    wx_tx.send(wx.clone()).expect("watcher to be received");
+
     tokio::select! {
         _ = wx.main() => {
             info!("watcher main finished");
