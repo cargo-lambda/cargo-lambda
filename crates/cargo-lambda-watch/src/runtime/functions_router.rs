@@ -91,6 +91,7 @@ async fn process_next_request(
     } else {
         function_name
     };
+    println!("recieved req: {req:?}");
 
     let req_id = req
         .headers()
