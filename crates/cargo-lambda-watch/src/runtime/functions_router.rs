@@ -91,7 +91,6 @@ async fn process_next_request(
     } else {
         function_name
     };
-    println!("recieved req: {req:?}");
 
     let req_id = req
         .headers()
@@ -103,10 +102,7 @@ async fn process_next_request(
         .header(LAMBDA_RUNTIME_DEADLINE_MS, 600_000_u32)
         .header(LAMBDA_RUNTIME_FUNCTION_ARN, "function-arn");
 
-    let resp = match req_cache.pop(function_name).await.map(|req| {
-        println!("recieved req: {req:?}");
-        req
-    }) {
+    let resp = match req_cache.pop(function_name).await {
         None => builder.status(StatusCode::NO_CONTENT).body(Body::empty()),
         Some(invoke) => {
             let req_id = req_id
