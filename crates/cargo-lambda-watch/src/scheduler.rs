@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     error::ServerError,
     requests::{InvokeRequest, NextEvent},
-    state::{self, ExtensionCache, RuntimeState},
+    state::{ExtensionCache, RuntimeState},
     watcher::{FunctionData, WatcherConfig},
     CargoOptions,
 };
