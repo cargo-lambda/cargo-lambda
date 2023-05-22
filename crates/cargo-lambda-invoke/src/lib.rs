@@ -33,11 +33,18 @@ const EXAMPLES_URL: &str = "https://github.com/calavera/aws-lambda-events/raw/ma
     after_help = "Full command documentation: https://www.cargo-lambda.info/commands/invoke.html"
 )]
 pub struct Invoke {
+    #[cfg_attr(
+        target_os = "windows",
+        arg(short = 'a', long, default_value = "127.0.0.1")
+    )]
+    #[cfg_attr(
+        not(target_os = "windows"),
+        arg(short = 'a', long, default_value = "::1")
+    )]
     /// Local address host (IPv4 or IPv6) to send invoke requests
-    #[arg(short = 'a', long, default_value = "127.0.0.1")]
     invoke_address: String,
 
-    /// Local port to send invoke requests
+    /// Local port to send invoke equests
     #[arg(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
 
