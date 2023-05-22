@@ -44,7 +44,7 @@ pub struct Invoke {
     /// Local address host (IPv4 or IPv6) to send invoke requests
     invoke_address: String,
 
-    /// Local port to send invoke equests
+    /// Local port to send invoke requests
     #[arg(short = 'p', long, default_value = "9000")]
     invoke_port: u16,
 
