@@ -90,16 +90,6 @@ async fn start_scheduler(
     }
 }
 
-async fn create_watcher(
-    cargo_options: CargoOptions,
-    watcher_config: WatcherConfig,
-    ext_cache: ExtensionCache,
-    function_rx: Arc<Mutex<Receiver<FunctionData>>>,
-) -> Result<Arc<Watchexec>, ServerError> {
-    info!(manifest = ?cargo_options.manifest_path, "starting watcher");
-    crate::watcher::new(watcher_config, ext_cache.clone(), function_rx).await
-}
-
 fn function_data(name: String, runtime_api: String, cargo_options: CargoOptions) -> FunctionData {
     let cmd = cargo_command(&name, &cargo_options);
     let bin_name = if is_valid_bin_name(&name) {
@@ -125,13 +115,8 @@ async fn start_watcher(
     function_rx: Arc<Mutex<Receiver<FunctionData>>>,
     ext_cache: ExtensionCache,
 ) -> Result<(), ServerError> {
-    let wx = create_watcher(
-        cargo_options,
-        watcher_config,
-        ext_cache.clone(),
-        function_rx,
-    )
-    .await?;
+    info!(manifest = ?cargo_options.manifest_path, "starting watcher");
+    let wx = crate::watcher::new(watcher_config, ext_cache.clone(), function_rx).await?;
 
     wx_tx.send(wx.clone()).expect("watcher to be received");
 
