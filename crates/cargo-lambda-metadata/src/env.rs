@@ -1,13 +1,8 @@
 use aws_sdk_lambda::model::{environment::Builder, Environment};
 use clap::{Args, ValueHint};
 use env_file_reader::read_file;
-use miette::{IntoDiagnostic, Result, WrapErr};
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{BufRead, BufReader},
-    path::PathBuf,
-};
+use miette::{IntoDiagnostic, Result};
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::error::MetadataError;
 
