@@ -1,5 +1,6 @@
 use aws_sdk_lambda::model::{environment::Builder, Environment};
 use clap::{Args, ValueHint};
+use env_file_reader::read_file;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use std::{
     collections::HashMap,
@@ -56,18 +57,8 @@ pub(crate) fn lambda_environment(
 
     if let Some(path) = env_file {
         if path.is_file() {
-            let file = File::open(path)
-                .into_diagnostic()
-                .wrap_err(format!("failed to open env file: {path:?}"))?;
-            let reader = BufReader::new(file);
-
-            for line in reader.lines() {
-                let line = line.into_diagnostic().wrap_err("failed to read env line")?;
-                if line.is_empty() || line.starts_with('#') {
-                    continue;
-                }
-
-                let (key, value) = extract_var(&line)?;
+            let env_variables = read_file(path).into_diagnostic()?;
+            for (key, value) in env_variables {
                 env = env.variables(key, value);
             }
         }
@@ -160,7 +151,7 @@ mod test {
     #[test]
     fn test_environment_with_file() {
         let file = temp_dir().join(".env");
-        std::fs::write(&file, "BAR=BAZ\n\nQUUX=QUUUX\n#IGNORE=ME").unwrap();
+        std::fs::write(&file, "BAR=BAZ\n\nexport QUUX = 'QUUUX'\n#IGNORE=ME").unwrap();
 
         let mut base = HashMap::new();
         base.insert("FOO".into(), "BAR".into());
