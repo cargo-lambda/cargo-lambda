@@ -87,7 +87,6 @@ async fn runtime(
     debug!(ignore_files = ?wc.ignore_files, "creating watcher config");
 
     config.pathset([wc.base.clone()]);
-    config.commands(vec![]);
 
     let mut filter = IgnoreFilter::new(&wc.base, &wc.ignore_files)
         .await
@@ -103,6 +102,7 @@ async fn runtime(
 
     {
         let function_cache = function_cache.clone();
+
         config.on_action(move |action: Action| {
             let signals: Vec<MainSignal> = action.events.iter().flat_map(|e| e.signals()).collect();
             let has_paths = action
@@ -131,34 +131,25 @@ async fn runtime(
             let function_rx = function_rx.clone();
             let function_cache = function_cache.clone();
             async move {
-                let mut requested = vec![];
-                let mut function_rx = function_rx.lock().await;
-                while let Some(function) = function_rx.recv().await {
-                    requested.push(function);
-                }
-                drop(function_rx);
-
-                // Start up new functions
-                for function in requested {
-                    info!(function = ?function, "starting function process");
-                    let process = action
-                        .start_process(function.cmd.clone(), watchexec::action::EventSet::All)
-                        .await;
-                    function_cache.lock().await.insert(process, function);
-                }
-                drop(function_cache);
-
                 // TODO filter events
                 // let function_events: HashMap<String, Vec<Event>> = HashMap::new();
+                async fn apply_all(action: &Action, outcome: Outcome) {
+                    for &function in action.list() {
+                        action
+                            .apply(outcome.clone(), function, watchexec::action::EventSet::All)
+                            .await;
+                    }
+                }
 
                 info!(signals = ?signals, "searching signals");
                 if signals.contains(&MainSignal::Terminate) {
-                    action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
+                    apply_all(&action, Outcome::both(Outcome::Stop, Outcome::Exit)).await;
+
                     return Ok(());
                 }
 
                 if signals.contains(&MainSignal::Interrupt) {
-                    action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
+                    apply_all(&action, Outcome::both(Outcome::Stop, Outcome::Exit)).await;
                     return Ok(());
                 }
 
@@ -168,8 +159,8 @@ async fn runtime(
                         for sig in signals {
                             out = Outcome::both(out, Outcome::Signal(sig));
                         }
+                        apply_all(&action, out).await;
 
-                        action.outcome(out);
                         return Ok(());
                     }
 
@@ -191,7 +182,8 @@ async fn runtime(
                             _ => {}
                         };
 
-                        action.outcome(Outcome::DoNothing);
+                        // `DoNothing` is equivalent to doing nothing here and applying no
+                        // outcome.
                         return Ok(());
                     }
                 }
@@ -203,7 +195,16 @@ async fn runtime(
 
                 let when_running = Outcome::both(Outcome::Stop, Outcome::Start);
                 info!("setting outcome to running");
-                action.outcome(Outcome::if_running(when_running, Outcome::Start));
+                apply_all(&action, Outcome::if_running(when_running, Outcome::Start)).await;
+
+                // Start up new functions only if
+                while let Some(function) = function_rx.lock().await.recv().await {
+                    info!(function = ?function, "starting function process");
+                    let process = action
+                        .create(vec![function.cmd.clone()], watchexec::action::EventSet::All)
+                        .await;
+                    function_cache.lock().await.insert(process, function);
+                }
 
                 Ok::<(), ServerError>(())
             }
@@ -217,13 +218,13 @@ async fn runtime(
 
         async move {
             let function_cache = function_cache.clone().lock_owned().await;
-            let pid = prespawn.process();
-            let FunctionData {
+            let pid = prespawn.supervisor();
+            let Some(FunctionData {
                 cmd: _,
                 name,
                 runtime_api,
                 bin_name,
-            } = function_cache.get(&pid).expect("process to be registered");
+            }) = function_cache.get(&pid) else { return Ok::<(), Infallible>(()); };
 
             trace!("loading watch environment metadata");
 
@@ -233,9 +234,6 @@ async fn runtime(
                     err
                 })
                 .unwrap_or_default();
-
-            println!("base env: {base_env:?}");
-            println!("env: {env:?}");
 
             if let Some(mut command) = prespawn.command().await {
                 command
