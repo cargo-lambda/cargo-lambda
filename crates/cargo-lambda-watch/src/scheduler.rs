@@ -45,7 +45,6 @@ async fn start_scheduler(
         tokio::sync::oneshot::channel();
 
     {
-        let gc_tx = gc_tx.clone();
         let cargo_options = cargo_options.clone();
         let watcher_config = watcher_config.clone();
         let ext_cache = state.ext_cache.clone();
@@ -139,7 +138,10 @@ fn is_valid_bin_name(name: &str) -> bool {
     !name.is_empty() && name != DEFAULT_PACKAGE_FUNCTION
 }
 
-fn cargo_command(name: &str, cargo_options: &CargoOptions) -> watchexec::command::Command {
+pub(crate) fn cargo_command(
+    name: &str,
+    cargo_options: &CargoOptions,
+) -> watchexec::command::Command {
     let mut args = vec!["run".into()];
     if let Some(features) = cargo_options.features.as_deref() {
         args.push("--features".into());
