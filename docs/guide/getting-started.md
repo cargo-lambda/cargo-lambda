@@ -129,7 +129,3 @@ jobs:
 ## AWS CDK Support
 
 You can build and deploy Rust functions with Cargo Lambda and the AWS CDK with the [constructs in the Cargo Lambda CDK repository](https://github.com/cargo-lambda/cargo-lambda-cdk).
-
-## Rust version
-
-This project works with Rust 1.64 and above.

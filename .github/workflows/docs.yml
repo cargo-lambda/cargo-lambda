@@ -1,4 +1,3 @@
-# Simple workflow for deploying static content to GitHub Pages
 name: Deploy documentation
 
 on:
@@ -36,7 +35,7 @@ jobs:
           version: 6.32.9
       - uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 18
           cache: 'pnpm'
           cache-dependency-path: docs/pnpm-lock.yaml
       - name: Build docs

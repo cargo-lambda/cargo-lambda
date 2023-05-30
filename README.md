@@ -7,10 +7,6 @@ cargo-lambda is a [Cargo](https://doc.rust-lang.org/cargo/) subcommand to help y
 
 Get started by looking at **[the documentation](https://www.cargo-lambda.info/guide/getting-started)**.
 
-## Rust version
-
-This project works with Rust 1.64 and above.
-
 ## License
 
 This project is released under the [MIT License](/LICENSE).

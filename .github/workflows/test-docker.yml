@@ -1,9 +1,17 @@
 name: Test Docker image
 
 on:
-  push:
+  pull_request:
     paths:
       - "Dockerfile"
+      - '.github/workflows/test-docker.yml'
+
+  push:
+    branches: [ 'main' ]
+    tags-ignore: [ '*' ]
+    paths:
+      - "Dockerfile"
+      - '.github/workflows/test-docker.yml'
 
 jobs:
   docker:
@@ -23,8 +31,8 @@ jobs:
         with:
           context: .
           load: true
-          tags: ghcr.io/cargo-lambda/cargo-lambda:${{ github.ref_name }}
+          tags: ghcr.io/cargo-lambda/cargo-lambda:test
 
       - name: Test Docker image
         run: |
-          docker run --rm ghcr.io/cargo-lambda/cargo-lambda:${{ github.ref_name }}
+          docker run --rm ghcr.io/cargo-lambda/cargo-lambda:test
