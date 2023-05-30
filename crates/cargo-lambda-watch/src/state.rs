@@ -3,11 +3,13 @@ use crate::{
     requests::{InvokeRequest, NextEvent},
 };
 use axum::{body::Body, response::Response};
+use miette::Result;
+use mpsc::{channel, Receiver, Sender};
 use std::{
-    collections::{hash_map::Entry, HashMap, VecDeque},
+    collections::{hash_map::Entry, HashMap},
     sync::Arc,
 };
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -18,43 +20,52 @@ pub(crate) struct RuntimeState {
 
 #[derive(Clone)]
 pub(crate) struct RequestQueue {
-    inner: Arc<Mutex<VecDeque<InvokeRequest>>>,
+    tx: Arc<Sender<InvokeRequest>>,
+    rx: Arc<Mutex<Receiver<InvokeRequest>>>,
 }
 
 impl RequestQueue {
     pub fn new() -> RequestQueue {
+        let (tx, rx) = channel::<InvokeRequest>(100);
+
         RequestQueue {
-            inner: Arc::new(Mutex::new(VecDeque::new())),
+            tx: Arc::new(tx),
+            rx: Arc::new(Mutex::new(rx)),
         }
     }
 
     pub async fn pop(&self) -> Option<InvokeRequest> {
-        let mut queue = self.inner.lock().await;
-        queue.pop_front()
+        let mut rx = self.rx.lock().await;
+        rx.recv().await
     }
 
-    pub async fn push(&self, req: InvokeRequest) {
-        let mut queue = self.inner.lock().await;
-        queue.push_back(req);
+    pub async fn push(&self, req: InvokeRequest) -> Result<(), ServerError> {
+        self.tx
+            .send(req)
+            .await
+            .map_err(|e| ServerError::SendInvokeMessage(Box::new(e)))
     }
 }
 
 #[derive(Clone)]
 pub(crate) struct RequestCache {
     server_addr: String,
-    inner: Arc<Mutex<HashMap<String, RequestQueue>>>,
+    inner: Arc<RwLock<HashMap<String, RequestQueue>>>,
 }
 
 impl RequestCache {
     pub fn new(server_addr: String) -> RequestCache {
         RequestCache {
             server_addr,
-            inner: Arc::new(Mutex::new(HashMap::new())),
+            inner: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    pub async fn upsert(&self, req: InvokeRequest) -> Option<(String, String)> {
-        let mut inner = self.inner.lock().await;
+    pub async fn upsert(
+        &self,
+        req: InvokeRequest,
+    ) -> Result<Option<(String, String)>, ServerError> {
+        let mut inner = self.inner.write().await;
         let name = req.function_name.clone();
 
         match inner.entry(name) {
@@ -63,30 +74,31 @@ impl RequestCache {
                 let runtime_api = format!("{}/{}", &self.server_addr, &name);
 
                 let stack = RequestQueue::new();
-                stack.push(req).await;
+                stack.push(req).await?;
                 v.insert(stack);
 
-                Some((name, runtime_api))
+                Ok(Some((name, runtime_api)))
             }
             Entry::Occupied(o) => {
-                o.into_mut().push(req).await;
-                None
+                o.into_mut().push(req).await?;
+                Ok(None)
             }
         }
     }
 
     pub async fn pop(&self, function_name: &str) -> Option<InvokeRequest> {
-        let inner = self.inner.lock().await;
+        let inner = self.inner.read().await;
         let stack = match inner.get(function_name) {
             None => return None,
-            Some(s) => s,
+            Some(s) => s.clone(),
         };
+        drop(inner);
 
         stack.pop().await
     }
 
     pub async fn clean(&self, function_name: &str) {
-        let mut inner = self.inner.lock().await;
+        let mut inner = self.inner.write().await;
         inner.remove(function_name);
     }
 }
