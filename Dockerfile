@@ -1,5 +1,5 @@
 ARG RUST_VERSION=1.66.0
-FROM --platform=$BUILDPLATFORM rust:${RUST_VERSION}
+FROM rust:${RUST_VERSION}
 
 RUN set -eux; \
     rustup toolchain install stable; \
