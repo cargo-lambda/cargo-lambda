@@ -1,0 +1,35 @@
+name: Test documentation
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/test-docs.yml'
+
+  push:
+    branches: [ 'main' ]
+    tags-ignore: [ '*' ]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/test-docs.yml'
+
+jobs:
+  test-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 6.32.9
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'pnpm'
+          cache-dependency-path: docs/pnpm-lock.yaml
+      - name: Build docs
+        working-directory: docs
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run docs:build
