@@ -20,8 +20,7 @@ pub(crate) async fn init_scheduler(
     let (req_tx, req_rx) = mpsc::channel::<InvokeRequest>(100);
 
     subsys.start("lambda scheduler", move |s| async move {
-        start_scheduler(s, state, cargo_options, watcher_config, req_rx).await;
-        Ok::<_, std::convert::Infallible>(())
+        start_scheduler(s, state, cargo_options, watcher_config, req_rx).await
     });
 
     req_tx
@@ -33,13 +32,14 @@ async fn start_scheduler(
     cargo_options: CargoOptions,
     watcher_config: WatcherConfig,
     mut req_rx: Receiver<InvokeRequest>,
-) {
+) -> Result<(), ServerError> {
     let (gc_tx, mut gc_rx) = mpsc::channel::<String>(10);
 
     loop {
         tokio::select! {
             Some(req) = req_rx.recv() => {
-                if let Some((name, api)) = state.req_cache.upsert(req).await {
+                let result = state.req_cache.upsert(req).await?;
+                if let Some((name, api)) = result {
                     if !watcher_config.only_lambda_apis {
                         let gc_tx = gc_tx.clone();
                         let cargo_options = cargo_options.clone();
@@ -54,7 +54,7 @@ async fn start_scheduler(
             },
             _ = subsys.on_shutdown_requested() => {
                 info!("terminating lambda scheduler");
-                return;
+                return Ok(());
             },
 
         };
