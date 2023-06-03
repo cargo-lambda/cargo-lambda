@@ -22,7 +22,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.19.2"
+version = "0.19.3"
 authors = ["David Calavera"]
 edition = "2021"
 license = "MIT"
@@ -40,14 +40,14 @@ aws-sdk-s3 = "0.23.0"
 aws-sdk-sts = "0.23.0"
 aws-smithy-types = "0.53.0"
 aws-types = "0.53.0"
-cargo-lambda-build = { version = "0.19.2", path = "crates/cargo-lambda-build" }
-cargo-lambda-deploy = { version = "0.19.2", path = "crates/cargo-lambda-deploy" }
-cargo-lambda-interactive = { version = "0.19.2", path = "crates/cargo-lambda-interactive" }
-cargo-lambda-invoke = { version = "0.19.2", path = "crates/cargo-lambda-invoke" }
-cargo-lambda-metadata = { version = "0.19.2", path = "crates/cargo-lambda-metadata" }
-cargo-lambda-new = { version = "0.19.2", path = "crates/cargo-lambda-new" }
-cargo-lambda-remote = { version = "0.19.2", path = "crates/cargo-lambda-remote" }
-cargo-lambda-watch = { version = "0.19.2", path = "crates/cargo-lambda-watch" }
+cargo-lambda-build = { version = "0.19.3", path = "crates/cargo-lambda-build" }
+cargo-lambda-deploy = { version = "0.19.3", path = "crates/cargo-lambda-deploy" }
+cargo-lambda-interactive = { version = "0.19.3", path = "crates/cargo-lambda-interactive" }
+cargo-lambda-invoke = { version = "0.19.3", path = "crates/cargo-lambda-invoke" }
+cargo-lambda-metadata = { version = "0.19.3", path = "crates/cargo-lambda-metadata" }
+cargo-lambda-new = { version = "0.19.3", path = "crates/cargo-lambda-new" }
+cargo-lambda-remote = { version = "0.19.3", path = "crates/cargo-lambda-remote" }
+cargo-lambda-watch = { version = "0.19.3", path = "crates/cargo-lambda-watch" }
 clap = { version = "4", features = ["derive"] }
 dunce = "1.0.3"
 home = "0.5.3"
