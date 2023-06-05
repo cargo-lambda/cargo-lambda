@@ -198,13 +198,15 @@ async fn runtime(
                 apply_all(&action, Outcome::if_running(when_running, Outcome::Start)).await;
 
                 // Start up new functions only if
-                while let Some(function) = function_rx.lock().await.recv().await {
+                while let Ok(function) = function_rx.lock().await.try_recv() {
                     info!(function = ?function, "starting function process");
                     let process = action
                         .create(vec![function.cmd.clone()], watchexec::action::EventSet::All)
                         .await;
                     function_cache.lock().await.insert(process, function);
                 }
+
+                println!("action handler done!");
 
                 Ok::<(), ServerError>(())
             }

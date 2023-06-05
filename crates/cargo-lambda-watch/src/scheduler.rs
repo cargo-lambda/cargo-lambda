@@ -1,20 +1,18 @@
-use std::sync::Arc;
-
 use crate::{
-    error::ServerError,
-    requests::{InvokeRequest, NextEvent},
-    state::{ExtensionCache, RuntimeState},
+    requests::InvokeRequest,
+    state::RuntimeState,
     watcher::{FunctionData, WatcherConfig},
     CargoOptions,
 };
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
+use std::sync::Arc;
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
     Mutex,
 };
 use tokio_graceful_shutdown::SubsystemHandle;
 use tracing::{error, info};
-use watchexec::{command::Command, event::Event, Watchexec};
+use watchexec::{command::Command, event::Event};
 
 pub(crate) async fn init_scheduler(
     subsys: &SubsystemHandle,
@@ -37,32 +35,16 @@ async fn start_scheduler(
     cargo_options: CargoOptions,
     watcher_config: WatcherConfig,
     mut req_rx: Receiver<InvokeRequest>,
-) -> Result<(), ServerError> {
-    let (gc_tx, mut gc_rx) = mpsc::channel::<String>(10);
+) {
     let (function_tx, function_rx) = mpsc::channel::<FunctionData>(10);
     let function_rx = Arc::new(Mutex::new(function_rx));
-    let (wx_tx, wx_rx): (_, tokio::sync::oneshot::Receiver<Arc<Watchexec>>) =
-        tokio::sync::oneshot::channel();
 
-    {
-        let cargo_options = cargo_options.clone();
-        let watcher_config = watcher_config.clone();
-        let ext_cache = state.ext_cache.clone();
-        let function_rx = function_rx.clone();
-        subsys.start("watcher system", move |s| {
-            start_watcher(
-                s,
-                wx_tx,
-                gc_tx,
-                cargo_options,
-                watcher_config,
-                function_rx,
-                ext_cache,
-            )
-        });
-    }
+    let wx = crate::watcher::new(watcher_config.clone(), state.ext_cache.clone(), function_rx)
+        .await
+        .expect("watcher to start");
 
-    let wx = wx_rx.await.expect("expect watcher to start");
+    let wx_handle = wx.main();
+    tokio::pin!(wx_handle);
 
     loop {
         tokio::select! {
@@ -77,14 +59,14 @@ async fn start_scheduler(
                     }
                 }
             },
-            Some(gc) = gc_rx.recv() => {
-                state.req_cache.clean(&gc).await;
+            _ = &mut wx_handle => {
+                error!("watcher main stopped");
+                panic!("watcher main stopped")
             },
             _ = subsys.on_shutdown_requested() => {
                 info!("terminating lambda scheduler");
                 return;
             },
-
         };
     }
 }
@@ -103,35 +85,6 @@ fn function_data(name: String, runtime_api: String, cargo_options: CargoOptions)
         runtime_api,
         bin_name,
     }
-}
-
-async fn start_watcher(
-    subsys: SubsystemHandle,
-    wx_tx: tokio::sync::oneshot::Sender<Arc<Watchexec>>,
-    gc_tx: Sender<String>,
-    cargo_options: CargoOptions,
-    watcher_config: WatcherConfig,
-    function_rx: Arc<Mutex<Receiver<FunctionData>>>,
-    ext_cache: ExtensionCache,
-) -> Result<(), ServerError> {
-    info!(manifest = ?cargo_options.manifest_path, "starting watcher");
-    let wx = crate::watcher::new(watcher_config, ext_cache.clone(), function_rx).await?;
-
-    wx_tx.send(wx.clone()).expect("watcher to be received");
-
-    tokio::select! {
-        _ = wx.main() => {
-            info!("watcher main finished");
-            if let Err(err) = gc_tx.send("watcher".to_string()).await {
-                error!(error = %err, "failed to send message to cleanup dead watcher");
-            }
-        },
-        _ = subsys.on_shutdown_requested() => {
-            info!("terminating watcher");
-        }
-    }
-    let event = NextEvent::shutdown(&format!("watcher shutting down"));
-    ext_cache.send_event(event).await
 }
 
 fn is_valid_bin_name(name: &str) -> bool {
