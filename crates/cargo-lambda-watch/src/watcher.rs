@@ -2,10 +2,13 @@ use crate::{error::ServerError, requests::NextEvent, state::ExtensionCache};
 use cargo_lambda_metadata::cargo::function_environment_metadata;
 use ignore_files::{IgnoreFile, IgnoreFilter};
 use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
-use tokio::sync::{mpsc::Receiver, Mutex};
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    Mutex,
+};
 use tracing::{debug, error, info, trace};
 use watchexec::{
-    action::{Action, Outcome, PreSpawn},
+    action::{Action, Outcome, PostSpawn, PreSpawn},
     command::{Command, SupervisorId},
     config::{InitConfig, RuntimeConfig},
     error::RuntimeError,
@@ -29,9 +32,10 @@ pub(crate) async fn new(
     wc: WatcherConfig,
     ext_cache: ExtensionCache,
     function_rx: Arc<Mutex<Receiver<FunctionData>>>,
+    gc_tx: Sender<String>,
 ) -> Result<Arc<Watchexec>, ServerError> {
     let init = crate::watcher::init();
-    let runtime = crate::watcher::runtime(wc, ext_cache, function_rx).await?;
+    let runtime = crate::watcher::runtime(wc, ext_cache, function_rx, gc_tx).await?;
 
     let wx = Watchexec::new(init, runtime).map_err(ServerError::WatcherError)?;
     wx.send_event(Event::default(), Priority::Urgent)
@@ -79,6 +83,7 @@ async fn runtime(
     wc: WatcherConfig,
     ext_cache: ExtensionCache,
     function_rx: Arc<Mutex<Receiver<FunctionData>>>,
+    gc_tx: Sender<String>,
 ) -> Result<RuntimeConfig, ServerError> {
     let mut config = RuntimeConfig::default();
     let function_cache: Arc<Mutex<HashMap<SupervisorId, FunctionData>>> =
@@ -213,8 +218,9 @@ async fn runtime(
         });
     }
 
+    let fc_clone = function_cache.clone();
     config.on_pre_spawn(move |prespawn: PreSpawn| {
-        let function_cache = function_cache.clone();
+        let function_cache = fc_clone.clone();
         let manifest_path = wc.manifest_path.clone();
         let base_env = wc.env.clone();
 
@@ -249,6 +255,29 @@ async fn runtime(
                 println!("command with ENV: {command:?}");
             }
 
+            Ok::<(), Infallible>(())
+        }
+    });
+
+    config.on_post_spawn(move |postspawn: PostSpawn| {
+        let function_cache = function_cache.clone();
+        let gc_tx = gc_tx.clone();
+
+        async move {
+            let sup = postspawn.supervisor();
+
+            // TODO should we `expect` a name here to ensure sanity of state or does it not matter
+            // enough?
+            // let name = function_cache.lock().await.remove(&sup).expect("function to be in cache").name;
+            
+            let Some(name) = function_cache.lock().await.remove(&sup).map(|f| f.name) else {
+                return Ok(());
+            };
+
+            if let Err(err) = gc_tx.send(name.clone()).await {
+                error!(error = %err, function = ?name, "failed to send message to clean up dead function");
+            }
+            
             Ok::<(), Infallible>(())
         }
     });

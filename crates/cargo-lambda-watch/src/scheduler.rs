@@ -37,11 +37,17 @@ async fn start_scheduler(
     mut req_rx: Receiver<InvokeRequest>,
 ) {
     let (function_tx, function_rx) = mpsc::channel::<FunctionData>(10);
+    let (gc_tx, mut gc_rx) = mpsc::channel::<String>(10);
     let function_rx = Arc::new(Mutex::new(function_rx));
 
-    let wx = crate::watcher::new(watcher_config.clone(), state.ext_cache.clone(), function_rx)
-        .await
-        .expect("watcher to start");
+    let wx = crate::watcher::new(
+        watcher_config.clone(),
+        state.ext_cache.clone(),
+        function_rx,
+        gc_tx,
+    )
+    .await
+    .expect("watcher to start");
 
     let wx_handle = wx.main();
     tokio::pin!(wx_handle);
@@ -59,9 +65,15 @@ async fn start_scheduler(
                     }
                 }
             },
-            _ = &mut wx_handle => {
-                error!("watcher main stopped");
-                panic!("watcher main stopped")
+            Some(name) = gc_rx.recv() => {
+                state.req_cache.clean(&name).await;
+            }
+            res = &mut wx_handle => {
+                if let Err(err) = res {
+                    error!(error = %err, "watcher stopped with error");
+                }
+                info!("watcher stopped gracefully");
+                subsys.request_shutdown()
             },
             _ = subsys.on_shutdown_requested() => {
                 info!("terminating lambda scheduler");

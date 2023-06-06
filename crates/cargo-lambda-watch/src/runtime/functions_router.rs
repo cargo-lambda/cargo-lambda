@@ -1,5 +1,3 @@
-use std::println;
-
 use crate::{
     error::ServerError,
     requests::*,
