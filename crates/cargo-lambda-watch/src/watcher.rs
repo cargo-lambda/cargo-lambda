@@ -12,7 +12,7 @@ use watchexec::{
     command::{Command, SupervisorId},
     config::{InitConfig, RuntimeConfig},
     error::RuntimeError,
-    event::{Event, Priority, ProcessEnd},
+    event::{Event, Priority, ProcessEnd, Tag},
     handler::SyncFnHandler,
     signal::source::MainSignal,
     ErrorHook, Watchexec,
@@ -107,6 +107,7 @@ async fn runtime(
 
     {
         let function_cache = function_cache.clone();
+        let gc_tx = gc_tx.clone();
 
         config.on_action(move |action: Action| {
             let signals: Vec<MainSignal> = action.events.iter().flat_map(|e| e.signals()).collect();
@@ -124,6 +125,19 @@ async fn runtime(
                 .next()
                 .unwrap_or_default();
 
+            // TODO gc completed lambda functions
+            let process_completions = action
+                .events
+                .iter()
+                .filter_map(|e| {
+                    e.tags.iter().find_map(|t| match t {
+                        Tag::ProcessCompletion(data) => Some(data),
+                        _ => None,
+                    })
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+
             debug!(
                 ?action,
                 ?signals,
@@ -135,6 +149,7 @@ async fn runtime(
             let ext_cache = ext_cache.clone();
             let function_rx = function_rx.clone();
             let function_cache = function_cache.clone();
+            let gc_tx = gc_tx.clone();
             async move {
                 // TODO filter events
                 // let function_events: HashMap<String, Vec<Event>> = HashMap::new();
@@ -211,6 +226,19 @@ async fn runtime(
                     function_cache.lock().await.insert(process, function);
                 }
 
+                // TODO gc completed lambda functions
+                for _process_end in process_completions {
+                    /*
+                    let Some(name) = function_cache.lock().await.remove(&e.).map(|f| f.name) else {
+                        continue;
+                    };
+
+                    if let Err(err) = gc_tx.send(name.clone()).await {
+                        error!(error = %err, function = ?name, "failed to send message to clean up dead function");
+                    }
+                    */
+                }
+
                 println!("action handler done!");
 
                 Ok::<(), ServerError>(())
@@ -255,29 +283,6 @@ async fn runtime(
                 println!("command with ENV: {command:?}");
             }
 
-            Ok::<(), Infallible>(())
-        }
-    });
-
-    config.on_post_spawn(move |postspawn: PostSpawn| {
-        let function_cache = function_cache.clone();
-        let gc_tx = gc_tx.clone();
-
-        async move {
-            let sup = postspawn.supervisor();
-
-            // TODO should we `expect` a name here to ensure sanity of state or does it not matter
-            // enough?
-            // let name = function_cache.lock().await.remove(&sup).expect("function to be in cache").name;
-            
-            let Some(name) = function_cache.lock().await.remove(&sup).map(|f| f.name) else {
-                return Ok(());
-            };
-
-            if let Err(err) = gc_tx.send(name.clone()).await {
-                error!(error = %err, function = ?name, "failed to send message to clean up dead function");
-            }
-            
             Ok::<(), Infallible>(())
         }
     });
