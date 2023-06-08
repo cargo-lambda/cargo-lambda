@@ -114,6 +114,14 @@ layers = [                     # List of layers to deploy with your function
 tags = { "team" = "lambda" }   # List of AWS resource tags for this function
 ```
 
+## Deploying to S3
+
+AWS Lambda has a 50MB limit for Zip file direct uploads. If the Zip file that you're trying to deploy is larger than 50MB, you can upload it to S3 using the `--s3-bucket` option. This option takes the name of a bucket in your account where the Zip file will be stored. To use this option, you need `Post` or `Put` access to S3 in your deployment credentials:
+
+```
+cargo lambda deploy --s3-bucket bucket-name
+```
+
 ## Other options
 
 Use the `--help` flag to see other options to configure the function's deployment.
