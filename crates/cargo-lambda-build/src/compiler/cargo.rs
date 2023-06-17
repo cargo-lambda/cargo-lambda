@@ -27,7 +27,12 @@ impl Cargo {
 
 #[async_trait::async_trait]
 impl Compiler for Cargo {
-    async fn command(&self, cargo: &Build, _target_arch: &TargetArch) -> Result<Command> {
+    async fn command(
+        &self,
+        cargo: &Build,
+        _target_arch: &TargetArch,
+        _skip_target_check: bool,
+    ) -> Result<Command> {
         tracing::debug!("compiling with Cargo");
 
         let mut cmd = if let Some(subcommand) = &self.compiler.subcommand {
