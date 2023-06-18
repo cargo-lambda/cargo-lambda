@@ -1,5 +1,4 @@
 use cargo_lambda_interactive::{
-    choose_option,
     error::{CustomUserError, InquireError},
     is_stdin_tty,
     validator::{ErrorMessage, Validation},
@@ -39,51 +38,6 @@ pub(crate) enum HttpFeature {
     ApigwWebsockets,
 }
 
-enum HttpEndpoints {
-    Alb,
-    ApigwRest,
-    ApigwHttp,
-    ApigwWebsockets,
-    LambdaUrls,
-    Unknown,
-}
-
-impl std::fmt::Display for HttpEndpoints {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Alb => write!(f, "Amazon Elastic Application Load Balancer (ALB)"),
-            Self::ApigwRest => write!(f, "Amazon Api Gateway REST Api"),
-            Self::ApigwHttp => write!(f, "Amazon Api Gateway HTTP Api"),
-            Self::ApigwWebsockets => write!(f, "Amazon Api Gateway Websockets"),
-            Self::LambdaUrls => write!(f, "AWS Lambda function URLs"),
-            Self::Unknown => write!(f, "I don't know yet"),
-        }
-    }
-}
-
-impl HttpEndpoints {
-    fn to_feature(&self) -> Option<HttpFeature> {
-        match self {
-            Self::Alb => Some(HttpFeature::Alb),
-            Self::ApigwRest => Some(HttpFeature::ApigwRest),
-            Self::ApigwHttp | Self::LambdaUrls => Some(HttpFeature::ApigwHttp),
-            Self::ApigwWebsockets => Some(HttpFeature::ApigwWebsockets),
-            Self::Unknown => None,
-        }
-    }
-
-    fn all() -> Vec<HttpEndpoints> {
-        vec![
-            HttpEndpoints::Unknown,
-            HttpEndpoints::Alb,
-            HttpEndpoints::ApigwRest,
-            HttpEndpoints::ApigwHttp,
-            HttpEndpoints::ApigwWebsockets,
-            HttpEndpoints::LambdaUrls,
-        ]
-    }
-}
-
 impl Options {
     pub(crate) fn validate_options(&mut self, no_interactive: bool) -> Result<(), CreateError> {
         if no_interactive {
@@ -119,14 +73,6 @@ impl Options {
                 .with_help_message("type `yes` if the Lambda function is triggered by an API Gateway, Amazon Load Balancer(ALB), or a Lambda URL")
                 .with_default(false)
                 .prompt()?;
-        }
-
-        if self.http && self.http_feature.is_none() {
-            let http_endpoint = choose_option(
-                "Which service is this function receiving events from?",
-                HttpEndpoints::all(),
-            )?;
-            self.http_feature = http_endpoint.to_feature();
         }
 
         if !self.http {
