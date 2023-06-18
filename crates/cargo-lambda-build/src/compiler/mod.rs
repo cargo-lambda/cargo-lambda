@@ -13,7 +13,12 @@ use cross::Cross;
 
 #[async_trait::async_trait]
 pub(crate) trait Compiler {
-    async fn command(&self, cargo: &Build, target_arch: &TargetArch) -> Result<Command>;
+    async fn command(
+        &self,
+        cargo: &Build,
+        target_arch: &TargetArch,
+        skip_target_check: bool,
+    ) -> Result<Command>;
 
     fn build_profile<'a>(&self, cargo: &'a Build) -> &'a str {
         build_profile(cargo.profile.as_deref(), cargo.release)

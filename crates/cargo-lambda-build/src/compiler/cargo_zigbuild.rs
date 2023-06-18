@@ -9,13 +9,20 @@ pub(crate) struct CargoZigbuild;
 
 #[async_trait::async_trait]
 impl Compiler for CargoZigbuild {
-    async fn command(&self, cargo: &Build, target_arch: &TargetArch) -> Result<Command> {
+    async fn command(
+        &self,
+        cargo: &Build,
+        target_arch: &TargetArch,
+        skip_target_check: bool,
+    ) -> Result<Command> {
         tracing::debug!("compiling with CargoZigbuild");
         crate::zig::check_installation().await?;
 
         // confirm that target component is included in host toolchain, or add
         // it with `rustup` otherwise.
-        crate::toolchain::check_target_component_with_rustc_meta(target_arch).await?;
+        if !skip_target_check {
+            crate::toolchain::check_target_component_with_rustc_meta(target_arch).await?;
+        }
 
         #[allow(unused_mut)]
         let mut zig_build: ZigBuild = cargo.to_owned().into();

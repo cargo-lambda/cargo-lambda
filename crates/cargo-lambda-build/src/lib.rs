@@ -69,6 +69,10 @@ pub struct Build {
     #[arg(long)]
     flatten: Option<String>,
 
+    /// Whether to skip the target check
+    #[arg(long)]
+    skip_target_check: bool,
+
     #[arg(short, long, env = "CARGO_LAMBDA_COMPILER")]
     compiler: Option<CompilerFlag>,
 
@@ -178,7 +182,9 @@ impl Build {
 
         let compiler = new_compiler(compiler_option);
         let profile = compiler.build_profile(&self.build);
-        let cmd = compiler.command(&self.build, &target_arch).await;
+        let cmd = compiler
+            .command(&self.build, &target_arch, self.skip_target_check)
+            .await;
 
         let mut cmd = match cmd {
             Ok(cmd) => cmd,
