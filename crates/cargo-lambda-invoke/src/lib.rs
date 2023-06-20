@@ -56,7 +56,7 @@ pub struct Invoke {
     #[arg(short = 'A', long)]
     data_ascii: Option<String>,
 
-    /// Example payload from LegNeato/aws-lambda-events
+    /// Example payload from AWS Lambda Events
     #[arg(short = 'E', long)]
     data_example: Option<String>,
 

@@ -61,13 +61,23 @@ cargo lambda watch
 
 ## Step 4: Test your function
 
-The [invoke](/commands/invoke) subcommand can send payloads to the function running locally:
+The [invoke](/commands/invoke) subcommand can send JSON payloads to the function running locally. Payloads are deserialized into strongly typed Rust structs, and the invoke call will fail if the payload doesn't have the right shape.
+
+If you're starting with a basic function that only receives events with a `command` field in the payload, you can invoke them with the following command:
 
 ```sh
 cargo lambda invoke --data-ascii "{ \"command\": \"hi\" }"
 ```
 
-If you're testing an HTTP function, you can access it with your browser from the local endpoint: `http://localhost:9000/lambda-url/new-lambda-project`.
+If you're starting an HTTP function, you can access it with your browser from the local endpoint: `http://localhost:9000/`. You can also invoke HTTP functions with the `invoke` subcommand, the payload to send will depend if this function receives calls from Amazon API Gateway, Amazon Elastic Load Balancer, or Lambda Function URLs.
+
+If your function integrates with Amazon API Gateway, you can use one of the payload examples that we provide by using the `--data-example` flag:
+
+```sh
+cargo lambda invoke http-lambda --data-example apigw-request
+```
+
+Read more about the example flag in the [Invoke documentation](/commands/invoke.html#example-data).
 
 ## Step 5: Build the function to deploy it on AWS Lambda
 
