@@ -53,7 +53,7 @@ cargo lambda invoke basic-lambda --data-file examples/my-payload.json
 
 ## Example data
 
-The `--data-example` flag allows you to fetch an example payload from the [aws-lambda-events repository](https://github.com/LegNeato/aws-lambda-events/), and use it as your request payload. For example, if you want to use the [example-apigw-request.json](https://github.com/LegNeato/aws-lambda-events/blob/master/aws_lambda_events/src/generated/fixtures/example-apigw-request.json) payload, you have to pass the name `apigw-request` into this flag:
+The `--data-example` flag allows you to fetch an example payload from the [aws-lambda-events repository](https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/lambda-events), and use it as your request payload. For example, if you want to use the [example-apigw-request.json](https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/lambda-events/src/fixtures/example-apigw-request.json) payload, you have to pass the name `apigw-request` into this flag:
 
 ```
 cargo lambda invoke http-lambda --data-example apigw-request
