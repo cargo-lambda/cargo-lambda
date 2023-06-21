@@ -1,7 +1,7 @@
 use cargo_lambda_interactive::{error::InquireError, is_user_cancellation_error};
 use cargo_lambda_metadata::{
     cargo::{
-        binary_targets_from_metadata, function_build_metadata, load_metadata,
+        binary_targets_from_metadata, function_build_metadata, load_metadata, target_dir,
         target_dir_from_metadata, CompilerOptions,
     },
     fs::copy_and_replace,
@@ -13,7 +13,7 @@ use object::{read::File as ObjectFile, Architecture, Object};
 use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
-    env,
+    env, fmt,
     fs::{create_dir_all, read, File},
     io::Write,
     path::{Path, PathBuf},
@@ -277,12 +277,17 @@ pub struct BinaryArchive {
 
 /// Search for the bootstrap file for a function inside the target directory.
 /// If the binary file exists, it creates the zip archive and extracts its architecture by reading the binary.
-pub fn find_binary_archive<P: AsRef<Path>>(
+pub fn find_binary_archive<M, P>(
     name: &str,
+    manifest_path: M,
     base_dir: &Option<P>,
     is_extension: bool,
-) -> Result<BinaryArchive> {
-    let target_dir = Path::new("target");
+) -> Result<BinaryArchive>
+where
+    M: AsRef<Path> + fmt::Debug,
+    P: AsRef<Path>,
+{
+    let target_dir = target_dir(manifest_path).unwrap_or_else(|_| PathBuf::from("target"));
     let (dir_name, binary_name, parent) = if is_extension {
         ("extensions", name, Some("extensions"))
     } else {
