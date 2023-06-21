@@ -220,7 +220,12 @@ impl Deploy {
                 };
                 let binary_name = self.binary_name.as_deref().unwrap_or(&name);
 
-                let arc = find_binary_archive(binary_name, &self.lambda_dir, self.extension)?;
+                let arc = find_binary_archive(
+                    binary_name,
+                    &self.manifest_path,
+                    &self.lambda_dir,
+                    self.extension,
+                )?;
                 (name, arc)
             }
         };
