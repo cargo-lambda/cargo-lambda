@@ -262,7 +262,7 @@ impl Build {
             }
         }
         if !found_binaries {
-            warn!("no binaries found in target after build, try using the --bin or --package options to build specific binaries");
+            warn!(?base, "no binaries found in target directory after build, try using the --bin or --package options to build specific binaries");
         }
 
         Ok(())
@@ -326,12 +326,15 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     let path = binary_path.as_ref();
     let dir = destination_directory.as_ref();
     let zipped = dir.join(format!("{name}.zip"));
+    debug!(name, parent, ?path, ?dir, ?zipped, "zipping binary");
 
     let zipped_binary = File::create(&zipped).into_diagnostic()?;
     let binary_data = read(path).into_diagnostic()?;
     let binary_perm = binary_permissions(path)?;
     let binary_data = &*binary_data;
-    let object = ObjectFile::parse(binary_data).into_diagnostic()?;
+    let object = ObjectFile::parse(binary_data)
+        .into_diagnostic()
+        .wrap_err("the provided function file is not a valid Linux binary")?;
 
     let arch = match object.architecture() {
         Architecture::Aarch64 => "arm64",
@@ -352,8 +355,10 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
         PathBuf::from(name)
     };
 
+    let zip_file_name = convert_to_unix_path(&file_name)
+        .ok_or_else(|| miette::miette!("invalid file name: {file_name}"))?;
     zip.start_file(
-        convert_to_unix_path(&file_name).expect("failed to convert file path"),
+        zip_file_name,
         FileOptions::default().unix_permissions(binary_perm),
     )
     .into_diagnostic()?;

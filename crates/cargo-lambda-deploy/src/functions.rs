@@ -211,17 +211,17 @@ async fn upsert_function(
                 Some(role) => (role.clone(), false),
             };
 
-            tracing::debug!(role_arn = ?iam_role, config = ?deploy_metadata, "creating new function");
+            debug!(role_arn = ?iam_role, config = ?deploy_metadata, "creating new function");
             progress.set_message("deploying function");
 
             let code = match &s3_bucket {
                 None => {
-                    tracing::debug!("uploading zip to Lambda");
+                    debug!("uploading zip to Lambda");
                     let blob = Blob::new(binary_data);
                     FunctionCode::builder().zip_file(blob).build()
                 }
                 Some(bucket) => {
-                    tracing::debug!(bucket = bucket, "uploading zip to S3");
+                    debug!(bucket = bucket, "uploading zip to S3");
                     let client = S3Client::new(sdk_config);
                     client
                         .put_object()
@@ -369,7 +369,7 @@ async fn upsert_function(
             }
 
             if update_config {
-                tracing::debug!(config = ?builder, "updating function's configuration");
+                debug!(config = ?builder, "updating function's configuration");
                 builder
                     .send()
                     .await
@@ -397,12 +397,12 @@ async fn upsert_function(
 
             match &s3_bucket {
                 None => {
-                    tracing::debug!("uploading zip to Lambda");
+                    debug!("uploading zip to Lambda");
                     let blob = Blob::new(binary_data);
                     builder = builder.zip_file(blob)
                 }
                 Some(bucket) => {
-                    tracing::debug!(bucket = bucket, "uploading zip to S3");
+                    debug!(bucket = bucket, "uploading zip to S3");
 
                     let client = S3Client::new(sdk_config);
                     let mut operation = client
