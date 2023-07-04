@@ -1,5 +1,6 @@
 use super::{build_profile, Compiler};
 use crate::TargetArch;
+use cargo_lambda_metadata::cargo::CargoMetadata;
 use cargo_options::Build;
 use cargo_zigbuild::Build as ZigBuild;
 use miette::Result;
@@ -13,6 +14,7 @@ impl Compiler for CargoZigbuild {
         &self,
         cargo: &Build,
         target_arch: &TargetArch,
+        _cargo_metadata: &CargoMetadata,
         skip_target_check: bool,
     ) -> Result<Command> {
         tracing::debug!("compiling with CargoZigbuild");

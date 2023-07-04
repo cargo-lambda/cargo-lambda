@@ -1,5 +1,5 @@
 use aws_sdk_lambda::model::Environment;
-use cargo_metadata::Metadata as CargoMetadata;
+pub use cargo_metadata::Metadata as CargoMetadata;
 use miette::{IntoDiagnostic, Result};
 use serde::Deserialize;
 use std::{
