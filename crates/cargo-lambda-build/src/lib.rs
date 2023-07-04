@@ -183,7 +183,7 @@ impl Build {
         let compiler = new_compiler(compiler_option);
         let profile = compiler.build_profile(&self.build);
         let cmd = compiler
-            .command(&self.build, &target_arch, self.skip_target_check)
+            .command(&self.build, &target_arch, &metadata, self.skip_target_check)
             .await;
 
         let mut cmd = match cmd {

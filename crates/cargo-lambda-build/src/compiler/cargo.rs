@@ -1,6 +1,6 @@
 use super::Compiler;
 use crate::TargetArch;
-use cargo_lambda_metadata::cargo::CargoCompilerOptions;
+use cargo_lambda_metadata::cargo::{CargoCompilerOptions, CargoMetadata};
 use cargo_options::Build;
 use miette::Result;
 use std::{collections::VecDeque, env, ffi::OsStr, process::Command};
@@ -31,6 +31,7 @@ impl Compiler for Cargo {
         &self,
         cargo: &Build,
         _target_arch: &TargetArch,
+        _cargo_metadata: &CargoMetadata,
         _skip_target_check: bool,
     ) -> Result<Command> {
         tracing::debug!("compiling with Cargo");
