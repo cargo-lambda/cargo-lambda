@@ -51,15 +51,20 @@ fn default_cross_image(target: &str, metadata: &CargoMetadata) -> Option<(String
 
 fn is_build_image_configured(target_arch: &str, env_name: &str, metadata: &CargoMetadata) -> bool {
     // Check for cross configuration in the package's Cargo.toml
-    for pkg in &metadata.packages {
+    'outer: for pkg in &metadata.packages {
         for target in &pkg.targets {
             if target.kind.iter().any(|kind| kind == "bin") && pkg.metadata.is_object() {
-                if let Some(cross) = pkg.metadata.get("cross") {
-                    if cross.get("target").is_some_and(|t| {
-                        t.get(target_arch).is_some_and(|t| t.get("image").is_some())
-                    }) {
-                        return true;
-                    }
+                let Some(cross) = pkg.metadata.get("cross") else {
+                    break 'outer;
+                };
+                let Some(t) = cross.get("target") else {
+                    break 'outer;
+                };
+                let Some(arch) = t.get(target_arch) else {
+                    break 'outer;
+                };
+                if arch.get("image").is_some() {
+                    return true;
                 }
             }
         }
@@ -67,11 +72,12 @@ fn is_build_image_configured(target_arch: &str, env_name: &str, metadata: &Cargo
 
     // Check for cross configuration in the workspace's Cargo.toml
     if let Some(cross) = metadata.workspace_metadata.get("cross") {
-        if cross
-            .get("target")
-            .is_some_and(|t| t.get(target_arch).is_some_and(|t| t.get("image").is_some()))
-        {
-            return true;
+        if let Some(target) = cross.get("target") {
+            if let Some(arch) = target.get(target_arch) {
+                if arch.get("image").is_some() {
+                    return true;
+                }
+            }
         }
     }
 
