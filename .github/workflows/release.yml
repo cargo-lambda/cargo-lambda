@@ -89,7 +89,7 @@ jobs:
           { target: "armv7-unknown-linux-musleabi", image_tag: "armv7-musleabi" },
         ]
     container:
-      image: rust-cross/rust-musl-cross:${{ matrix.platform.image_tag }}
+      image: ghcr.io/rust-cross/rust-musl-cross:${{ matrix.platform.image_tag }}
       env:
         CFLAGS_armv7_unknown_linux_musleabihf: '-mfpu=vfpv3-d16'
     steps:
