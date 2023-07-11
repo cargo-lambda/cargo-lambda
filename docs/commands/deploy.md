@@ -96,6 +96,15 @@ cargo lambda build --release --extension
 cargo lambda deploy --extension
 ```
 
+### Internal extensions
+
+To deploy an [internal extension](https://docs.aws.amazon.com/lambda/latest/dg/lambda-extensions.html), add the `--internal` flag to the deploy command:
+
+```
+cargo lambda build --release --extension
+cargo lambda deploy --extension --internal
+```
+
 ## Deploy configuration in Cargo's Metadata
 
 You can keep some deploy configuration options in your project's `Cargo.toml` file. This give you a more "configuration as code" approach since you can store that configuration along side your project. The following example shows the options that you can specify in the metadata, all of them are optional:
