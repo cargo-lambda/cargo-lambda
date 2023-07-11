@@ -36,3 +36,4 @@ cargo-test-macro = { git = "https://github.com/rust-lang/cargo" }
 cargo-test-support = { git = "https://github.com/rust-lang/cargo" }
 dunce = "1.0.3"
 snapbox = { version = "0.4.3", features = ["cmd", "debug"] }
+zip.workspace = true

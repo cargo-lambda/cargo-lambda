@@ -64,6 +64,10 @@ pub struct Build {
     #[arg(long)]
     extension: bool,
 
+    /// Whether an extension is internal or external
+    #[arg(long, requires = "extension")]
+    internal: bool,
+
     /// Put a bootstrap file in the root of the lambda directory.
     /// Use the name of the compiled binary to choose which file to move.
     #[arg(long)]
@@ -251,7 +255,7 @@ impl Build {
                         copy_and_replace(binary, bootstrap_dir.join(bin_name)).into_diagnostic()?;
                     }
                     OutputFormat::Zip => {
-                        let parent = if self.extension {
+                        let parent = if self.extension && !self.internal {
                             Some("extensions")
                         } else {
                             None
@@ -282,13 +286,16 @@ pub fn find_binary_archive<M, P>(
     manifest_path: M,
     base_dir: &Option<P>,
     is_extension: bool,
+    is_internal: bool,
 ) -> Result<BinaryArchive>
 where
     M: AsRef<Path> + fmt::Debug,
     P: AsRef<Path>,
 {
     let target_dir = target_dir(manifest_path).unwrap_or_else(|_| PathBuf::from("target"));
-    let (dir_name, binary_name, parent) = if is_extension {
+    let (dir_name, binary_name, parent) = if is_extension && is_internal {
+        ("extensions", name, None)
+    } else if is_extension && !is_internal {
         ("extensions", name, Some("extensions"))
     } else {
         (name, "bootstrap", None)
@@ -302,7 +309,9 @@ where
 
     let binary_path = bootstrap_dir.join(binary_name);
     if !binary_path.exists() {
-        let build_cmd = if is_extension {
+        let build_cmd = if is_extension && is_internal {
+            "build --extension --internal"
+        } else if is_extension && !is_internal {
             "build --extension"
         } else {
             "build"

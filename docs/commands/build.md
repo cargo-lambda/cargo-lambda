@@ -76,6 +76,12 @@ If you want to create a zip file with the structure that AWS Lambda expects to f
 cargo lambda build --release --extension --output-format zip
 ```
 
+If you're building an internal extension, add the `--internal` flag to the build command. You can skip this flag if you use `cargo lambda deploy` to deploy the extension later.
+
+```
+cargo lambda build --release --extension --internal --output-format zip
+```
+
 ## Compiler backends
 
 Cargo Lambda has an internal abstraction to work with different ways to compile functions.
