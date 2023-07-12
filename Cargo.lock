@@ -957,7 +957,6 @@ dependencies = [
  "miette 4.7.1",
  "opentelemetry",
  "opentelemetry-aws",
- "project-origins",
  "query_map",
  "reqwest",
  "serde",

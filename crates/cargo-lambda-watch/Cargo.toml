@@ -28,7 +28,6 @@ dunce.workspace = true
 http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
 hyper = "0.14.18"
 ignore-files = "=1.2.0"
-project-origins = "1.2.0"
 miette.workspace = true
 opentelemetry = "0.17.0"
 opentelemetry-aws = "0.5.0"
