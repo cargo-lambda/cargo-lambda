@@ -9,6 +9,7 @@ use opentelemetry::{
 };
 use opentelemetry_aws::trace::XrayPropagator;
 use std::{
+    collections::HashSet,
     net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
     str::FromStr,
@@ -170,12 +171,22 @@ async fn discover_ignore_files(base: &Path) -> Vec<ignore_files::IgnoreFile> {
     trace!(ignore_files = ?origin_ignore, errors = ?origin_ignore_errs, "discovered ignore files from origin");
     ignore_files.append(&mut origin_ignore);
 
-    for parent in project_origins::origins(base).await {
-        let types = project_origins::types(&parent).await;
-        if !types.contains(&project_origins::ProjectType::Cargo) {
+    let mut origins = HashSet::new();
+    let mut current = base;
+    if base.is_dir() && base.join("Cargo.toml").is_file() {
+        origins.insert(base.to_owned());
+    }
+
+    while let Some(parent) = current.parent() {
+        current = parent;
+        if current.is_dir() && current.join("Cargo.toml").is_file() {
+            origins.insert(current.to_owned());
+        } else {
             break;
         }
+    }
 
+    for parent in origins {
         let (mut parent_ignore, parent_ignore_errs) = ignore_files::from_origin(&parent).await;
         trace!(parent = ?parent, ignore_files = ?parent_ignore, errors = ?parent_ignore_errs, "discovered ignore files from parent origin");
         ignore_files.append(&mut parent_ignore);
