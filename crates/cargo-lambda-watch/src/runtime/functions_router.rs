@@ -12,6 +12,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use base64::{engine::general_purpose as b64, Engine as _};
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
 use tracing::debug;
 
@@ -117,7 +118,12 @@ async fn process_next_request(
 
             let headers = parts.headers;
             if let Some(h) = headers.get(LAMBDA_RUNTIME_CLIENT_CONTEXT) {
-                builder = builder.header(LAMBDA_RUNTIME_CLIENT_CONTEXT, h);
+                let ctx = b64::STANDARD.encode(h.as_bytes());
+                let ctx = ctx.as_bytes();
+                if ctx.len() > 3583 {
+                    return Err(ServerError::InvalidClientContext(ctx.len()));
+                }
+                builder = builder.header(LAMBDA_RUNTIME_CLIENT_CONTEXT, ctx);
             }
             if let Some(h) = headers.get(LAMBDA_RUNTIME_COGNITO_IDENTITY) {
                 builder = builder.header(LAMBDA_RUNTIME_COGNITO_IDENTITY, h);

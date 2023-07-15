@@ -64,4 +64,8 @@ pub enum ServerError {
     #[error("no extension event received")]
     #[diagnostic()]
     NoExtensionEvent,
+
+    #[error("client context cannot be longer than 3583 bytes after base64 encoding, the current size is {0}")]
+    #[diagnostic()]
+    InvalidClientContext(usize),
 }

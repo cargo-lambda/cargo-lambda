@@ -203,8 +203,9 @@ pub fn target_dir_from_metadata(metadata: &CargoMetadata) -> Result<PathBuf> {
 pub fn load_metadata<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<CargoMetadata> {
     trace!("loading Cargo metadata");
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
-    metadata_cmd.no_deps();
-    metadata_cmd.verbose(enabled!(target: "cargo_lambda", Level::TRACE));
+    metadata_cmd
+        .no_deps()
+        .verbose(enabled!(target: "cargo_lambda", Level::TRACE));
 
     // try to split manifest path and assign current_dir to enable parsing a project-specific
     // cargo config

@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose as b64, Engine as _};
 use cargo_lambda_remote::{
     aws_sdk_lambda::{types::Blob, Client as LambdaClient},
     RemoteConfig,
@@ -5,6 +6,7 @@ use cargo_lambda_remote::{
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use reqwest::{Client, StatusCode};
+use serde::Serialize;
 use serde_json::{from_str, to_string_pretty, value::Value};
 use std::{
     convert::TryFrom,
@@ -26,6 +28,9 @@ use error::*;
 /// which is the main binary for that package.
 pub const DEFAULT_PACKAGE_FUNCTION: &str = "_";
 const EXAMPLES_URL: &str = "https://github.com/calavera/aws-lambda-events/raw/main/src/fixtures";
+
+const LAMBDA_RUNTIME_CLIENT_CONTEXT: &str = "lambda-runtime-client-context";
+const LAMBDA_RUNTIME_COGNITO_IDENTITY: &str = "lambda-runtime-cognito-identity";
 
 #[derive(Args, Clone, Debug)]
 #[command(
@@ -67,9 +72,20 @@ pub struct Invoke {
     #[command(flatten)]
     remote_config: RemoteConfig,
 
+    /// JSON string representing the client context for the function invocation
+    #[arg(long)]
+    client_context_ascii: Option<String>,
+
+    /// Path to a file with the JSON representation of the client context for the function invocation
+    #[arg(long)]
+    client_context_file: Option<PathBuf>,
+
     /// Format to render the output (text, or json)
     #[arg(short, long, default_value_t = OutputFormat::Text)]
     output_format: OutputFormat,
+
+    #[command(flatten)]
+    cognito: Option<CognitoIdentity>,
 
     /// Name of the function to invoke
     #[arg(default_value = DEFAULT_PACKAGE_FUNCTION)]
@@ -81,6 +97,18 @@ pub struct Invoke {
 enum OutputFormat {
     Text,
     Json,
+}
+
+#[derive(Args, Clone, Debug, Serialize)]
+pub struct CognitoIdentity {
+    /// The unique identity id for the Cognito credentials invoking the function.
+    #[arg(long, requires = "identity-pool-id")]
+    #[serde(rename = "cognitoIdentityId")]
+    pub identity_id: String,
+    /// The identity pool id the caller is "registered" with.
+    #[arg(long, requires = "identity-id")]
+    #[serde(rename = "cognitoIdentityPoolId")]
+    pub identity_pool_id: String,
 }
 
 impl Invoke {
@@ -138,6 +166,9 @@ impl Invoke {
         if self.function_name == DEFAULT_PACKAGE_FUNCTION {
             return Err(InvokeError::InvalidFunctionName.into());
         }
+
+        let client_context = self.client_context(true)?;
+
         let sdk_config = self.remote_config.sdk_config(None).await;
         let client = LambdaClient::new(&sdk_config);
 
@@ -146,6 +177,7 @@ impl Invoke {
             .function_name(&self.function_name)
             .set_qualifier(self.remote_config.alias.clone())
             .payload(Blob::new(data.as_bytes()))
+            .set_client_context(client_context)
             .send()
             .await
             .into_diagnostic()
@@ -177,9 +209,18 @@ impl Invoke {
         );
 
         let client = Client::new();
-        let resp = client
-            .post(url)
-            .body(data.to_string())
+        let mut req = client.post(url).body(data.to_string());
+        if let Some(identity) = &self.cognito {
+            let ser = serde_json::to_string(&identity)
+                .into_diagnostic()
+                .wrap_err("failed to serialize Cognito's identity information")?;
+            req = req.header(LAMBDA_RUNTIME_COGNITO_IDENTITY, ser);
+        }
+        if let Some(client_context) = self.client_context(false)? {
+            req = req.header(LAMBDA_RUNTIME_CLIENT_CONTEXT, client_context);
+        }
+
+        let resp = req
             .send()
             .await
             .into_diagnostic()
@@ -198,6 +239,24 @@ impl Invoke {
             let err = RemoteInvokeError::try_from(payload.as_str())?;
             Err(err.into())
         }
+    }
+
+    fn client_context(&self, encode: bool) -> Result<Option<String>> {
+        let mut data = if let Some(file) = &self.client_context_file {
+            read_to_string(file)
+                .into_diagnostic()
+                .wrap_err("error reading client context file")?
+        } else if let Some(data) = &self.client_context_ascii {
+            data.clone()
+        } else {
+            return Ok(None);
+        };
+
+        if encode {
+            data = b64::STANDARD.encode(data)
+        }
+
+        Ok(Some(data))
     }
 }
 
