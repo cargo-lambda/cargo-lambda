@@ -91,11 +91,11 @@ struct CargoOptions {
     manifest_path: PathBuf,
 
     /// Features to pass to `cargo run`, separated by comma
-    #[arg(long)]
+    #[arg(long, short = 'F')]
     features: Option<String>,
 
     /// Enable release mode when the emulator starts
-    #[arg(long)]
+    #[arg(long, short = 'r')]
     release: bool,
 }
 

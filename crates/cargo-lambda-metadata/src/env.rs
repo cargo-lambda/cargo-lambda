@@ -15,7 +15,7 @@ pub struct EnvOptions {
 
     /// Command separated list of environment variables (--env-vars KEY=VALUE,OTHER=NEW-VALUE)
     /// This option overrides any values set with the --env-var flag that match the same key.
-    #[arg(long)]
+    #[arg(long, value_delimiter = ',')]
     pub env_vars: Option<Vec<String>>,
 
     /// Read environment variables from a file.
