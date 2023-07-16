@@ -19,7 +19,7 @@ description.workspace = true
 [dependencies]
 aws_lambda_events = { version = "0.6.3", features = ["apigw"] }
 axum = "0.5.4"
-base64 = "0.13.0"
+base64.workspace = true
 cargo-lambda-invoke.workspace = true
 cargo-lambda-metadata.workspace = true
 chrono = "0.4.19"

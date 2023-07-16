@@ -19,6 +19,7 @@ use axum::{
     routing::{any, post},
     Router,
 };
+use base64::{engine::general_purpose as b64, Engine as _};
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
 use chrono::Utc;
 use hyper::{body::to_bytes, header};
@@ -73,7 +74,7 @@ async fn furls_handler(
             String::from_utf8(body.into_iter().collect()).map_err(ServerError::StringBody)?;
         (Some(body), false)
     } else {
-        let body = base64::encode(body.into_iter().collect::<Vec<u8>>());
+        let body = b64::STANDARD.encode(body.into_iter().collect::<Vec<u8>>());
         (Some(body), true)
     };
 
@@ -152,9 +153,11 @@ async fn furls_handler(
     let is_base64_encoded = resp_event.is_base64_encoded.unwrap_or(false);
     let resp_body = match resp_event.body.unwrap_or(LambdaBody::Empty) {
         LambdaBody::Empty => Body::empty(),
-        b if is_base64_encoded => {
-            Body::from(base64::decode(b.as_ref()).map_err(ServerError::BodyDecodeError)?)
-        }
+        b if is_base64_encoded => Body::from(
+            b64::STANDARD
+                .decode(b.as_ref())
+                .map_err(ServerError::BodyDecodeError)?,
+        ),
         LambdaBody::Text(s) => Body::from(s),
         LambdaBody::Binary(b) => Body::from(b),
     };
