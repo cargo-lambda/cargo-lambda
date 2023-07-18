@@ -17,6 +17,7 @@ use std::{
     str::{from_utf8, FromStr},
 };
 use strum_macros::{Display, EnumString};
+use tracing::debug;
 
 mod error;
 use error::*;
@@ -104,11 +105,17 @@ pub struct CognitoIdentity {
     /// The unique identity id for the Cognito credentials invoking the function.
     #[arg(long, requires = "identity-pool-id")]
     #[serde(rename = "cognitoIdentityId")]
-    pub identity_id: String,
+    pub identity_id: Option<String>,
     /// The identity pool id the caller is "registered" with.
     #[arg(long, requires = "identity-id")]
     #[serde(rename = "cognitoIdentityPoolId")]
-    pub identity_pool_id: String,
+    pub identity_pool_id: Option<String>,
+}
+
+impl CognitoIdentity {
+    fn is_valid(&self) -> bool {
+        self.identity_id.is_some() && self.identity_pool_id.is_some()
+    }
 }
 
 impl Invoke {
@@ -211,10 +218,12 @@ impl Invoke {
         let client = Client::new();
         let mut req = client.post(url).body(data.to_string());
         if let Some(identity) = &self.cognito {
-            let ser = serde_json::to_string(&identity)
-                .into_diagnostic()
-                .wrap_err("failed to serialize Cognito's identity information")?;
-            req = req.header(LAMBDA_RUNTIME_COGNITO_IDENTITY, ser);
+            if identity.is_valid() {
+                let ser = serde_json::to_string(&identity)
+                    .into_diagnostic()
+                    .wrap_err("failed to serialize Cognito's identity information")?;
+                req = req.header(LAMBDA_RUNTIME_COGNITO_IDENTITY, ser);
+            }
         }
         if let Some(client_context) = self.client_context(false)? {
             req = req.header(LAMBDA_RUNTIME_CLIENT_CONTEXT, client_context);
@@ -236,6 +245,7 @@ impl Invoke {
         if success {
             Ok(payload)
         } else {
+            debug!(error = ?payload, "error received from server");
             let err = RemoteInvokeError::try_from(payload.as_str())?;
             Err(err.into())
         }
