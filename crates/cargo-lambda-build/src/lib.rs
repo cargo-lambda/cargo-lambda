@@ -21,6 +21,7 @@ use std::{
 };
 use strum_macros::EnumString;
 use target_arch::TargetArch;
+use toolchain::rustup_cmd;
 use tracing::{debug, warn};
 use zip::{write::FileOptions, ZipWriter};
 
@@ -187,7 +188,12 @@ impl Build {
         let compiler = new_compiler(compiler_option);
         let profile = compiler.build_profile(&self.build);
         let cmd = compiler
-            .command(&self.build, &target_arch, &metadata, self.skip_target_check)
+            .command(
+                &self.build,
+                &target_arch,
+                &metadata,
+                self.skip_target_check(),
+            )
             .await;
 
         let mut cmd = match cmd {
@@ -270,6 +276,10 @@ impl Build {
         }
 
         Ok(())
+    }
+
+    fn skip_target_check(&self) -> bool {
+        self.skip_target_check || which::which(rustup_cmd()).is_err()
     }
 }
 

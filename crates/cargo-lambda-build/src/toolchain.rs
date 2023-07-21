@@ -75,7 +75,7 @@ async fn install_target_component(component: &str, toolchain: &str) -> Result<()
     silent_command(&cmd, &args).await
 }
 
-fn rustup_cmd() -> String {
+pub(crate) fn rustup_cmd() -> String {
     env::var("RUSTUP").unwrap_or_else(|_| "rustup".to_string())
 }
 
