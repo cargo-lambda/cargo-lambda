@@ -6,7 +6,7 @@ The `invoke` subcommand sends raw JSON payloads to your Rust functions. The Rust
 
 Rust functions implemented with `lambda_http` require the HTTP calls to be wrapped into the right JSON payloads. This is because AWS Lambda doesn't support HTTP calls natively. Services like Amazon API Gateway, Amazon Load Balancer, or Lambda Function URLs, receive the incoming HTTP calls and translate them to JSON payloads. `lambda_http` performs the opposite translation, so you can work with HTTP primitives.
 
-You can find many examples of JSON paylaods in the [AWS Lambda Events repository](https://github.com/calavera/aws-lambda-events/tree/main/src/fixtures). You can copy them directly, or use the [--data-example flag](/commands/invoke.html#example-data) to load them on demand.
+You can find many examples of JSON payloads in the [AWS Lambda Events repository](https://github.com/calavera/aws-lambda-events/tree/main/src/fixtures). You can copy them directly, or use the [--data-example flag](/commands/invoke.html#example-data) to load them on demand.
 
 The following video shows you how to use this subcommand:
 
