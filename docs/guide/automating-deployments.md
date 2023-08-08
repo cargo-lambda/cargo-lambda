@@ -52,11 +52,11 @@ resource "aws_iam_user_policy_attachment" "lambda-service-user-policy-attachment
 }
 
 output "aws_access_key_id" {
-  value = aws_iam_access_key.lambda-service.id
+  value = aws_iam_access_key.lambda-service-user.id
 }
 
 output "aws_secret_access_key" {
-  value     = aws_iam_access_key.lambda-service.secret
+  value     = aws_iam_access_key.lambda-service-user.secret
   sensitive = true
 }
 ```
