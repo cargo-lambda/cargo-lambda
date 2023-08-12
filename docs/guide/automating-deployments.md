@@ -11,7 +11,57 @@ First we need a set of user credentials, to be able to authenticate to AWS when 
 Our user needs to be able to create, update, and retrieve lambda functions, and it needs to be
 able to publish new versions.
 
-Here's how you might define the user, using terraform:
+### Using the AWS CDK
+
+Here's how you might define a service user with the AWS CDK in TypeScript:
+
+```js
+import * as cdk from 'aws-cdk-lib';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import { Construct } from 'constructs';
+
+export class CdkStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+    super(scope, id, props);
+
+    const user = new iam.User(this, 'lambda-service-user');
+    const accessKey = new iam.AccessKey(this, 'lambda-service-access-key', { user });
+
+    const policy = new iam.Policy(this, 'lambda-service-policy', {
+      statements: [new iam.PolicyStatement({
+        sid: "Enable Lambda User Permissions",
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'lambda:GetFunction',
+          'lambda:GetLayerVersion',
+          'lambda:CreateFunction',
+          'lambda:UpdateFunctionCode',
+          'lambda:UpdateFunctionConfiguration',
+          'lambda:PublishVersion',
+          'lambda:TagResource'
+        ],
+        resources: ['arn:aws:lambda:*:*:function:*'],
+      })],
+    });
+
+    policy.attachToUser(user);
+
+    new cdk.CfnOutput(this, 'aws_access_key_id', {
+      value: accessKey.accessKeyId,
+    });
+
+    new cdk.CfnOutput(this, 'aws_secret_access_key', {
+      value: accessKey.secretAccessKey.toString(),
+    });
+  }
+}
+```
+
+When the stack is deployed, the `aws_access_key_id` and the `aws_secret_access_key` settings for this user will be printed in the terminal.
+
+### Using Terraform
+
+Here's how you might define a service user with Terraform:
 
 ```shell
 resource "aws_iam_user" "lambda-service-user" {
@@ -66,7 +116,7 @@ When applied, the secret access key can be read with `terraform output -raw aws_
 If you prefer to do this without the use of terraform, feel free to use another
 tool like it, or just create the user directly in the AWS console.
 
-## Step 2: Add credentials to your repository\'s secret
+## Step 2: Add credentials to your repository's secret
 
 If you're using Github, go to `github.com/<YOUR-ORG-OR-USERNAME>/<REPO>/settings/secrets/actions`,
 and add the key and secret we just created:
