@@ -1,7 +1,7 @@
 use aws_sdk_lambda::model::{environment::Builder, Environment};
 use clap::{Args, ValueHint};
 use env_file_reader::read_file;
-use miette::{IntoDiagnostic, Result};
+use miette::Result;
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::error::MetadataError;
@@ -38,7 +38,7 @@ impl EnvOptions {
         }
     }
 
-    pub fn lambda_environment(&self) -> Result<Environment> {
+    pub fn lambda_environment(&self) -> Result<Environment, MetadataError> {
         lambda_environment(None, &self.env_file, self.flag_vars()).map(|e| e.build())
     }
 }
@@ -47,12 +47,13 @@ pub(crate) fn lambda_environment(
     base: Option<&HashMap<String, String>>,
     env_file: &Option<PathBuf>,
     vars: Option<Vec<String>>,
-) -> Result<Builder> {
+) -> Result<Builder, MetadataError> {
     let mut env = Environment::builder().set_variables(base.cloned());
 
     if let Some(path) = env_file {
         if path.is_file() {
-            let env_variables = read_file(path).into_diagnostic()?;
+            let env_variables =
+                read_file(path).map_err(|e| MetadataError::InvalidEnvFile(path.into(), e))?;
             for (key, value) in env_variables {
                 env = env.variables(key, value);
             }
@@ -69,7 +70,7 @@ pub(crate) fn lambda_environment(
     Ok(env)
 }
 
-fn extract_var(line: &str) -> Result<(&str, &str)> {
+fn extract_var(line: &str) -> Result<(&str, &str), MetadataError> {
     let mut iter = line.trim().splitn(2, '=');
 
     let key = iter

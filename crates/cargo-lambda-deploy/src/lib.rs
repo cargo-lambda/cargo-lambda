@@ -225,7 +225,7 @@ impl Deploy {
             None => {
                 let name = match &self.name {
                     Some(name) => name.clone(),
-                    None => main_binary(&self.manifest_path)?,
+                    None => main_binary(&self.manifest_path).into_diagnostic()?,
                 };
                 let binary_name = self.binary_name.as_deref().unwrap_or(&name);
 

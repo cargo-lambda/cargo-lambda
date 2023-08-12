@@ -447,7 +447,8 @@ fn load_deploy_environment(
     function_config: &FunctionDeployConfig,
     tags: &Option<Vec<String>>,
 ) -> Result<(Environment, DeployConfig)> {
-    let base = function_deploy_metadata(manifest_path, binary_name)?
+    let base = function_deploy_metadata(manifest_path, binary_name)
+        .into_diagnostic()?
         .unwrap_or_else(|| function_config.to_deploy_config());
     let (environment, deploy_metadata) = merge_configuration(&base, function_config, tags)?;
 
@@ -499,7 +500,7 @@ fn merge_configuration(
     }
 
     let environment = match &function_config.env_options {
-        None => deploy_metadata.lambda_environment()?,
+        None => deploy_metadata.lambda_environment().into_diagnostic()?,
         Some(config) => {
             deploy_metadata.use_for_update = true;
 
@@ -507,8 +508,10 @@ fn merge_configuration(
                 deploy_metadata.env_file = config.env_file.clone();
             }
 
-            let flag_env = config.lambda_environment()?;
-            deploy_metadata.extend_environment(flag_env)?
+            let flag_env = config.lambda_environment().into_diagnostic()?;
+            deploy_metadata
+                .extend_environment(flag_env)
+                .into_diagnostic()?
         }
     };
 

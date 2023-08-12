@@ -49,8 +49,9 @@ pub(crate) async fn deploy(
         Some(bucket) => {
             progress.set_message("uploading binary to S3");
 
-            let mut deploy_metadata =
-                function_deploy_metadata(manifest_path, name)?.unwrap_or_default();
+            let mut deploy_metadata = function_deploy_metadata(manifest_path, name)
+                .into_diagnostic()?
+                .unwrap_or_default();
 
             if let Some(tags) = tags {
                 deploy_metadata.append_tags(extract_tags(tags));

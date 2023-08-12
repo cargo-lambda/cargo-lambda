@@ -111,8 +111,8 @@ impl Build {
             .as_deref()
             .unwrap_or_else(|| Path::new("Cargo.toml"));
 
-        let metadata = load_metadata(manifest_path)?;
-        let build_config = function_build_metadata(&metadata)?;
+        let metadata = load_metadata(manifest_path).map_err(BuildError::MetadataError)?;
+        let build_config = function_build_metadata(&metadata).map_err(BuildError::MetadataError)?;
         let compiler_option = match (&build_config.compiler, &self.compiler) {
             (None, None) => CompilerOptions::default(),
             (_, Some(c)) => CompilerOptions::from(c.to_string()),
@@ -140,7 +140,7 @@ impl Build {
 
         self.build.target = vec![target_arch.to_string()];
 
-        let binaries = binary_targets_from_metadata(&metadata)?;
+        let binaries = binary_targets_from_metadata(&metadata);
         debug!(binaries = ?binaries, "found new target binaries to build");
 
         if !self.build.bin.is_empty() {
@@ -206,14 +206,8 @@ impl Build {
             cmd.env("RUSTFLAGS", rust_flags);
         }
 
-        let mut child = cmd
-            .spawn()
-            .into_diagnostic()
-            .wrap_err("Failed to run cargo build")?;
-        let status = child
-            .wait()
-            .into_diagnostic()
-            .wrap_err("Failed to wait on cargo build process")?;
+        let mut child = cmd.spawn().map_err(BuildError::FailedBuildCommand)?;
+        let status = child.wait().map_err(BuildError::FailedBuildCommand)?;
         if !status.success() {
             std::process::exit(status.code().unwrap_or(1));
         }
@@ -375,7 +369,7 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     };
 
     let zip_file_name = convert_to_unix_path(&file_name)
-        .ok_or_else(|| miette::miette!("invalid file name: {file_name}"))?;
+        .ok_or_else(|| BuildError::InvalidUnixFileName(file_name.clone()))?;
     zip.start_file(
         zip_file_name,
         FileOptions::default().unix_permissions(binary_perm),

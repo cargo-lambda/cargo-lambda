@@ -115,7 +115,7 @@ impl Watch {
         let base = dunce::canonicalize(".").into_diagnostic()?;
         let ignore_files = discover_ignore_files(&base).await;
 
-        let env = self.env_options.lambda_environment()?;
+        let env = self.env_options.lambda_environment().into_diagnostic()?;
 
         let watcher_config = WatcherConfig {
             base,
@@ -134,7 +134,7 @@ impl Watch {
             .catch_signals()
             .handle_shutdown_requests(Duration::from_millis(1000))
             .await
-            .map_err(|e| miette::miette!("{}", e))
+            .into_diagnostic()
     }
 
     pub fn xray_layer<S>(&self) -> OpenTelemetryLayer<S, Tracer>
