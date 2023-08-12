@@ -1,6 +1,6 @@
 use aws_sdk_lambda::model::Environment;
 pub use cargo_metadata::Metadata as CargoMetadata;
-use miette::{IntoDiagnostic, Result};
+use miette::Result;
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
@@ -134,7 +134,7 @@ impl DeployConfig {
         }
     }
 
-    pub fn lambda_environment(&self) -> Result<Environment> {
+    pub fn lambda_environment(&self) -> Result<Environment, MetadataError> {
         let base = if self.env.is_empty() {
             None
         } else {
@@ -143,7 +143,7 @@ impl DeployConfig {
         lambda_environment(base, &self.env_file, None).map(|e| e.build())
     }
 
-    pub fn extend_environment(&mut self, extra: Environment) -> Result<Environment> {
+    pub fn extend_environment(&mut self, extra: Environment) -> Result<Environment, MetadataError> {
         let mut env = lambda_environment(Some(&self.env), &self.env_file, None)?;
         if let Some(vars) = extra.variables() {
             for (key, value) in vars {
@@ -155,7 +155,9 @@ impl DeployConfig {
 }
 
 /// Extract all the binary target names from a Cargo.toml file
-pub fn binary_targets<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<HashSet<String>> {
+pub fn binary_targets<P: AsRef<Path> + Debug>(
+    manifest_path: P,
+) -> Result<HashSet<String>, MetadataError> {
     let metadata = load_metadata(manifest_path)?;
     let bins = metadata
         .packages
@@ -170,8 +172,8 @@ pub fn binary_targets<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<HashSe
     Ok(bins)
 }
 
-pub fn binary_targets_from_metadata(metadata: &CargoMetadata) -> Result<HashSet<String>> {
-    let bins = metadata
+pub fn binary_targets_from_metadata(metadata: &CargoMetadata) -> HashSet<String> {
+    metadata
         .packages
         .iter()
         .flat_map(|p| {
@@ -180,8 +182,7 @@ pub fn binary_targets_from_metadata(metadata: &CargoMetadata) -> Result<HashSet<
                 .filter(|target| target.kind.iter().any(|k| k == "bin"))
         })
         .map(|target| target.name.clone())
-        .collect::<_>();
-    Ok(bins)
+        .collect::<_>()
 }
 
 /// Extract target directory information
@@ -200,7 +201,9 @@ pub fn target_dir_from_metadata(metadata: &CargoMetadata) -> Result<PathBuf> {
 
 /// Create metadata about the root package in the Cargo manifest, without any dependencies.
 #[tracing::instrument(target = "cargo_lambda")]
-pub fn load_metadata<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<CargoMetadata> {
+pub fn load_metadata<P: AsRef<Path> + Debug>(
+    manifest_path: P,
+) -> Result<CargoMetadata, MetadataError> {
     trace!("loading Cargo metadata");
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
     metadata_cmd
@@ -224,7 +227,9 @@ pub fn load_metadata<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<CargoMe
     }
 
     trace!(metadata = ?metadata_cmd, "loading cargo metadata");
-    let meta = metadata_cmd.exec().into_diagnostic()?;
+    let meta = metadata_cmd
+        .exec()
+        .map_err(MetadataError::FailedCmdExecution)?;
     trace!(metadata = ?meta, "loaded cargo metadata");
     Ok(meta)
 }
@@ -289,7 +294,7 @@ pub fn function_environment_metadata<P: AsRef<Path> + Debug>(
 pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
     manifest_path: P,
     name: &str,
-) -> Result<Option<DeployConfig>> {
+) -> Result<Option<DeployConfig>, MetadataError> {
     let metadata = load_metadata(manifest_path)?;
     let ws_metadata: LambdaMetadata =
         serde_json::from_value(metadata.workspace_metadata).unwrap_or_default();
@@ -343,7 +348,7 @@ pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
 /// This function loads the workspace configuration that's merged
 /// with the configuration from the first binary target in the project.
 /// It assumes that all functions in the workspace will use the same compiler configuration.
-pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig> {
+pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig, MetadataError> {
     let ws_metadata: LambdaMetadata =
         serde_json::from_value(metadata.workspace_metadata.clone()).unwrap_or_default();
 
@@ -370,7 +375,7 @@ pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig> 
 /// It returns an error if the project includes from than one binary.
 /// Use this function when the user didn't provide any funcion name
 /// assuming that there is only one binary in the project
-pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String> {
+pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String, MetadataError> {
     let targets = binary_targets(manifest_path)?;
     if targets.len() > 1 {
         Err(MetadataError::MultipleBinariesInProject)?;
@@ -381,7 +386,7 @@ pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String> {
     targets
         .into_iter()
         .next()
-        .ok_or_else(|| MetadataError::MissingBinaryInProject.into())
+        .ok_or_else(|| MetadataError::MissingBinaryInProject)
 }
 
 fn merge_deploy_config(base: &DeployConfig, package_deploy: &DeployConfig) -> DeployConfig {
@@ -662,7 +667,6 @@ mod tests {
     fn test_main_binary_multi_binaries() {
         let manifest_path = fixture("multi-binary-package");
         let err = main_binary(manifest_path).unwrap_err();
-        let err: MetadataError = err.downcast().unwrap();
         assert_eq!(
             "there are more than one binary in the project, you must specify a binary name",
             err.to_string()

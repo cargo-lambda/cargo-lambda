@@ -99,6 +99,16 @@ async fn main() -> Result<()> {
     let mut args = env::args();
     let program_path = PathBuf::from(args.next().expect("missing program path"));
     let program_name = program_path.file_stem().expect("missing program name");
+
+    miette::set_hook(Box::new(|_| {
+        Box::new(
+            miette::MietteHandlerOpts::new()
+                .terminal_links(true)
+                .footer("Was this an unexpected error?\nOpen an issue in https://github.com/cargo-lambda/cargo-lambda/issues".into())
+                .build(),
+        )
+    }))?;
+
     if program_name.eq_ignore_ascii_case("ar") {
         let zig = Zig::Ar {
             args: args.collect(),
