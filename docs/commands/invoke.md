@@ -59,7 +59,7 @@ The `--data-example` flag allows you to fetch an example payload from the [aws-l
 cargo lambda invoke http-lambda --data-example apigw-request
 ```
 
-After the first download, these examples are cached in your home directory, under `.cargo/lambda/invoke-fixtures`.
+After the first download, these examples are cached (in your system's user-local cache) in your home directory, under `cargo-lambda/invoke-fixtures`.
 
 ## Remote
 
