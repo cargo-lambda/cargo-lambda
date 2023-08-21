@@ -104,7 +104,7 @@ async fn main() -> Result<()> {
         Box::new(
             miette::MietteHandlerOpts::new()
                 .terminal_links(true)
-                .footer("Was this an unexpected error?\nOpen an issue in https://github.com/cargo-lambda/cargo-lambda/issues".into())
+                .footer("Was this error unexpected?\nOpen an issue in https://github.com/cargo-lambda/cargo-lambda/issues".into())
                 .build(),
         )
     }))?;

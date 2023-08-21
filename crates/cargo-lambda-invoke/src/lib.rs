@@ -28,7 +28,7 @@ use error::*;
 /// assume that the package only has one function,
 /// which is the main binary for that package.
 pub const DEFAULT_PACKAGE_FUNCTION: &str = "_";
-const EXAMPLES_URL: &str = "https://github.com/calavera/aws-lambda-events/raw/main/src/fixtures";
+const EXAMPLES_URL: &str = "https://event-examples.cargo-lambda.info";
 
 const LAMBDA_RUNTIME_CLIENT_CONTEXT: &str = "lambda-runtime-client-context";
 const LAMBDA_RUNTIME_COGNITO_IDENTITY: &str = "lambda-runtime-cognito-identity";
