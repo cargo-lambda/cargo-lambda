@@ -146,6 +146,7 @@ impl Invoke {
                         .into_diagnostic()
                         .wrap_err("error reading data file")?
                 }
+                _ if self.skip_cache => download_example(&name, None).await?,
                 _ => download_example(&name, cache).await?,
             }
         } else {
