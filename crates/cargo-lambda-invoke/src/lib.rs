@@ -88,6 +88,10 @@ pub struct Invoke {
     #[command(flatten)]
     cognito: Option<CognitoIdentity>,
 
+    /// Ignore data stored in the local cache
+    #[arg(long, default_value_t = false)]
+    skip_cache: bool,
+
     /// Name of the function to invoke
     #[arg(default_value = DEFAULT_PACKAGE_FUNCTION)]
     function_name: String,
@@ -136,9 +140,12 @@ impl Invoke {
                 .map(|p| p.join("cargo-lambda").join("invoke-fixtures").join(&name));
 
             match cache {
-                Some(cache) if cache.exists() => read_to_string(cache)
-                    .into_diagnostic()
-                    .wrap_err("error reading data file")?,
+                Some(cache) if !self.skip_cache && cache.exists() => {
+                    tracing::debug!(?cache, "using example from cache");
+                    read_to_string(cache)
+                        .into_diagnostic()
+                        .wrap_err("error reading data file")?
+                }
                 _ => download_example(&name, cache).await?,
             }
         } else {
@@ -273,6 +280,7 @@ impl Invoke {
 async fn download_example(name: &str, cache: Option<PathBuf>) -> Result<String> {
     let target = format!("{EXAMPLES_URL}/{name}");
 
+    tracing::debug!(?target, "downloading remote example");
     let response = reqwest::get(&target)
         .await
         .into_diagnostic()
@@ -288,6 +296,7 @@ async fn download_example(name: &str, cache: Option<PathBuf>) -> Result<String> 
             .wrap_err("error reading example data")?;
 
         if let Some(cache) = cache {
+            tracing::debug!(?cache, "storing example in cache");
             create_dir_all(cache.parent().unwrap()).into_diagnostic()?;
             let mut dest = File::create(cache).into_diagnostic()?;
             copy(&mut content.as_bytes(), &mut dest).into_diagnostic()?;
