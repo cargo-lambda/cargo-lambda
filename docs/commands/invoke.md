@@ -61,6 +61,12 @@ cargo lambda invoke http-lambda --data-example apigw-request
 
 After the first download, these examples are cached (in your system's user-local cache) in your home directory, under `cargo-lambda/invoke-fixtures`.
 
+If you don't want to cache the example or want to ignore the file in the cache, add the flag `--skip-cache` to the command:
+
+```
+cargo lambda invoke http-lambda --data-example apigw-request --skip-cache
+```
+
 ## Remote
 
 The `--remote` flag allows you to send requests to a remote function deployed on AWS Lambda. This flag assumes that your AWS account has permission to call the `lambda:invokeFunction` operation. You can specify the region where the function is deployed, as well as any credentials profile that the command should use to authenticate you:
