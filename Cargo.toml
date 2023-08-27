@@ -21,6 +21,8 @@ exclude = [
     "tests/fixtures/single-binary-different-name",
 ]
 
+resolver = "2"
+
 [workspace.package]
 version = "0.20.4"
 authors = ["David Calavera"]
