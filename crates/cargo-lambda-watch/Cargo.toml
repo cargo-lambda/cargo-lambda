@@ -49,5 +49,5 @@ tracing.workspace = true
 tracing-opentelemetry = "0.17.2"
 tracing-subscriber.workspace = true
 uuid.workspace = true
-watchexec = "=2.2.0"
+watchexec = "2.3.0"
 watchexec-filterer-ignore = "1.0.0"
