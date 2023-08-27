@@ -10,6 +10,7 @@ pub(crate) struct CargoZigbuild;
 
 #[async_trait::async_trait]
 impl Compiler for CargoZigbuild {
+    #[tracing::instrument(skip(self), target = "cargo_lambda")]
     async fn command(
         &self,
         cargo: &Build,

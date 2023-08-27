@@ -27,6 +27,7 @@ impl Cargo {
 
 #[async_trait::async_trait]
 impl Compiler for Cargo {
+    #[tracing::instrument(skip(self), target = "cargo_lambda")]
     async fn command(
         &self,
         cargo: &Build,
