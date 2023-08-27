@@ -46,7 +46,7 @@ pub(crate) fn routes() -> Router {
 }
 
 async fn furls_handler(
-    Extension(cmd_tx): Extension<Sender<InvokeRequest>>,
+    Extension(cmd_tx): Extension<Sender<Action>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
     let (parts, body) = req.into_parts();
@@ -178,7 +178,7 @@ async fn furls_handler(
 }
 
 async fn invoke_handler(
-    Extension(cmd_tx): Extension<Sender<InvokeRequest>>,
+    Extension(cmd_tx): Extension<Sender<Action>>,
     Path(function_name): Path<String>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
@@ -186,7 +186,7 @@ async fn invoke_handler(
 }
 
 async fn schedule_invocation(
-    cmd_tx: &Sender<InvokeRequest>,
+    cmd_tx: &Sender<Action>,
     function_name: String,
     mut req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
@@ -220,9 +220,9 @@ async fn schedule_invocation(
     };
 
     cmd_tx
-        .send(req)
+        .send(Action::Invoke(req))
         .await
-        .map_err(|e| ServerError::SendInvokeMessage(Box::new(e)))?;
+        .map_err(|e| ServerError::SendActionMessage(Box::new(e)))?;
 
     let resp = resp_rx.await.map_err(ServerError::ReceiveFunctionMessage)?;
 
