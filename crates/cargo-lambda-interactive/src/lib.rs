@@ -1,7 +1,4 @@
-use inquire::{
-    self,
-    error::{InquireError, InquireResult},
-};
+use inquire::{self, error::InquireResult};
 use is_terminal::IsTerminal;
 use std::fmt::Display;
 

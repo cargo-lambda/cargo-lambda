@@ -157,7 +157,7 @@ impl Build {
             // this is not checked
             if target_arch.compatible_host_linker() {
                 target_arch.set_al2_glibc_version();
-            } else {
+            } else if !target_arch.is_static_linking() {
                 return Err(BuildError::InvalidCompilerOption.into());
             }
         }
