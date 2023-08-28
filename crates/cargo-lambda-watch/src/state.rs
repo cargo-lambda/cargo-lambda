@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub(crate) struct RuntimeState {
+    pub server_addr: String,
     pub req_cache: RequestCache,
     pub ext_cache: ExtensionCache,
 }
@@ -49,35 +50,27 @@ impl RequestQueue {
 
 #[derive(Clone)]
 pub(crate) struct RequestCache {
-    server_addr: String,
     inner: Arc<RwLock<HashMap<String, RequestQueue>>>,
 }
 
 impl RequestCache {
-    pub fn new(server_addr: String) -> RequestCache {
+    pub fn new() -> RequestCache {
         RequestCache {
-            server_addr,
             inner: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    pub async fn upsert(
-        &self,
-        req: InvokeRequest,
-    ) -> Result<Option<(String, String)>, ServerError> {
+    pub async fn upsert(&self, req: InvokeRequest) -> Result<Option<String>, ServerError> {
         let mut inner = self.inner.write().await;
         let name = req.function_name.clone();
 
-        match inner.entry(name) {
+        match inner.entry(name.clone()) {
             Entry::Vacant(v) => {
-                let name = req.function_name.clone();
-                let runtime_api = format!("{}/{}", &self.server_addr, &name);
-
                 let stack = RequestQueue::new();
                 stack.push(req).await?;
                 v.insert(stack);
 
-                Ok(Some((name, runtime_api)))
+                Ok(Some(name))
             }
             Entry::Occupied(o) => {
                 o.into_mut().push(req).await?;

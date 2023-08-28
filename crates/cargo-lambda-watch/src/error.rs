@@ -1,7 +1,8 @@
+use cargo_lambda_metadata::error::MetadataError;
 use miette::Diagnostic;
 use thiserror::Error;
 
-use crate::requests::{InvokeRequest, NextEvent};
+use crate::requests::{Action, InvokeRequest, NextEvent};
 
 #[derive(Debug, Diagnostic, Error)]
 pub enum ServerError {
@@ -9,7 +10,7 @@ pub enum ServerError {
     #[diagnostic()]
     ResponseBuild(#[from] axum::http::Error),
 
-    #[error("failed to decode a base64 encoded body")]
+    #[error("failed to decode a base64 encoded body: {0}")]
     #[diagnostic()]
     BodyDecodeError(#[from] base64::DecodeError),
 
@@ -17,11 +18,15 @@ pub enum ServerError {
     #[diagnostic()]
     SendFunctionMessage,
 
-    #[error("failed to send message to function")]
+    #[error("failed to send message to function: {0}")]
+    #[diagnostic()]
+    SendActionMessage(#[from] Box<tokio::sync::mpsc::error::SendError<Action>>),
+
+    #[error("failed to send message to function: {0}")]
     #[diagnostic()]
     SendInvokeMessage(#[from] Box<tokio::sync::mpsc::error::SendError<InvokeRequest>>),
 
-    #[error("failed to receive message from function")]
+    #[error("failed to receive message from function: {0}")]
     #[diagnostic()]
     ReceiveFunctionMessage(#[from] tokio::sync::oneshot::error::RecvError),
 
@@ -29,7 +34,7 @@ pub enum ServerError {
     #[diagnostic()]
     SpawnCommand(#[from] std::io::Error),
 
-    #[error("invalid request id header")]
+    #[error("invalid request id header: {0}")]
     #[diagnostic()]
     InvalidRequestIdHeader(#[from] axum::http::header::ToStrError),
 
@@ -37,7 +42,7 @@ pub enum ServerError {
     #[diagnostic()]
     BodyDeserialization(#[from] hyper::Error),
 
-    #[error("failed to deserialize the request body")]
+    #[error("failed to deserialize the request body: {0}")]
     #[diagnostic()]
     StringBody(#[from] std::string::FromUtf8Error),
 
@@ -57,7 +62,7 @@ pub enum ServerError {
     #[diagnostic()]
     MissingExtensionIdHeader,
 
-    #[error("failed to send message to extension")]
+    #[error("failed to send message to extension: {0}")]
     #[diagnostic()]
     SendEventMessage(#[from] Box<tokio::sync::mpsc::error::SendError<NextEvent>>),
 
@@ -68,4 +73,12 @@ pub enum ServerError {
     #[error("client context cannot be longer than 3583 bytes after base64 encoding, the current size is {0}")]
     #[diagnostic()]
     InvalidClientContext(usize),
+
+    #[error(transparent)]
+    #[diagnostic()]
+    FailedToReadMetadata(#[from] MetadataError),
+
+    #[error("the project doesn't include any binary packages")]
+    #[diagnostic()]
+    NoBinaryPackages,
 }
