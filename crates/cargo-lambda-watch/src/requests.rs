@@ -11,6 +11,12 @@ use tokio::sync::oneshot::Sender;
 pub(crate) const AWS_XRAY_TRACE_HEADER: &str = "x-amzn-trace-id";
 
 #[derive(Debug)]
+pub enum Action {
+    Invoke(InvokeRequest),
+    Init,
+}
+
+#[derive(Debug)]
 pub struct InvokeRequest {
     pub function_name: String,
     pub req: Request<Body>,

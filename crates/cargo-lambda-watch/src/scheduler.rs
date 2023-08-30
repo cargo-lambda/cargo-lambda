@@ -1,6 +1,6 @@
 use crate::{
-    requests::InvokeRequest,
-    state::RuntimeState,
+    requests::{Action, NextEvent},
+    state::{ExtensionCache, RuntimeState},
     watcher::{FunctionData, WatcherConfig},
     CargoOptions,
 };
@@ -19,8 +19,8 @@ pub(crate) async fn init_scheduler(
     state: RuntimeState,
     cargo_options: CargoOptions,
     watcher_config: WatcherConfig,
-) -> Sender<InvokeRequest> {
-    let (req_tx, req_rx) = mpsc::channel::<InvokeRequest>(100);
+) -> Sender<Action> {
+    let (req_tx, req_rx) = mpsc::channel::<Action>(100);
 
     subsys.start("lambda scheduler", move |s| async move {
         start_scheduler(s, state, cargo_options, watcher_config, req_rx).await
@@ -34,7 +34,7 @@ async fn start_scheduler(
     state: RuntimeState,
     cargo_options: CargoOptions,
     watcher_config: WatcherConfig,
-    mut req_rx: Receiver<InvokeRequest>,
+    mut req_rx: Receiver<Action>,
 ) {
     let (function_tx, function_rx) = mpsc::channel::<FunctionData>(10);
     let (gc_tx, mut gc_rx) = mpsc::channel::<String>(10);
@@ -54,10 +54,22 @@ async fn start_scheduler(
 
     loop {
         tokio::select! {
-            Some(req) = req_rx.recv() => {
-                let result = state.req_cache.upsert(req).await?;
-                if let Some((name, api)) = result {
-                    if !watcher_config.only_lambda_apis {
+            Some(action) = req_rx.recv() => {
+                let start_function_name = match action {
+                    Action::Invoke(req) => {
+                        match state.req_cache.upsert(req).await {
+                            None => None,
+                            Some(v) => v,
+                        }
+                    },
+                    Action::Init => {
+                        Some(DEFAULT_PACKAGE_FUNCTION.into())
+                    }
+                };
+
+                if watcher_config.start_function() {
+                    if let Some(name) = start_function_name {
+                        let runtime_api = format!("{}/{}", &state.server_addr, &name);
                         info!(function = name, "starting new lambda");
                         let function_data = function_data(name, api, cargo_options.clone());
                         _ = function_tx.send(function_data).await;

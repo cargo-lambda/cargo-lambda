@@ -28,6 +28,12 @@ pub(crate) struct WatcherConfig {
     pub env: HashMap<String, String>,
 }
 
+impl WatcherConfig {
+    pub(crate) fn start_function(&self) -> bool {
+        !self.only_lambda_apis
+    }
+}
+
 pub(crate) async fn new(
     wc: WatcherConfig,
     ext_cache: ExtensionCache,
