@@ -62,6 +62,22 @@ fn test_build_basic_zip_function() {
 fn test_build_http_function() {
     let (root, cmd) = cargo_lambda_new("test-http-function");
 
+    cmd.arg("--http")
+        .arg("test-http-function")
+        .assert()
+        .success();
+
+    let project = test_project(root);
+    cargo_lambda_build(project.root()).assert().success();
+
+    let bin = project.lambda_function_bin("test-http-function");
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
+}
+
+#[cargo_test]
+fn test_build_http_feature_function() {
+    let (root, cmd) = cargo_lambda_new("test-http-function");
+
     cmd.arg("--http-feature")
         .arg("apigw_rest")
         .arg("test-http-function")
@@ -72,6 +88,23 @@ fn test_build_http_function() {
     cargo_lambda_build(project.root()).assert().success();
 
     let bin = project.lambda_function_bin("test-http-function");
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
+}
+
+#[cargo_test]
+fn test_build_event_type_function() {
+    let (root, cmd) = cargo_lambda_new("test-event-type-function");
+
+    cmd.arg("--event-type")
+        .arg("s3::S3Event")
+        .arg("test-event-type-function")
+        .assert()
+        .success();
+
+    let project = test_project(root);
+    cargo_lambda_build(project.root()).assert().success();
+
+    let bin = project.lambda_function_bin("test-event-type-function");
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
