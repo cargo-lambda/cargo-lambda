@@ -9,6 +9,7 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
+use tracing::debug;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -59,20 +60,33 @@ impl RequestCache {
         }
     }
 
+    pub async fn init(&self, function_name: &str) {
+        let mut inner = self.inner.write().await;
+        inner.insert(function_name.into(), RequestQueue::new());
+        debug!(
+            function_name,
+            "request stack initialized before compilation"
+        );
+    }
+
     pub async fn upsert(&self, req: InvokeRequest) -> Result<Option<String>, ServerError> {
         let mut inner = self.inner.write().await;
-        let name = req.function_name.clone();
+        let function_name = req.function_name.clone();
 
-        match inner.entry(name.clone()) {
+        match inner.entry(function_name.clone()) {
             Entry::Vacant(v) => {
                 let stack = RequestQueue::new();
                 stack.push(req).await?;
                 v.insert(stack);
 
-                Ok(Some(name))
+                debug!(?function_name, "request stack initialized in first request");
+
+                Ok(Some(function_name))
             }
             Entry::Occupied(o) => {
                 o.into_mut().push(req).await?;
+                debug!(?function_name, "request stack increased");
+
                 Ok(None)
             }
         }
@@ -92,6 +106,7 @@ impl RequestCache {
     pub async fn clean(&self, function_name: &str) {
         let mut inner = self.inner.write().await;
         inner.remove(function_name);
+        debug!(function_name, "request stack cleaned");
     }
 }
 
