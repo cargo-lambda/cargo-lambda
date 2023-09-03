@@ -9,7 +9,7 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
 };
-use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
+use tokio::sync::{mpsc, oneshot, Mutex, RwLock, TryLockError};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -168,6 +168,32 @@ impl ExtensionCache {
                     tx.send(event.clone())
                         .await
                         .map_err(|e| ServerError::SendEventMessage(Box::new(e)))?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn try_send_event(&self, event: NextEvent) -> Result<(), ServerError> {
+        let events = self
+            .events
+            .try_lock()
+            .map_err(|e| ServerError::TryLockSendEventMessage(Box::new(e)))?;
+
+        let queue = event.type_queue();
+
+        if let Some(ids) = events.get(queue) {
+            let senders = self
+                .senders
+                .try_lock()
+                .map_err(|e| ServerError::TryLockSendEventMessage(Box::new(e)))?;
+
+            for id in ids {
+                let name = format!("{id}_{queue}");
+                if let Some(tx) = senders.get(&name) {
+                    tx.try_send(event.clone())
+                        .map_err(|e| ServerError::TrySendEventMessage(Box::new(e)))?;
                 }
             }
         }

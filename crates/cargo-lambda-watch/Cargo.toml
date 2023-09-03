@@ -40,14 +40,16 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }
 tokio-graceful-shutdown = "0.13.0"
 tower-http = { version = "0.3.3", features = [
-    "catch-panic",
-    "request-id",
-    "trace",
-    "cors",
+	"catch-panic",
+	"request-id",
+	"trace",
+	"cors",
 ] }
 tracing.workspace = true
 tracing-opentelemetry = "0.17.2"
 tracing-subscriber.workspace = true
 uuid.workspace = true
 watchexec = { version = "2.3.0", path = "../../../watchexec/crates/lib" }
+watchexec-signals = { version = "1.0.0", path = "../../../watchexec/crates/signals" }
+watchexec-events = { version = "1.0.0", path = "../../../watchexec/crates/events" }
 watchexec-filterer-ignore = { version = "1.0.0", path = "../../../watchexec/crates/filterer/ignore" }

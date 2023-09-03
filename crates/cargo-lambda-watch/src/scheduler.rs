@@ -5,14 +5,12 @@ use crate::{
     CargoOptions,
 };
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
-use std::sync::Arc;
-use tokio::sync::{
-    mpsc::{self, Receiver, Sender},
-    Mutex,
-};
+use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio_graceful_shutdown::SubsystemHandle;
 use tracing::{error, info};
-use watchexec::{command::Command, event::Event};
+use watchexec::command::Program;
+use watchexec_events::{Event, Priority};
 
 pub(crate) async fn init_scheduler(
     subsys: &SubsystemHandle,
@@ -23,7 +21,8 @@ pub(crate) async fn init_scheduler(
     let (req_tx, req_rx) = mpsc::channel::<Action>(100);
 
     subsys.start("lambda scheduler", move |s| async move {
-        start_scheduler(s, state, cargo_options, watcher_config, req_rx).await
+        start_scheduler(s, state, cargo_options, watcher_config, req_rx).await;
+        Ok::<_, std::convert::Infallible>(())
     });
 
     req_tx
@@ -58,8 +57,8 @@ async fn start_scheduler(
                 let start_function_name = match action {
                     Action::Invoke(req) => {
                         match state.req_cache.upsert(req).await {
-                            None => None,
-                            Some(v) => v,
+                            Err(_) => None,
+                            Ok(v) => v,
                         }
                     },
                     Action::Init => {
@@ -71,9 +70,9 @@ async fn start_scheduler(
                     if let Some(name) = start_function_name {
                         let runtime_api = format!("{}/{}", &state.server_addr, &name);
                         info!(function = name, "starting new lambda");
-                        let function_data = function_data(name, api, cargo_options.clone());
+                        let function_data = function_data(name, runtime_api, cargo_options.clone());
                         _ = function_tx.send(function_data).await;
-                        _ = wx.send_event(Event::default(), watchexec::event::Priority::Urgent).await;
+                        _ = wx.send_event(Event::default(), Priority::High)
                     }
                 }
             },
@@ -134,8 +133,8 @@ pub(crate) fn cargo_command(
         args.push(name.into());
     }
 
-    Command::Exec {
+    watchexec::command::Command::from(Program::Exec {
         prog: "cargo".into(),
         args,
-    }
+    })
 }

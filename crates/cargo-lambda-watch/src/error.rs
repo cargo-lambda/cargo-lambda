@@ -66,6 +66,14 @@ pub enum ServerError {
     #[diagnostic()]
     SendEventMessage(#[from] Box<tokio::sync::mpsc::error::SendError<NextEvent>>),
 
+    #[error("failed to send message to extension")]
+    #[diagnostic()]
+    TrySendEventMessage(#[from] Box<tokio::sync::mpsc::error::TrySendError<NextEvent>>),
+
+    #[error("failed to send message to extension")]
+    #[diagnostic()]
+    TryLockSendEventMessage(#[from] Box<tokio::sync::TryLockError>),
+
     #[error("no extension event received")]
     #[diagnostic()]
     NoExtensionEvent,
