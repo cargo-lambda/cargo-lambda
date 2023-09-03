@@ -1,8 +1,7 @@
 use crate::{
     error::ServerError,
-    requests::{InvokeRequest, NextEvent},
+    requests::{InvokeRequest, LambdaResponse, NextEvent},
 };
-use axum::{body::Body, response::Response};
 use miette::Result;
 use mpsc::{channel, Receiver, Sender};
 use std::{
@@ -19,7 +18,7 @@ pub(crate) struct RuntimeState {
     pub ext_cache: ExtensionCache,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct RequestQueue {
     tx: Arc<Sender<InvokeRequest>>,
     rx: Arc<Mutex<Receiver<InvokeRequest>>>,
@@ -48,7 +47,7 @@ impl RequestQueue {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct RequestCache {
     inner: Arc<RwLock<HashMap<String, RequestQueue>>>,
 }
@@ -98,7 +97,7 @@ impl RequestCache {
 
 #[derive(Clone)]
 pub(crate) struct ResponseCache {
-    inner: Arc<Mutex<HashMap<String, oneshot::Sender<Response<Body>>>>>,
+    inner: Arc<Mutex<HashMap<String, oneshot::Sender<LambdaResponse>>>>,
 }
 
 impl ResponseCache {
@@ -108,12 +107,12 @@ impl ResponseCache {
         }
     }
 
-    pub async fn pop(&self, req_id: &str) -> Option<oneshot::Sender<Response<Body>>> {
+    pub async fn pop(&self, req_id: &str) -> Option<oneshot::Sender<LambdaResponse>> {
         let mut cache = self.inner.lock().await;
         cache.remove(req_id)
     }
 
-    pub async fn push(&self, req_id: &str, resp_tx: oneshot::Sender<Response<Body>>) {
+    pub async fn push(&self, req_id: &str, resp_tx: oneshot::Sender<LambdaResponse>) {
         let mut cache = self.inner.lock().await;
         cache.insert(req_id.into(), resp_tx);
     }

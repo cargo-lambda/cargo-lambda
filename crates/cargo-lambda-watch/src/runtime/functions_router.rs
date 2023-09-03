@@ -174,20 +174,14 @@ async fn bare_next_invocation_error(
 async fn respond_to_next_invocation(
     cache: &ResponseCache,
     req_id: &str,
-    req: Request<Body>,
+    mut req: Request<Body>,
     response_status: StatusCode,
 ) -> Result<Response<Body>, ServerError> {
     if let Some(resp_tx) = cache.pop(req_id).await {
-        let (_, body) = req.into_parts();
-
-        let resp = Response::builder()
-            .status(response_status)
-            .header(LAMBDA_RUNTIME_AWS_REQUEST_ID, req_id)
-            .body(body)
-            .map_err(ServerError::ResponseBuild)?;
+        req.extensions_mut().insert(response_status);
 
         resp_tx
-            .send(resp)
+            .send(req)
             .map_err(|_| ServerError::SendFunctionMessage)?;
     }
 

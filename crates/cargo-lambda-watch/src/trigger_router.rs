@@ -14,7 +14,7 @@ use axum::{
     body::Body,
     extract::{Extension, Path},
     handler::Handler,
-    http::{HeaderValue, Request},
+    http::{response::Builder, HeaderValue, Request},
     response::Response,
     routing::{any, post},
     Router,
@@ -22,7 +22,11 @@ use axum::{
 use base64::{engine::general_purpose as b64, Engine as _};
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
 use chrono::Utc;
-use hyper::{body::to_bytes, header};
+use hyper::{
+    body::{to_bytes, HttpBody},
+    header::{self},
+    HeaderMap, StatusCode,
+};
 use miette::Result;
 use opentelemetry::{
     global,
@@ -58,7 +62,7 @@ async fn furls_handler(
 
     let body = to_bytes(body)
         .await
-        .map_err(ServerError::BodyDeserialization)?;
+        .map_err(ServerError::DataDeserialization)?;
     let text_content_type = match headers.get("content-type") {
         None => true,
         Some(c) => {
@@ -142,39 +146,56 @@ async fn furls_handler(
     let event = serde_json::to_string(&event).map_err(ServerError::SerializationError)?;
 
     let req = Request::from_parts(parts, event.into());
-    let mut resp = schedule_invocation(&cmd_tx, function_name, req).await?;
+    let resp = schedule_invocation(&cmd_tx, function_name, req).await?;
+    let status_code = resp
+        .extensions()
+        .get::<StatusCode>()
+        .cloned()
+        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
-    let body = to_bytes(resp.body_mut())
-        .await
-        .map_err(ServerError::BodyDeserialization)?;
-    let resp_event: ApiGatewayV2httpResponse =
-        serde_json::from_slice(&body).map_err(ServerError::SerializationError)?;
+    let (info, mut body) = resp.into_parts();
 
-    let is_base64_encoded = resp_event.is_base64_encoded.unwrap_or(false);
-    let resp_body = match resp_event.body.unwrap_or(LambdaBody::Empty) {
-        LambdaBody::Empty => Body::empty(),
-        b if is_base64_encoded => Body::from(
-            b64::STANDARD
-                .decode(b.as_ref())
-                .map_err(ServerError::BodyDecodeError)?,
-        ),
-        LambdaBody::Text(s) => Body::from(s),
-        LambdaBody::Binary(b) => Body::from(b),
-    };
-    let mut builder = Response::builder().status(resp_event.status_code as u16);
-    if let Some(headers) = builder.headers_mut() {
-        headers.extend(resp_event.headers);
-        headers.extend(resp_event.multi_value_headers);
+    let mut builder = Response::builder().status(status_code);
 
-        resp_event.cookies.iter().try_for_each(|cookie| {
-            let header_value =
-                HeaderValue::try_from(cookie).map_err(|e| ServerError::ResponseBuild(e.into()))?;
-            headers.append(header::SET_COOKIE, header_value);
-            Ok::<(), ServerError>(())
-        })?;
+    if is_streaming_response(&info.headers) && status_code == StatusCode::OK {
+        let status = create_streaming_response(&mut builder, &mut body).await?;
+
+        builder
+            .status(status)
+            .body(body)
+            .map_err(ServerError::ResponseBuild)
+    } else {
+        let body = to_bytes(body)
+            .await
+            .map_err(ServerError::DataDeserialization)?;
+        let resp_event: ApiGatewayV2httpResponse =
+            serde_json::from_slice(&body).map_err(ServerError::SerializationError)?;
+
+        let is_base64_encoded = resp_event.is_base64_encoded.unwrap_or(false);
+        let resp_body = match resp_event.body.unwrap_or(LambdaBody::Empty) {
+            LambdaBody::Empty => Body::empty(),
+            b if is_base64_encoded => Body::from(
+                b64::STANDARD
+                    .decode(b.as_ref())
+                    .map_err(ServerError::BodyDecodeError)?,
+            ),
+            LambdaBody::Text(s) => Body::from(s),
+            LambdaBody::Binary(b) => Body::from(b),
+        };
+        if let Some(headers) = builder.headers_mut() {
+            headers.extend(resp_event.headers);
+            headers.extend(resp_event.multi_value_headers);
+
+            resp_event.cookies.iter().try_for_each(|cookie| {
+                let header_value = HeaderValue::try_from(cookie)
+                    .map_err(|e| ServerError::ResponseBuild(e.into()))?;
+                headers.append(header::SET_COOKIE, header_value);
+                Ok::<(), ServerError>(())
+            })?;
+        }
+
+        builder.body(resp_body).map_err(ServerError::ResponseBuild)
     }
-
-    builder.body(resp_body).map_err(ServerError::ResponseBuild)
 }
 
 async fn invoke_handler(
@@ -182,14 +203,30 @@ async fn invoke_handler(
     Path(function_name): Path<String>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
-    schedule_invocation(&cmd_tx, function_name, req).await
+    let resp = schedule_invocation(&cmd_tx, function_name, req).await?;
+    let status_code = resp
+        .extensions()
+        .get::<StatusCode>()
+        .cloned()
+        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+
+    let (info, mut body) = resp.into_parts();
+
+    let mut builder = Response::builder().status(status_code);
+
+    if is_streaming_response(&info.headers) && status_code == StatusCode::OK {
+        let status = create_streaming_response(&mut builder, &mut body).await?;
+        builder = builder.status(status);
+    }
+
+    builder.body(body).map_err(ServerError::ResponseBuild)
 }
 
 async fn schedule_invocation(
     cmd_tx: &Sender<Action>,
     function_name: String,
     mut req: Request<Body>,
-) -> Result<Response<Body>, ServerError> {
+) -> Result<LambdaResponse, ServerError> {
     let headers = req.headers_mut();
 
     let span = global::tracer("cargo-lambda/emulator").start("invoke request");
@@ -206,7 +243,7 @@ async fn schedule_invocation(
         .expect("x-amzn-trace-id header is not in the expected format"); // this is Infaliable
     headers.insert(LAMBDA_RUNTIME_XRAY_TRACE_HEADER, xray_header);
 
-    let (resp_tx, resp_rx) = oneshot::channel::<Response<Body>>();
+    let (resp_tx, resp_rx) = oneshot::channel::<LambdaResponse>();
     let function_name = if function_name.is_empty() {
         DEFAULT_PACKAGE_FUNCTION.into()
     } else {
@@ -226,10 +263,12 @@ async fn schedule_invocation(
 
     let resp = resp_rx.await.map_err(ServerError::ReceiveFunctionMessage)?;
 
-    cx.span().add_event(
-        "function call completed",
-        vec![KeyValue::new("status", resp.status().to_string())],
-    );
+    if let Some(status_code) = resp.extensions().get::<StatusCode>() {
+        cx.span().add_event(
+            "function call completed",
+            vec![KeyValue::new("status", status_code.to_string())],
+        );
+    }
 
     Ok(resp)
 }
@@ -250,6 +289,59 @@ fn extract_path_parameters(path: &str) -> (String, String) {
     }
 
     (DEFAULT_PACKAGE_FUNCTION.to_string(), path.to_string())
+}
+
+async fn create_streaming_response(
+    builder: &mut Builder,
+    body: &mut Body,
+) -> Result<StatusCode, ServerError> {
+    let prelude: StreamingPrelude = body
+        .data()
+        .await
+        .ok_or(ServerError::MissingStreamingPrelude)?
+        .map_err(ServerError::DataDeserialization)
+        .and_then(|prelude| {
+            serde_json::from_slice(&prelude).map_err(ServerError::SerializationError)
+        })?;
+
+    let _separator = body
+        .data()
+        .await
+        .ok_or(ServerError::MissingStreamingPrelude)?
+        .map_err(ServerError::DataDeserialization)?;
+
+    if let Some(headers) = builder.headers_mut() {
+        headers.extend(prelude.headers);
+
+        prelude.cookies.iter().try_for_each(|cookie| {
+            let header_value =
+                HeaderValue::try_from(cookie).map_err(|e| ServerError::ResponseBuild(e.into()))?;
+            headers.append(header::SET_COOKIE, header_value);
+            Ok::<(), ServerError>(())
+        })?;
+
+        headers.insert("transfer-encoding", HeaderValue::from_static("chunked"));
+        headers.insert(
+            "lambda-runtime-function-response-mode",
+            HeaderValue::from_static("streaming"),
+        );
+    }
+
+    Ok(prelude.status_code)
+}
+
+fn is_streaming_response(headers: &HeaderMap) -> bool {
+    let Some(_streaming) = headers
+        .get("lambda-runtime-function-response-mode")
+        .map(|v| v == "streaming")
+    else {
+        return false;
+    };
+
+    headers
+        .get("transfer-encoding")
+        .map(|v| v == "chunked")
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

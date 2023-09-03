@@ -5,10 +5,16 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use http_api_problem::ApiError;
+use hyper::HeaderMap;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Sender;
 
 pub(crate) const AWS_XRAY_TRACE_HEADER: &str = "x-amzn-trace-id";
+
+/// LambdaResponse is the data that the Lambda function sends
+/// as the response to an invocation. Because Lambda uses a push
+/// model, this response is represented as a HTTP Request data object.
+pub type LambdaResponse = Request<Body>;
 
 #[derive(Debug)]
 pub enum Action {
@@ -20,7 +26,17 @@ pub enum Action {
 pub struct InvokeRequest {
     pub function_name: String,
     pub req: Request<Body>,
-    pub resp_tx: Sender<Response<Body>>,
+    pub resp_tx: Sender<LambdaResponse>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StreamingPrelude {
+    #[serde(deserialize_with = "http_serde::status_code::deserialize")]
+    #[serde(rename = "statusCode")]
+    pub status_code: StatusCode,
+    #[serde(deserialize_with = "http_serde::header_map::deserialize", default)]
+    pub headers: HeaderMap,
+    pub cookies: Vec<String>,
 }
 
 impl IntoResponse for ServerError {

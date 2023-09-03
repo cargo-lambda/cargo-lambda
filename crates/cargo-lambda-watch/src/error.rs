@@ -38,9 +38,9 @@ pub enum ServerError {
     #[diagnostic()]
     InvalidRequestIdHeader(#[from] axum::http::header::ToStrError),
 
-    #[error("failed to deserialize the request body")]
+    #[error("failed to deserialize data {0}")]
     #[diagnostic()]
-    BodyDeserialization(#[from] hyper::Error),
+    DataDeserialization(#[from] hyper::Error),
 
     #[error("failed to deserialize the request body: {0}")]
     #[diagnostic()]
@@ -81,4 +81,8 @@ pub enum ServerError {
     #[error("the project doesn't include any binary packages")]
     #[diagnostic()]
     NoBinaryPackages,
+
+    #[error("the streaming prelude is missing from the Lambda response")]
+    #[diagnostic()]
+    MissingStreamingPrelude,
 }

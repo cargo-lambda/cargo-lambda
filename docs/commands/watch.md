@@ -106,6 +106,22 @@ Your function MUST have the `apigw_http` feature enabled in the `lambda_http` de
 
 If your project includes several functions under the same package, you can access them using the function's name as the prefix in the request path `http://localhost:9000/lambda-url/FUNCTION_NAME`. You can also add any additional path after the function name, or any query parameters.
 
+## Lambda response streaming
+
+When you work with function URLs, you can stream responses to the client with [Lambda's support for Streaming Responses](https://aws.amazon.com/blogs/compute/introducing-aws-lambda-response-streaming/).
+
+Start the watch command in a function that uses the Response Streaming API, like the [example function in the Runtime's repository](https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/examples/basic-streaming-response):
+
+```
+cargo lambda watch
+```
+
+Then use cURL to send requests to the Lambda function. You'll see that the client starts printing the response as soon as it receives the first chunk of data, without waiting to have the complete response:
+
+```
+curl http://localhost:9000
+```
+
 ## Enabling features
 
 You can pass a list of features separated by comma to the `watch` command to load them during run:
