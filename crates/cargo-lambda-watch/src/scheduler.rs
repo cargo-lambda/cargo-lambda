@@ -1,6 +1,6 @@
 use crate::{
-    requests::{Action, NextEvent},
-    state::{ExtensionCache, RuntimeState},
+    requests::{Action},
+    state::{RuntimeState},
     watcher::{FunctionData, WatcherConfig},
     CargoOptions,
 };

@@ -197,7 +197,7 @@ async fn handlers(
             let ext_cache = ext_cache.clone();
             let function_rx = function_rx.clone();
             let function_cache = function_cache.clone();
-            let gc_tx = gc_tx.clone();
+            let _gc_tx = gc_tx.clone();
             // TODO filter events
             // let function_events: HashMap<String, Vec<Event>> = HashMap::new();
             let apply_all = |action: &Action, outcome: Outcome| {

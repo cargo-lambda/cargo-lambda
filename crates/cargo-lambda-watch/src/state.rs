@@ -8,7 +8,7 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
 };
-use tokio::sync::{mpsc, oneshot, Mutex, RwLock, TryLockError};
+use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use uuid::Uuid;
 
 #[derive(Clone)]
