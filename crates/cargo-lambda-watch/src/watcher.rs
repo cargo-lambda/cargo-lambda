@@ -69,6 +69,10 @@ pub(crate) async fn new(
     let mut filter = IgnoreFilter::new(&wc.base, &wc.ignore_files)
         .await
         .map_err(ServerError::InvalidIgnoreFiles)?;
+    filter
+        .add_globs(&["target/*", "target*"], Some(&wc.base))
+        .map_err(ServerError::InvalidIgnoreFiles)?;
+
     if wc.ignore_changes {
         filter
             .add_globs(&["**/*"], Some(&wc.base))

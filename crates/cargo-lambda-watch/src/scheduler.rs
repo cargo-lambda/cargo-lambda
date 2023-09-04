@@ -1,6 +1,6 @@
 use crate::{
-    requests::{Action},
-    state::{RuntimeState},
+    requests::Action,
+    state::RuntimeState,
     watcher::{FunctionData, WatcherConfig},
     CargoOptions,
 };
@@ -62,6 +62,7 @@ async fn start_scheduler(
                         }
                     },
                     Action::Init => {
+                        state.req_cache.init(DEFAULT_PACKAGE_FUNCTION).await;
                         Some(DEFAULT_PACKAGE_FUNCTION.into())
                     }
                 };
