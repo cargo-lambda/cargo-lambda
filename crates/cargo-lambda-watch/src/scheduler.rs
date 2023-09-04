@@ -48,8 +48,8 @@ async fn start_scheduler(
     .await
     .expect("watcher to start");
 
-    let wx_handle = wx.main();
-    tokio::pin!(wx_handle);
+    // Start watcher process.
+    _ = wx.main();
 
     loop {
         tokio::select! {
@@ -71,21 +71,19 @@ async fn start_scheduler(
                         let runtime_api = format!("{}/{}", &state.server_addr, &name);
                         info!(function = name, "starting new lambda");
                         let function_data = function_data(name, runtime_api, cargo_options.clone());
-                        _ = function_tx.send(function_data).await;
-                        _ = wx.send_event(Event::default(), Priority::High)
+                        // Check for errors sending function or event.
+                        if let Err(err) = function_tx.send(function_data.clone()).await {
+                            error!(error = ?err, "failed to send function data");
+                        }
+                        if let Err(err) = wx.send_event(Event::default(), Priority::High).await {
+                            error!(error = ?err, "failed to send event");
+                        }
                     }
                 }
             },
             Some(name) = gc_rx.recv() => {
                 state.req_cache.clean(&name).await;
             }
-            res = &mut wx_handle => {
-                if let Err(err) = res {
-                    error!(error = %err, "watcher stopped with error");
-                }
-                info!("watcher stopped gracefully");
-                subsys.request_shutdown()
-            },
             _ = subsys.on_shutdown_requested() => {
                 info!("terminating lambda scheduler");
                 return;
