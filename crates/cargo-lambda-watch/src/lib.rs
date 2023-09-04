@@ -281,9 +281,15 @@ async fn start_server(
         }
     }
 
-    axum::Server::bind(&addr)
+    if let Err(error) = axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .with_graceful_shutdown(subsys.on_shutdown_requested())
         .await
-        .map_err(axum::Error::new)
+    {
+        if error.to_string() != "shutdown timed out" {
+            return Err(axum::Error::new(error));
+        }
+    }
+
+    Ok(())
 }

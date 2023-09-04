@@ -43,6 +43,7 @@ async fn start_scheduler(
                         state.req_cache.upsert(req).await?
                     },
                     Action::Init => {
+                        state.req_cache.init(DEFAULT_PACKAGE_FUNCTION).await;
                         Some(DEFAULT_PACKAGE_FUNCTION.into())
                     }
                 };
@@ -58,8 +59,8 @@ async fn start_scheduler(
                     }
                 }
             }
-            Some(gc) = gc_rx.recv() => {
-                state.req_cache.clean(&gc).await;
+            Some(name) = gc_rx.recv() => {
+                state.req_cache.clean(&name).await;
             }
             _ = subsys.on_shutdown_requested() => {
                 info!("terminating lambda scheduler");
@@ -92,9 +93,13 @@ async fn start_function(
     let wx = crate::watcher::new(cmd, watcher_config, ext_cache.clone()).await?;
 
     tokio::select! {
-        _ = wx.main() => {
-            if let Err(err) = gc_tx.send(name.clone()).await {
-                error!(error = %err, function = ?name, "failed to send message to cleanup dead function");
+        res = wx.main() => match res {
+            Ok(_) => {},
+            Err(error) => {
+                error!(?error, "failed to obtain the watchexec task");
+                if let Err(error) = gc_tx.send(name.clone()).await {
+                    error!(%error, function = ?name, "failed to send message to cleanup dead function");
+                }
             }
         },
         _ = subsys.on_shutdown_requested() => {
