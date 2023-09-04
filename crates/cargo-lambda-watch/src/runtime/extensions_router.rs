@@ -86,7 +86,7 @@ async fn extract_json<T: DeserializeOwned>(req: Request<Body>) -> Result<T, Serv
     let body = req.into_body();
     let bytes = hyper::body::to_bytes(body)
         .await
-        .map_err(ServerError::BodyDeserialization)?;
+        .map_err(ServerError::DataDeserialization)?;
 
     serde_json::from_slice(&bytes).map_err(ServerError::SerializationError)
 }
