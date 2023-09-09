@@ -275,14 +275,13 @@ async fn handlers(
             apply_all(&action, Outcome::if_running(when_running, Outcome::Start));
 
             // Start up new functions only if
-            while let Some(function) = function_rx.lock().ok().and_then(|mut guard| {
-                let fun = guard.try_recv();
-                if let Err(err) = fun {
-                    error!(err = ?err, "failed to receive function");
-                };
-                fun.ok()
-            }) {
-                info!(function = ?function, "starting function process");
+            while let Some(function) = function_rx
+                .lock()
+                .ok()
+                .and_then(|mut guard| guard.try_recv().ok())
+            {
+                let name = &function.name;
+                info!( %name, "starting function process");
                 let process = action.create(function.cmd.clone());
                 action.apply(
                     process,

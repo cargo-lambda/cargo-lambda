@@ -48,49 +48,66 @@ async fn start_scheduler(
     .await
     .expect("watcher to start");
 
-    // Start watcher process and drop the handle.
-    std::mem::drop(wx.main());
+    let main = {
+        let wx = wx.clone();
+        let subsys = subsys.clone();
+        || {
+            async move {
+                loop {
+                    tokio::select! {
+                        Some(action) = req_rx.recv() => {
+                            let start_function_name = match action {
+                                Action::Invoke(req) => {
+                                    match state.req_cache.upsert(req).await {
+                                        Err(_) => None,
+                                        Ok(v) => v,
+                                    }
+                                },
+                                Action::Init => {
+                                    state.req_cache.init(DEFAULT_PACKAGE_FUNCTION).await;
+                                    Some(DEFAULT_PACKAGE_FUNCTION.into())
+                                }
+                            };
 
-    loop {
-        tokio::select! {
-            Some(action) = req_rx.recv() => {
-                let start_function_name = match action {
-                    Action::Invoke(req) => {
-                        match state.req_cache.upsert(req).await {
-                            Err(_) => None,
-                            Ok(v) => v,
-                        }
-                    },
-                    Action::Init => {
-                        state.req_cache.init(DEFAULT_PACKAGE_FUNCTION).await;
-                        Some(DEFAULT_PACKAGE_FUNCTION.into())
-                    }
-                };
-
-                if watcher_config.start_function() {
-                    if let Some(name) = start_function_name {
-                        let runtime_api = format!("{}/{}", &state.server_addr, &name);
-                        info!(function = name, "starting new lambda");
-                        let function_data = function_data(name, runtime_api, cargo_options.clone());
-                        // Check for errors sending function or event.
-                        if let Err(err) = function_tx.send(function_data.clone()).await {
-                            error!(error = ?err, "failed to send function data");
-                        }
-                        if let Err(err) = wx.send_event(Event::default(), Priority::High).await {
-                            error!(error = ?err, "failed to send event");
-                        }
-                    }
+                            if watcher_config.start_function() {
+                                if let Some(name) = start_function_name {
+                                    let runtime_api = format!("{}/{}", &state.server_addr, &name);
+                                    info!(function = name, "starting new lambda");
+                                    let function_data = function_data(name, runtime_api, cargo_options.clone());
+                                    // Check for errors sending function or event.
+                                    if let Err(err) = function_tx.send(function_data.clone()).await {
+                                        error!(error = ?err, "failed to send function data");
+                                    }
+                                    if let Err(err) = wx.send_event(Event::default(), Priority::High).await {
+                                        error!(error = ?err, "failed to send event");
+                                    }
+                                }
+                            }
+                        },
+                        Some(name) = gc_rx.recv() => {
+                            state.req_cache.clean(&name).await;
+                        },
+                        _ = subsys.on_shutdown_requested() => {
+                            info!("terminating lambda scheduler");
+                            return;
+                        },
+                    };
                 }
-            },
-            Some(name) = gc_rx.recv() => {
-                state.req_cache.clean(&name).await;
             }
-            _ = subsys.on_shutdown_requested() => {
-                info!("terminating lambda scheduler");
-                return;
-            },
-        };
-    }
+        }
+    };
+
+    // Start watcher process and main scheduler loop.
+    tokio::select! {
+        res = wx.main() => match res {
+            Ok(_) => {},
+            Err(error) => {
+                error!(?error, "failed to obtain watchexec task");
+                subsys.request_global_shutdown();
+            }
+        },
+        _ = main() => {}
+    };
 }
 
 fn function_data(name: String, runtime_api: String, cargo_options: CargoOptions) -> FunctionData {
