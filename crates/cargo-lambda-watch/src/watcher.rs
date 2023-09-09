@@ -148,8 +148,6 @@ async fn handlers(
                         .envs(env)
                         .env("AWS_LAMBDA_RUNTIME_API", &runtime_api)
                         .env("AWS_LAMBDA_FUNCTION_NAME", &name);
-
-                    println!("command with ENV: {command:?}");
                 });
             }
 
@@ -279,9 +277,9 @@ async fn handlers(
             // Start up new functions only if
             while let Some(function) = function_rx.lock().ok().and_then(|mut guard| {
                 let fun = guard.try_recv();
-                if fun.is_err() {
-                    println!("failed to receive function, err: {fun:?}")
-                }
+                if let Err(err) = fun {
+                    error!(err = ?err, "failed to receive function");
+                };
                 fun.ok()
             }) {
                 info!(function = ?function, "starting function process");
@@ -299,6 +297,8 @@ async fn handlers(
             }
 
             // TODO gc completed lambda functions
+            // Iterate over all completed processes, sending dead functions to the gc by mapping
+            // to them via their SupervisorId
             for _process_end in process_completions {
                 /*
                 let Some(name) = function_cache.lock().await.remove(&e.).map(|f| f.name) else {
@@ -310,8 +310,6 @@ async fn handlers(
                 }
                 */
             }
-
-            println!("action handler done!");
         }
     };
 

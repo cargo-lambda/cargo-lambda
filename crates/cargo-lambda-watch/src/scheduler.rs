@@ -48,8 +48,8 @@ async fn start_scheduler(
     .await
     .expect("watcher to start");
 
-    // Start watcher process.
-    _ = wx.main();
+    // Start watcher process and drop the handle.
+    std::mem::drop(wx.main());
 
     loop {
         tokio::select! {

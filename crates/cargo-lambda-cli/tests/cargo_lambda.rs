@@ -37,7 +37,7 @@ fn test_build_basic_zip_function() {
 
     let project = test_project(root);
     cargo_lambda_build(project.root())
-        .args(&["--output-format", "zip"])
+        .args(["--output-format", "zip"])
         .assert()
         .success();
 
@@ -52,7 +52,6 @@ fn test_build_basic_zip_function() {
         zip.by_name("bootstrap").is_ok(),
         "bootstrap is not in the zip archive. Files in zip: {:?}",
         zip.file_names()
-            .into_iter()
             .collect::<Vec<&str>>()
             .join(", ")
     );
@@ -224,7 +223,7 @@ fn test_build_basic_zip_extension() {
     let project = test_project(root);
     cargo_lambda_build(project.root())
         .arg("--extension")
-        .args(&["--output-format", "zip"])
+        .args(["--output-format", "zip"])
         .assert()
         .success();
 
@@ -236,7 +235,6 @@ fn test_build_basic_zip_extension() {
         zip.by_name("extensions/test-basic-extension").is_ok(),
         "test-basic-extension is not in the zip archive. Files in zip: {:?}",
         zip.file_names()
-            .into_iter()
             .collect::<Vec<&str>>()
             .join(", ")
     );
@@ -255,7 +253,7 @@ fn test_build_internal_zip_extension() {
     cargo_lambda_build(project.root())
         .arg("--extension")
         .arg("--internal")
-        .args(&["--output-format", "zip"])
+        .args(["--output-format", "zip"])
         .assert()
         .success();
 
@@ -267,7 +265,6 @@ fn test_build_internal_zip_extension() {
         zip.by_name("test-internal-extension").is_ok(),
         "test-internal-extension is not in the zip archive. Files in zip: {:?}",
         zip.file_names()
-            .into_iter()
             .collect::<Vec<&str>>()
             .join(", ")
     );

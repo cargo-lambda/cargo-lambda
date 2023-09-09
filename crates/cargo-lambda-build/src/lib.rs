@@ -451,7 +451,7 @@ mod test {
         let path = Path::new("");
         assert_eq!(
             "",
-            convert_to_unix_path(&path).expect("failed to convert file path")
+            convert_to_unix_path(path).expect("failed to convert file path")
         );
     }
 }
