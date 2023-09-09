@@ -48,10 +48,18 @@ async fn start_scheduler(
     .await
     .expect("watcher to start");
 
-    let main = {
-        let wx = wx.clone();
-        let subsys = subsys.clone();
-        || {
+    // Start watcher process and main scheduler loop.
+    tokio::select! {
+        res = wx.main() => match res {
+            Ok(_) => {},
+            Err(error) => {
+                error!(?error, "failed to obtain watchexec task");
+                subsys.request_global_shutdown();
+            }
+        },
+        _ = {
+            let wx = wx.clone();
+            let subsys = subsys.clone();
             async move {
                 loop {
                     tokio::select! {
@@ -73,12 +81,17 @@ async fn start_scheduler(
                                 if let Some(name) = start_function_name {
                                     let runtime_api = format!("{}/{}", &state.server_addr, &name);
                                     info!(function = name, "starting new lambda");
-                                    let function_data = function_data(name, runtime_api, cargo_options.clone());
+                                    let function_data =
+                                        function_data(name, runtime_api, cargo_options.clone());
                                     // Check for errors sending function or event.
-                                    if let Err(err) = function_tx.send(function_data.clone()).await {
+                                    if let Err(err) =
+                                        function_tx.send(function_data.clone()).await
+                                    {
                                         error!(error = ?err, "failed to send function data");
                                     }
-                                    if let Err(err) = wx.send_event(Event::default(), Priority::High).await {
+                                    if let Err(err) =
+                                        wx.send_event(Event::default(), Priority::High).await
+                                    {
                                         error!(error = ?err, "failed to send event");
                                     }
                                 }
@@ -94,19 +107,7 @@ async fn start_scheduler(
                     };
                 }
             }
-        }
-    };
-
-    // Start watcher process and main scheduler loop.
-    tokio::select! {
-        res = wx.main() => match res {
-            Ok(_) => {},
-            Err(error) => {
-                error!(?error, "failed to obtain watchexec task");
-                subsys.request_global_shutdown();
-            }
-        },
-        _ = main() => {}
+        } => {}
     };
 }
 
