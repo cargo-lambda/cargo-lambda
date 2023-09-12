@@ -105,6 +105,7 @@ async fn handlers(
     let function_cache: Arc<Mutex<HashMap<SupervisorId, FunctionData>>> =
         Arc::new(Mutex::new(HashMap::new()));
 
+    // Closure creates function specific `pre_spawn_hook` based on `SupervisorId`
     let create_prespawn = {
         let function_cache = function_cache.clone();
         let wc = wc.clone();
@@ -155,6 +156,7 @@ async fn handlers(
         }
     };
 
+    // Main action handler
     let handler = {
         let function_cache = function_cache.clone();
         let gc_tx = gc_tx.clone();
@@ -274,7 +276,7 @@ async fn handlers(
             info!("setting outcome to running");
             apply_all(&action, Outcome::if_running(when_running, Outcome::Start));
 
-            // Start up new functions only if
+            // Start functions queued up by scheduler.
             while let Some(function) = function_rx
                 .lock()
                 .ok()
@@ -295,9 +297,10 @@ async fn handlers(
                 }
             }
 
+            // Clean up dead functions.
             // TODO gc completed lambda functions
             // Iterate over all completed processes, sending dead functions to the gc by mapping
-            // to them via their SupervisorId
+            // to them via their SupervisorId.
             for _process_end in process_completions {
                 /*
                 let Some(name) = function_cache.lock().await.remove(&e.).map(|f| f.name) else {
