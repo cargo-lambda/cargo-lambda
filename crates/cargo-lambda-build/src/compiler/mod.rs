@@ -1,5 +1,5 @@
 use crate::TargetArch;
-use cargo_lambda_metadata::cargo::CompilerOptions;
+use cargo_lambda_metadata::cargo::{CargoMetadata, CompilerOptions};
 use cargo_options::Build;
 use miette::Result;
 use std::process::Command;
@@ -13,7 +13,13 @@ use cross::Cross;
 
 #[async_trait::async_trait]
 pub(crate) trait Compiler {
-    async fn command(&self, cargo: &Build, target_arch: &TargetArch) -> Result<Command>;
+    async fn command(
+        &self,
+        cargo: &Build,
+        target_arch: &TargetArch,
+        cargo_metadata: &CargoMetadata,
+        skip_target_check: bool,
+    ) -> Result<Command>;
 
     fn build_profile<'a>(&self, cargo: &'a Build) -> &'a str {
         build_profile(cargo.profile.as_deref(), cargo.release)

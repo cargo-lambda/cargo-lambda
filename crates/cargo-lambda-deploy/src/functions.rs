@@ -211,17 +211,17 @@ async fn upsert_function(
                 Some(role) => (role.clone(), false),
             };
 
-            tracing::debug!(role_arn = ?iam_role, config = ?deploy_metadata, "creating new function");
+            debug!(role_arn = ?iam_role, config = ?deploy_metadata, "creating new function");
             progress.set_message("deploying function");
 
             let code = match &s3_bucket {
                 None => {
-                    tracing::debug!("uploading zip to Lambda");
+                    debug!("uploading zip to Lambda");
                     let blob = Blob::new(binary_data);
                     FunctionCode::builder().zip_file(blob).build()
                 }
                 Some(bucket) => {
-                    tracing::debug!(bucket = bucket, "uploading zip to S3");
+                    debug!(bucket = bucket, "uploading zip to S3");
                     let client = S3Client::new(sdk_config);
                     client
                         .put_object()
@@ -369,7 +369,7 @@ async fn upsert_function(
             }
 
             if update_config {
-                tracing::debug!(config = ?builder, "updating function's configuration");
+                debug!(config = ?builder, "updating function's configuration");
                 builder
                     .send()
                     .await
@@ -397,12 +397,12 @@ async fn upsert_function(
 
             match &s3_bucket {
                 None => {
-                    tracing::debug!("uploading zip to Lambda");
+                    debug!("uploading zip to Lambda");
                     let blob = Blob::new(binary_data);
                     builder = builder.zip_file(blob)
                 }
                 Some(bucket) => {
-                    tracing::debug!(bucket = bucket, "uploading zip to S3");
+                    debug!(bucket = bucket, "uploading zip to S3");
 
                     let client = S3Client::new(sdk_config);
                     let mut operation = client
@@ -447,7 +447,8 @@ fn load_deploy_environment(
     function_config: &FunctionDeployConfig,
     tags: &Option<Vec<String>>,
 ) -> Result<(Environment, DeployConfig)> {
-    let base = function_deploy_metadata(manifest_path, binary_name)?
+    let base = function_deploy_metadata(manifest_path, binary_name)
+        .into_diagnostic()?
         .unwrap_or_else(|| function_config.to_deploy_config());
     let (environment, deploy_metadata) = merge_configuration(&base, function_config, tags)?;
 
@@ -499,7 +500,7 @@ fn merge_configuration(
     }
 
     let environment = match &function_config.env_options {
-        None => deploy_metadata.lambda_environment()?,
+        None => deploy_metadata.lambda_environment().into_diagnostic()?,
         Some(config) => {
             deploy_metadata.use_for_update = true;
 
@@ -507,8 +508,10 @@ fn merge_configuration(
                 deploy_metadata.env_file = config.env_file.clone();
             }
 
-            let flag_env = config.lambda_environment()?;
-            deploy_metadata.extend_environment(flag_env)?
+            let flag_env = config.lambda_environment().into_diagnostic()?;
+            deploy_metadata
+                .extend_environment(flag_env)
+                .into_diagnostic()?
         }
     };
 

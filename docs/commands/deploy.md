@@ -1,6 +1,6 @@
 # cargo lambda deploy
 
-This subcommand uploads functions to AWS Lambda. You can use the same command to create new functions as well as update existent functions code. This command assumes that your AWS account has permissions to call several lambda operations, like `lambda:getFunction`, `lambda:createFunction`, and `lambda:updateFunctionCode`. This subcommand also requires an IAM role with privileges in AWS Lambda.
+This subcommand uploads functions to AWS Lambda. You can use the same command to create new functions as well as update existent functions code. This command assumes that your AWS account has permissions to call several lambda operations, like `lambda:getFunction`, `lambda:createFunction`, and `lambda:updateFunctionCode`. If you are using layers, you must also add `lambda:GetLayerVersion`. This subcommand also requires an IAM role with privileges in AWS Lambda.
 
 When you call this subcommand, the function binary must have been created with the [Build](/commands/build) subcommand ahead of time. The command will fail if it cannot find the binary file.
 
@@ -96,6 +96,15 @@ cargo lambda build --release --extension
 cargo lambda deploy --extension
 ```
 
+### Internal extensions
+
+To deploy an [internal extension](https://docs.aws.amazon.com/lambda/latest/dg/lambda-extensions.html), add the `--internal` flag to the deploy command:
+
+```
+cargo lambda build --release --extension
+cargo lambda deploy --extension --internal
+```
+
 ## Deploy configuration in Cargo's Metadata
 
 You can keep some deploy configuration options in your project's `Cargo.toml` file. This give you a more "configuration as code" approach since you can store that configuration along side your project. The following example shows the options that you can specify in the metadata, all of them are optional:
@@ -112,6 +121,14 @@ layers = [                     # List of layers to deploy with your function
     "layer-full-arn"
 ]
 tags = { "team" = "lambda" }   # List of AWS resource tags for this function
+```
+
+## Deploying to S3
+
+AWS Lambda has a 50MB limit for Zip file direct uploads. If the Zip file that you're trying to deploy is larger than 50MB, you can upload it to S3 using the `--s3-bucket` option. This option takes the name of a bucket in your account where the Zip file will be stored. To use this option, you need `Post` or `Put` access to S3 in your deployment credentials:
+
+```
+cargo lambda deploy --s3-bucket bucket-name
 ```
 
 ## Other options

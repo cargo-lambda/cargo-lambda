@@ -19,9 +19,9 @@ pub enum InvokeError {
 
 #[derive(Debug, Deserialize)]
 pub struct RemoteInvokeError {
-    #[serde(rename = "errorType")]
+    #[serde(rename = "errorType", alias = "title")]
     code: String,
-    #[serde(rename = "errorMessage")]
+    #[serde(rename = "errorMessage", alias = "detail")]
     message: String,
 }
 

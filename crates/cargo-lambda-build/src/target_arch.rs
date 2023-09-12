@@ -1,7 +1,7 @@
 use crate::error::BuildError;
 use miette::{IntoDiagnostic, Result};
 use rustc_version::Channel;
-use std::{fmt::Display, str::FromStr};
+use std::{env::consts::ARCH, fmt::Display, str::FromStr};
 
 const TARGET_ARM: &str = "aarch64-unknown-linux-gnu";
 const TARGET_X86_64: &str = "x86_64-unknown-linux-gnu";
@@ -77,6 +77,16 @@ impl TargetArch {
     pub fn compatible_host_linker(&self) -> bool {
         self.rustc_target_without_glibc_version == TARGET_ARM
             || self.rustc_target_without_glibc_version == TARGET_X86_64
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn is_static_linking(&self) -> bool {
+        self.rustc_target_without_glibc_version == format!("{}-unknown-linux-musl", ARCH)
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn is_static_linking(&self) -> bool {
+        false
     }
 
     pub fn channel(&self) -> Result<Channel> {
@@ -193,5 +203,38 @@ mod test {
         assert!(!TargetArch::from_str("x86_64-pc-windows-gnu")
             .unwrap()
             .compatible_host_linker());
+    }
+
+    #[test]
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    fn test_is_static_linking() {
+        assert!(TargetArch::from_str("x86_64-unknown-linux-musl")
+            .unwrap()
+            .is_static_linking());
+        assert!(!TargetArch::from_str("aarch64-unknown-linux-musl")
+            .unwrap()
+            .is_static_linking());
+    }
+
+    #[test]
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    fn test_is_static_linking() {
+        assert!(TargetArch::from_str("aarch64-unknown-linux-musl")
+            .unwrap()
+            .is_static_linking());
+        assert!(!TargetArch::from_str("x86_64-unknown-linux-musl")
+            .unwrap()
+            .is_static_linking());
+    }
+
+    #[test]
+    #[cfg(not(target_os = "linux"))]
+    fn test_is_static_linking() {
+        assert!(!TargetArch::from_str("aarch64-unknown-linux-musl")
+            .unwrap()
+            .is_static_linking());
+        assert!(!TargetArch::from_str("x86_64-unknown-linux-musl")
+            .unwrap()
+            .is_static_linking());
     }
 }

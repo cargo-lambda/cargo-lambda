@@ -27,6 +27,12 @@ pub(crate) struct WatcherConfig {
     pub env: HashMap<String, String>,
 }
 
+impl WatcherConfig {
+    pub(crate) fn start_function(&self) -> bool {
+        !self.only_lambda_apis
+    }
+}
+
 pub(crate) async fn new(
     cmd: Command,
     wc: WatcherConfig,
@@ -84,6 +90,10 @@ async fn runtime(
     let mut filter = IgnoreFilter::new(&wc.base, &wc.ignore_files)
         .await
         .map_err(ServerError::InvalidIgnoreFiles)?;
+    filter
+        .add_globs(&["target/*", "target*"], Some(&wc.base))
+        .map_err(ServerError::InvalidIgnoreFiles)?;
+
     if wc.ignore_changes {
         filter
             .add_globs(&["**/*"], Some(&wc.base))

@@ -1,6 +1,6 @@
 use super::Compiler;
 use crate::TargetArch;
-use cargo_lambda_metadata::cargo::CargoCompilerOptions;
+use cargo_lambda_metadata::cargo::{CargoCompilerOptions, CargoMetadata};
 use cargo_options::Build;
 use miette::Result;
 use std::{collections::VecDeque, env, ffi::OsStr, process::Command};
@@ -27,7 +27,14 @@ impl Cargo {
 
 #[async_trait::async_trait]
 impl Compiler for Cargo {
-    async fn command(&self, cargo: &Build, _target_arch: &TargetArch) -> Result<Command> {
+    #[tracing::instrument(skip(self), target = "cargo_lambda")]
+    async fn command(
+        &self,
+        cargo: &Build,
+        _target_arch: &TargetArch,
+        _cargo_metadata: &CargoMetadata,
+        _skip_target_check: bool,
+    ) -> Result<Command> {
         tracing::debug!("compiling with Cargo");
 
         let mut cmd = if let Some(subcommand) = &self.compiler.subcommand {

@@ -1,99 +1,118 @@
 use crate::{
     error::ServerError,
-    requests::{InvokeRequest, NextEvent},
+    requests::{InvokeRequest, LambdaResponse, NextEvent},
 };
-use axum::{body::Body, response::Response};
+use miette::Result;
+use mpsc::{channel, Receiver, Sender};
 use std::{
-    collections::{hash_map::Entry, HashMap, VecDeque},
+    collections::{hash_map::Entry, HashMap},
     sync::Arc,
 };
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
+use tracing::debug;
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub(crate) struct RuntimeState {
+    pub server_addr: String,
     pub req_cache: RequestCache,
     pub ext_cache: ExtensionCache,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct RequestQueue {
-    inner: Arc<Mutex<VecDeque<InvokeRequest>>>,
+    tx: Arc<Sender<InvokeRequest>>,
+    rx: Arc<Mutex<Receiver<InvokeRequest>>>,
 }
 
 impl RequestQueue {
     pub fn new() -> RequestQueue {
+        let (tx, rx) = channel::<InvokeRequest>(100);
+
         RequestQueue {
-            inner: Arc::new(Mutex::new(VecDeque::new())),
+            tx: Arc::new(tx),
+            rx: Arc::new(Mutex::new(rx)),
         }
     }
 
     pub async fn pop(&self) -> Option<InvokeRequest> {
-        let mut queue = self.inner.lock().await;
-        queue.pop_front()
+        let mut rx = self.rx.lock().await;
+        rx.recv().await
     }
 
-    pub async fn push(&self, req: InvokeRequest) {
-        let mut queue = self.inner.lock().await;
-        queue.push_back(req);
+    pub async fn push(&self, req: InvokeRequest) -> Result<(), ServerError> {
+        self.tx
+            .send(req)
+            .await
+            .map_err(|e| ServerError::SendInvokeMessage(Box::new(e)))
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct RequestCache {
-    server_addr: String,
-    inner: Arc<Mutex<HashMap<String, RequestQueue>>>,
+    inner: Arc<RwLock<HashMap<String, RequestQueue>>>,
 }
 
 impl RequestCache {
-    pub fn new(server_addr: String) -> RequestCache {
+    pub fn new() -> RequestCache {
         RequestCache {
-            server_addr,
-            inner: Arc::new(Mutex::new(HashMap::new())),
+            inner: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    pub async fn upsert(&self, req: InvokeRequest) -> Option<(String, String)> {
-        let mut inner = self.inner.lock().await;
-        let name = req.function_name.clone();
+    pub async fn init(&self, function_name: &str) {
+        let mut inner = self.inner.write().await;
+        inner.insert(function_name.into(), RequestQueue::new());
+        debug!(
+            function_name,
+            "request stack initialized before compilation"
+        );
+    }
 
-        match inner.entry(name) {
+    pub async fn upsert(&self, req: InvokeRequest) -> Result<Option<String>, ServerError> {
+        let mut inner = self.inner.write().await;
+        let function_name = req.function_name.clone();
+
+        match inner.entry(function_name.clone()) {
             Entry::Vacant(v) => {
-                let name = req.function_name.clone();
-                let runtime_api = format!("{}/{}", &self.server_addr, &name);
-
                 let stack = RequestQueue::new();
-                stack.push(req).await;
+                stack.push(req).await?;
                 v.insert(stack);
 
-                Some((name, runtime_api))
+                debug!(?function_name, "request stack initialized in first request");
+
+                Ok(Some(function_name))
             }
             Entry::Occupied(o) => {
-                o.into_mut().push(req).await;
-                None
+                o.into_mut().push(req).await?;
+                debug!(?function_name, "request stack increased");
+
+                Ok(None)
             }
         }
     }
 
     pub async fn pop(&self, function_name: &str) -> Option<InvokeRequest> {
-        let inner = self.inner.lock().await;
+        let inner = self.inner.read().await;
         let stack = match inner.get(function_name) {
             None => return None,
-            Some(s) => s,
+            Some(s) => s.clone(),
         };
+        drop(inner);
 
         stack.pop().await
     }
 
     pub async fn clean(&self, function_name: &str) {
-        let mut inner = self.inner.lock().await;
+        let mut inner = self.inner.write().await;
         inner.remove(function_name);
+        debug!(function_name, "request stack cleaned");
     }
 }
 
 #[derive(Clone)]
 pub(crate) struct ResponseCache {
-    inner: Arc<Mutex<HashMap<String, oneshot::Sender<Response<Body>>>>>,
+    inner: Arc<Mutex<HashMap<String, oneshot::Sender<LambdaResponse>>>>,
 }
 
 impl ResponseCache {
@@ -103,12 +122,12 @@ impl ResponseCache {
         }
     }
 
-    pub async fn pop(&self, req_id: &str) -> Option<oneshot::Sender<Response<Body>>> {
+    pub async fn pop(&self, req_id: &str) -> Option<oneshot::Sender<LambdaResponse>> {
         let mut cache = self.inner.lock().await;
         cache.remove(req_id)
     }
 
-    pub async fn push(&self, req_id: &str, resp_tx: oneshot::Sender<Response<Body>>) {
+    pub async fn push(&self, req_id: &str, resp_tx: oneshot::Sender<LambdaResponse>) {
         let mut cache = self.inner.lock().await;
         cache.insert(req_id.into(), resp_tx);
     }

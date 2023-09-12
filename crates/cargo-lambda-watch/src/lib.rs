@@ -1,12 +1,7 @@
-use axum::{
-    extract::Extension,
-    http::{header::HeaderName, HeaderValue},
-    Router,
-};
+use axum::{extract::Extension, http::header::HeaderName, Router};
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
-use cargo_lambda_metadata::env::EnvOptions;
+use cargo_lambda_metadata::{cargo::binary_targets, env::EnvOptions};
 use clap::{Args, ValueHint};
-use hyper::Method;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
     global,
@@ -14,6 +9,7 @@ use opentelemetry::{
 };
 use opentelemetry_aws::trace::XrayPropagator;
 use std::{
+    collections::HashSet,
     net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
     str::FromStr,
@@ -42,6 +38,8 @@ use state::*;
 mod trigger_router;
 mod watcher;
 use watcher::WatcherConfig;
+
+use crate::{error::ServerError, requests::Action};
 
 const RUNTIME_EMULATOR_PATH: &str = "/.rt";
 
@@ -80,6 +78,10 @@ pub struct Watch {
     #[arg(long)]
     print_traces: bool,
 
+    /// Wait for the first invocation to run the function
+    #[arg(long, short)]
+    wait: bool,
+
     #[command(flatten)]
     cargo_options: CargoOptions,
 
@@ -95,11 +97,11 @@ struct CargoOptions {
     manifest_path: PathBuf,
 
     /// Features to pass to `cargo run`, separated by comma
-    #[arg(long)]
+    #[arg(long, short = 'F')]
     features: Option<String>,
 
     /// Enable release mode when the emulator starts
-    #[arg(long)]
+    #[arg(long, short = 'r')]
     release: bool,
 }
 
@@ -119,7 +121,15 @@ impl Watch {
         let base = dunce::canonicalize(".").into_diagnostic()?;
         let ignore_files = discover_ignore_files(&base).await;
 
-        let env = self.env_options.lambda_environment()?;
+        let env = self.env_options.lambda_environment().into_diagnostic()?;
+
+        let binary_packages = binary_targets(&cargo_options.manifest_path)
+            .map_err(ServerError::FailedToReadMetadata)?;
+        let start_function = match binary_packages.len() {
+            0 => Err(ServerError::NoBinaryPackages)?,
+            1 if self.send_function_init() => true,
+            _ => false,
+        };
 
         let watcher_config = WatcherConfig {
             base,
@@ -133,12 +143,12 @@ impl Watch {
 
         Toplevel::new()
             .start("Lambda server", move |s| {
-                start_server(s, addr, cargo_options, watcher_config)
+                start_server(s, addr, cargo_options, watcher_config, start_function)
             })
             .catch_signals()
             .handle_shutdown_requests(Duration::from_millis(1000))
             .await
-            .map_err(|e| miette::miette!("{}", e))
+            .into_diagnostic()
     }
 
     pub fn xray_layer<S>(&self) -> OpenTelemetryLayer<S, Tracer>
@@ -159,6 +169,10 @@ impl Watch {
         };
         tracing_opentelemetry::layer().with_tracer(tracer)
     }
+
+    fn send_function_init(&self) -> bool {
+        !self.only_lambda_apis && !self.wait
+    }
 }
 
 /// we discover ignore files from the `CARGO_LAMBDA_IGNORE_FILES` environment variable,
@@ -175,12 +189,22 @@ async fn discover_ignore_files(base: &Path) -> Vec<ignore_files::IgnoreFile> {
     trace!(ignore_files = ?origin_ignore, errors = ?origin_ignore_errs, "discovered ignore files from origin");
     ignore_files.append(&mut origin_ignore);
 
-    for parent in project_origins::origins(base).await {
-        let types = project_origins::types(&parent).await;
-        if !types.contains(&project_origins::ProjectType::Cargo) {
+    let mut origins = HashSet::new();
+    let mut current = base;
+    if base.is_dir() && base.join("Cargo.toml").is_file() {
+        origins.insert(base.to_owned());
+    }
+
+    while let Some(parent) = current.parent() {
+        current = parent;
+        if current.is_dir() && current.join("Cargo.toml").is_file() {
+            origins.insert(current.to_owned());
+        } else {
             break;
         }
+    }
 
+    for parent in origins {
         let (mut parent_ignore, parent_ignore_errs) = ignore_files::from_origin(&parent).await;
         trace!(parent = ?parent, ignore_files = ?parent_ignore, errors = ?parent_ignore_errs, "discovered ignore files from parent origin");
         ignore_files.append(&mut parent_ignore);
@@ -194,30 +218,22 @@ async fn start_server(
     addr: SocketAddr,
     cargo_options: CargoOptions,
     watcher_config: WatcherConfig,
+    init_function: bool,
 ) -> Result<(), axum::Error> {
-    let runtime_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
+    let server_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
 
-    if watcher_config.only_lambda_apis {
-        info!("the flag --only_lambda_apis is active, the lambda function will not be started by Cargo Lambda");
-        info!("the lambda function will depend on the following environment variables");
-        info!(
-            "you MUST set these variables in the environment where you're running your function:"
-        );
-        info!("AWS_LAMBDA_FUNCTION_VERSION=1");
-        info!("AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096");
-        info!("AWS_LAMBDA_RUNTIME_API={}", &runtime_addr);
-        info!("AWS_LAMBDA_FUNCTION_NAME={DEFAULT_PACKAGE_FUNCTION}");
-    }
+    let only_lambda_apis = watcher_config.only_lambda_apis;
 
     let ext_cache = ExtensionCache::default();
-    let req_cache = RequestCache::new(runtime_addr);
+    let req_cache = RequestCache::new();
     let runtime_state = RuntimeState {
+        server_addr: server_addr.clone(),
         req_cache: req_cache.clone(),
         ext_cache: ext_cache.clone(),
     };
 
     let req_tx = init_scheduler(&subsys, runtime_state, cargo_options, watcher_config).await;
-    let resp_cache = ResponseCache::new();
+
     let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
 
     let app = Router::new()
@@ -231,43 +247,49 @@ async fn start_server(
         .layer(Extension(ext_cache))
         .layer(Extension(req_tx.clone()))
         .layer(Extension(req_cache))
-        .layer(Extension(resp_cache))
+        .layer(Extension(ResponseCache::new()))
         .layer(TraceLayer::new_for_http())
         .layer(CatchPanicLayer::new())
-        .layer(
-            // This manually allows all possible localhost ports
-            // Access-Control-Allow-Origin wildcard '*' is blocked in browsers
-            CorsLayer::new()
-                .allow_origin(
-                    (0..=65535)
-                        .map(|port| format!("http://localhost:{}", port).parse().unwrap())
-                        .collect::<Vec<HeaderValue>>(),
-                )
-                .allow_credentials(true)
-                .allow_methods(vec![
-                    Method::OPTIONS,
-                    Method::GET,
-                    Method::POST,
-                    Method::PUT,
-                    Method::DELETE,
-                    Method::HEAD,
-                    Method::TRACE,
-                    Method::CONNECT,
-                    Method::PATCH,
-                ])
-                .allow_headers(vec![
-                    "content-type".parse().unwrap(),
-                    "authorization".parse().unwrap(),
-                    "x-amz-date".parse().unwrap(),
-                    "x-api-key".parse().unwrap(),
-                    "x-amz-security-token".parse().unwrap(),
-                ]),
-        );
+        .layer(CorsLayer::very_permissive());
 
     info!("invoke server listening on {}", addr);
-    axum::Server::bind(&addr)
+    if only_lambda_apis {
+        info!("");
+        info!("the flag --only_lambda_apis is active, the lambda function will not be started by Cargo Lambda");
+        info!("the lambda function will depend on the following environment variables");
+        info!(
+            "you MUST set these variables in the environment where you're running your function:"
+        );
+        info!("AWS_LAMBDA_FUNCTION_VERSION=1");
+        info!("AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096");
+        info!("AWS_LAMBDA_RUNTIME_API={}", server_addr);
+        info!("AWS_LAMBDA_FUNCTION_NAME={DEFAULT_PACKAGE_FUNCTION}");
+    } else {
+        let print_start_info = if init_function {
+            // This call ignores any error sending the action.
+            // The function can still be lazy loaded later if there is any error.
+            req_tx.send(Action::Init).await.is_err()
+        } else {
+            false
+        };
+
+        if print_start_info {
+            info!("");
+            info!("your function will start running when you send the first invoke request");
+            info!("read the invoke guide if you don't know how to continue:");
+            info!("https://www.cargo-lambda.info/commands/invoke.html");
+        }
+    }
+
+    if let Err(error) = axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .with_graceful_shutdown(subsys.on_shutdown_requested())
         .await
-        .map_err(axum::Error::new)
+    {
+        if error.to_string() != "shutdown timed out" {
+            return Err(axum::Error::new(error));
+        }
+    }
+
+    Ok(())
 }

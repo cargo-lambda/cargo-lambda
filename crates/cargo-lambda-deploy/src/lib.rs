@@ -76,9 +76,18 @@ pub struct Deploy {
     #[arg(long)]
     extension: bool,
 
+    /// Whether an extension is internal or external
+    #[arg(long, requires = "extension")]
+    internal: bool,
+
     /// Comma separated list with compatible runtimes for the Lambda Extension (--compatible_runtimes=provided.al2,nodejs16.x)
     /// List of allowed runtimes can be found in the AWS documentation: https://docs.aws.amazon.com/lambda/latest/dg/API_CreateFunction.html#SSS-CreateFunction-request-Runtime
-    #[arg(long, value_delimiter = ',', default_value = "provided.al2")]
+    #[arg(
+        long,
+        value_delimiter = ',',
+        default_value = "provided.al2",
+        requires = "extension"
+    )]
     compatible_runtimes: Vec<String>,
 
     /// Format to render the output (text, or json)
@@ -204,7 +213,7 @@ impl Deploy {
                     .parent()
                     .ok_or_else(|| miette::miette!("invalid binary path {:?}", bp))?;
 
-                let parent = if self.extension {
+                let parent = if self.extension && !self.internal {
                     Some("extensions")
                 } else {
                     None
@@ -216,11 +225,17 @@ impl Deploy {
             None => {
                 let name = match &self.name {
                     Some(name) => name.clone(),
-                    None => main_binary(&self.manifest_path)?,
+                    None => main_binary(&self.manifest_path).into_diagnostic()?,
                 };
                 let binary_name = self.binary_name.as_deref().unwrap_or(&name);
 
-                let arc = find_binary_archive(binary_name, &self.lambda_dir, self.extension)?;
+                let arc = find_binary_archive(
+                    binary_name,
+                    &self.manifest_path,
+                    &self.lambda_dir,
+                    self.extension,
+                    self.internal,
+                )?;
                 (name, arc)
             }
         };

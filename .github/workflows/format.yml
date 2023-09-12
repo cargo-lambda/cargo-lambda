@@ -1,20 +1,76 @@
+name: Formatting and Linting
+
 on:
   pull_request:
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'rustfmt.toml'
+      - '.github/workflows/format.yml'
   push:
-    tags-ignore: [ 'v*' ]
-
-name: Rustfmt
+    branches: [ 'main' ]
+    tags-ignore: [ '*' ]
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'rustfmt.toml'
+      - '.github/workflows/format.yml'
 
 jobs:
   format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-            toolchain: nightly
-            components: rustfmt
-      - uses: mbrobbel/rustfmt-check@master
+          components: rustfmt
+
+      - name: Run fmt check
+        id: cargoFmt
+        shell: bash
+        run: cargo +nightly fmt --all -- --check
+      - name: Notify fmt check
+        if: failure() && steps.cargoFmt.outcome == 'failure'
+        uses: actions/github-script@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all
+          script: |
+            const message = `👋 It looks like your code is not formatted like we expect.
+
+              Please run \`make fmt\` and push the code again.`;
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message,
+            });
+            core.setFailed('It looks like there are formatting errors');
+
+  linting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Run clippy check
+        id: cargoClippy
+        shell: bash
+        run: make clippy
+      - name: Notify fmt check
+        if: failure() && steps.cargoClippy.outcome == 'failure'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const message = `👋 It looks like your code has some linting issues.
+
+              Please run \`cargo clippy --fix\` and push the code again.`;
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message,
+            });
+            core.setFailed('It looks like there are linting errors');

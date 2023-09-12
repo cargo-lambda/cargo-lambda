@@ -12,6 +12,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use base64::{engine::general_purpose as b64, Engine as _};
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
 use tracing::debug;
 
@@ -117,7 +118,12 @@ async fn process_next_request(
 
             let headers = parts.headers;
             if let Some(h) = headers.get(LAMBDA_RUNTIME_CLIENT_CONTEXT) {
-                builder = builder.header(LAMBDA_RUNTIME_CLIENT_CONTEXT, h);
+                let ctx = b64::STANDARD.encode(h.as_bytes());
+                let ctx = ctx.as_bytes();
+                if ctx.len() > 3583 {
+                    return Err(ServerError::InvalidClientContext(ctx.len()));
+                }
+                builder = builder.header(LAMBDA_RUNTIME_CLIENT_CONTEXT, ctx);
             }
             if let Some(h) = headers.get(LAMBDA_RUNTIME_COGNITO_IDENTITY) {
                 builder = builder.header(LAMBDA_RUNTIME_COGNITO_IDENTITY, h);
@@ -168,20 +174,14 @@ async fn bare_next_invocation_error(
 async fn respond_to_next_invocation(
     cache: &ResponseCache,
     req_id: &str,
-    req: Request<Body>,
+    mut req: Request<Body>,
     response_status: StatusCode,
 ) -> Result<Response<Body>, ServerError> {
     if let Some(resp_tx) = cache.pop(req_id).await {
-        let (_, body) = req.into_parts();
-
-        let resp = Response::builder()
-            .status(response_status)
-            .header(LAMBDA_RUNTIME_AWS_REQUEST_ID, req_id)
-            .body(body)
-            .map_err(ServerError::ResponseBuild)?;
+        req.extensions_mut().insert(response_status);
 
         resp_tx
-            .send(resp)
+            .send(req)
             .map_err(|_| ServerError::SendFunctionMessage)?;
     }
 

@@ -6,7 +6,7 @@ The `invoke` subcommand sends raw JSON payloads to your Rust functions. The Rust
 
 Rust functions implemented with `lambda_http` require the HTTP calls to be wrapped into the right JSON payloads. This is because AWS Lambda doesn't support HTTP calls natively. Services like Amazon API Gateway, Amazon Load Balancer, or Lambda Function URLs, receive the incoming HTTP calls and translate them to JSON payloads. `lambda_http` performs the opposite translation, so you can work with HTTP primitives.
 
-You can find many examples of JSON paylaods in the [AWS Lambda Events repository](https://github.com/calavera/aws-lambda-events/tree/main/src/fixtures). You can copy them directly, or use the [--data-example flag](/commands/invoke.html#example-data) to load them on demand.
+You can find many examples of JSON payloads in the [AWS Lambda Events repository](https://github.com/calavera/aws-lambda-events/tree/main/src/fixtures). You can copy them directly, or use the [--data-example flag](/commands/invoke.html#example-data) to load them on demand.
 
 The following video shows you how to use this subcommand:
 
@@ -53,13 +53,19 @@ cargo lambda invoke basic-lambda --data-file examples/my-payload.json
 
 ## Example data
 
-The `--data-example` flag allows you to fetch an example payload from the [aws-lambda-events repository](https://github.com/LegNeato/aws-lambda-events/), and use it as your request payload. For example, if you want to use the [example-apigw-request.json](https://github.com/LegNeato/aws-lambda-events/blob/master/aws_lambda_events/src/generated/fixtures/example-apigw-request.json) payload, you have to pass the name `apigw-request` into this flag:
+The `--data-example` flag allows you to fetch an example payload from the [aws-lambda-events repository](https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/lambda-events), and use it as your request payload. For example, if you want to use the [example-apigw-request.json](https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/lambda-events/src/fixtures/example-apigw-request.json) payload, you have to pass the name `apigw-request` into this flag:
 
 ```
 cargo lambda invoke http-lambda --data-example apigw-request
 ```
 
-After the first download, these examples are cached in your home directory, under `.cargo/lambda/invoke-fixtures`.
+After the first download, these examples are cached (in your system's user-local cache) in your home directory, under `cargo-lambda/invoke-fixtures`.
+
+If you don't want to cache the example or want to ignore the file in the cache, add the flag `--skip-cache` to the command:
+
+```
+cargo lambda invoke http-lambda --data-example apigw-request --skip-cache
+```
 
 ## Remote
 

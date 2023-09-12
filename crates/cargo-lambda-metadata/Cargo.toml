@@ -20,6 +20,7 @@ description.workspace = true
 aws-sdk-lambda.workspace = true
 cargo_metadata = "0.15.3"
 clap.workspace = true
+env-file-reader = "0.3.0"
 miette = "4.7.1"
 remove_dir_all = "0.7.0"
 serde.workspace = true

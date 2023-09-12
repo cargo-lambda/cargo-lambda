@@ -5,12 +5,14 @@ use cargo_lambda_invoke::Invoke;
 use cargo_lambda_new::{Init, New};
 use cargo_lambda_watch::Watch;
 use clap::{CommandFactory, Parser, Subcommand};
+use clap_cargo::style::CLAP_STYLING;
 use miette::{miette, IntoDiagnostic, Result};
 use std::{boxed::Box, env, path::PathBuf};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
 #[command(name = "cargo", bin_name = "cargo", disable_version_flag = true)]
+#[command(styles = CLAP_STYLING)]
 enum App {
     Lambda(Lambda),
     #[command(subcommand, hide = true)]
@@ -82,7 +84,7 @@ fn print_help() -> Result<()> {
         .map(|a| a.name("cargo lambda").bin_name("cargo lambda"));
 
     match lambda {
-        Some(mut lambda) => lambda.print_help().into_diagnostic(),
+        Some(lambda) => lambda.styles(CLAP_STYLING).print_help().into_diagnostic(),
         None => {
             println!("Run `cargo lambda --help` to see usage");
             Ok(())
@@ -99,6 +101,16 @@ async fn main() -> Result<()> {
     let mut args = env::args();
     let program_path = PathBuf::from(args.next().expect("missing program path"));
     let program_name = program_path.file_stem().expect("missing program name");
+
+    miette::set_hook(Box::new(|_| {
+        Box::new(
+            miette::MietteHandlerOpts::new()
+                .terminal_links(true)
+                .footer("Was this error unexpected?\nOpen an issue in https://github.com/cargo-lambda/cargo-lambda/issues".into())
+                .build(),
+        )
+    }))?;
+
     if program_name.eq_ignore_ascii_case("ar") {
         let zig = Zig::Ar {
             args: args.collect(),

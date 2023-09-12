@@ -1,46 +1,45 @@
+name: Build Crates
+
 on:
   pull_request:
+    paths:
+      - 'crates/**'
+      - 'tests/**'
+      - 'Cargo.toml'
+      - 'deny.toml'
+      - 'rustfmt.toml'
+      - '.github/workflows/build.yml'
+
   push:
     branches: [ 'main' ]
     tags-ignore: [ '*' ]
-  workflow_dispatch:
+    paths:
+      - 'crates/**'
+      - 'tests/**'
+      - 'Cargo.toml'
+      - 'deny.toml'
+      - 'rustfmt.toml'
+      - '.github/workflows/build.yml'
 
-name: Build
+  workflow_dispatch:
 
 env:
   RUST_BACKTRACE: full
 
 jobs:
-  check:
-    name: Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-
-      - name: Run cargo check
-        run: cargo check
-
   test:
-    name: Test -- ${{ matrix.os }} -- ${{ matrix.rust_version }}
+    name: Test ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
-        rust_version: ["1.64.0", "stable"]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
 
       - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ matrix.rust_version }}
           targets: x86_64-unknown-linux-gnu
 
       - uses: korandoru/setup-zig@v1
@@ -54,19 +53,3 @@ jobs:
 
       - name: Run cargo test
         run: cargo test --all-features
-
-  lints:
-    name: Lints
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          components: clippy
-
-      - name: Run cargo clippy
-        run: cargo clippy --all-features -- -D warnings

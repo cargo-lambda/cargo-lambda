@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose as b64, Engine as _};
 use cargo_lambda_remote::{
     aws_sdk_lambda::{types::Blob, Client as LambdaClient},
     RemoteConfig,
@@ -5,6 +6,7 @@ use cargo_lambda_remote::{
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use reqwest::{Client, StatusCode};
+use serde::Serialize;
 use serde_json::{from_str, to_string_pretty, value::Value};
 use std::{
     convert::TryFrom,
@@ -15,6 +17,7 @@ use std::{
     str::{from_utf8, FromStr},
 };
 use strum_macros::{Display, EnumString};
+use tracing::debug;
 
 mod error;
 use error::*;
@@ -25,7 +28,10 @@ use error::*;
 /// assume that the package only has one function,
 /// which is the main binary for that package.
 pub const DEFAULT_PACKAGE_FUNCTION: &str = "_";
-const EXAMPLES_URL: &str = "https://github.com/calavera/aws-lambda-events/raw/main/src/fixtures";
+const EXAMPLES_URL: &str = "https://event-examples.cargo-lambda.info";
+
+const LAMBDA_RUNTIME_CLIENT_CONTEXT: &str = "lambda-runtime-client-context";
+const LAMBDA_RUNTIME_COGNITO_IDENTITY: &str = "lambda-runtime-cognito-identity";
 
 #[derive(Args, Clone, Debug)]
 #[command(
@@ -33,8 +39,15 @@ const EXAMPLES_URL: &str = "https://github.com/calavera/aws-lambda-events/raw/ma
     after_help = "Full command documentation: https://www.cargo-lambda.info/commands/invoke.html"
 )]
 pub struct Invoke {
+    #[cfg_attr(
+        target_os = "windows",
+        arg(short = 'a', long, default_value = "127.0.0.1")
+    )]
+    #[cfg_attr(
+        not(target_os = "windows"),
+        arg(short = 'a', long, default_value = "::1")
+    )]
     /// Local address host (IPv4 or IPv6) to send invoke requests
-    #[arg(short = 'a', long, default_value = "127.0.0.1")]
     invoke_address: String,
 
     /// Local port to send invoke requests
@@ -49,7 +62,7 @@ pub struct Invoke {
     #[arg(short = 'A', long)]
     data_ascii: Option<String>,
 
-    /// Example payload from LegNeato/aws-lambda-events
+    /// Example payload from AWS Lambda Events
     #[arg(short = 'E', long)]
     data_example: Option<String>,
 
@@ -60,9 +73,24 @@ pub struct Invoke {
     #[command(flatten)]
     remote_config: RemoteConfig,
 
+    /// JSON string representing the client context for the function invocation
+    #[arg(long)]
+    client_context_ascii: Option<String>,
+
+    /// Path to a file with the JSON representation of the client context for the function invocation
+    #[arg(long)]
+    client_context_file: Option<PathBuf>,
+
     /// Format to render the output (text, or json)
     #[arg(short, long, default_value_t = OutputFormat::Text)]
     output_format: OutputFormat,
+
+    #[command(flatten)]
+    cognito: Option<CognitoIdentity>,
+
+    /// Ignore data stored in the local cache
+    #[arg(long, default_value_t = false)]
+    skip_cache: bool,
 
     /// Name of the function to invoke
     #[arg(default_value = DEFAULT_PACKAGE_FUNCTION)]
@@ -74,6 +102,24 @@ pub struct Invoke {
 enum OutputFormat {
     Text,
     Json,
+}
+
+#[derive(Args, Clone, Debug, Serialize)]
+pub struct CognitoIdentity {
+    /// The unique identity id for the Cognito credentials invoking the function.
+    #[arg(long, requires = "identity-pool-id")]
+    #[serde(rename = "cognitoIdentityId")]
+    pub identity_id: Option<String>,
+    /// The identity pool id the caller is "registered" with.
+    #[arg(long, requires = "identity-id")]
+    #[serde(rename = "cognitoIdentityPoolId")]
+    pub identity_pool_id: Option<String>,
+}
+
+impl CognitoIdentity {
+    fn is_valid(&self) -> bool {
+        self.identity_id.is_some() && self.identity_pool_id.is_some()
+    }
 }
 
 impl Invoke {
@@ -94,9 +140,13 @@ impl Invoke {
                 .map(|p| p.join("cargo-lambda").join("invoke-fixtures").join(&name));
 
             match cache {
-                Some(cache) if cache.exists() => read_to_string(cache)
-                    .into_diagnostic()
-                    .wrap_err("error reading data file")?,
+                Some(cache) if !self.skip_cache && cache.exists() => {
+                    tracing::debug!(?cache, "using example from cache");
+                    read_to_string(cache)
+                        .into_diagnostic()
+                        .wrap_err("error reading data file")?
+                }
+                _ if self.skip_cache => download_example(&name, None).await?,
                 _ => download_example(&name, cache).await?,
             }
         } else {
@@ -131,6 +181,9 @@ impl Invoke {
         if self.function_name == DEFAULT_PACKAGE_FUNCTION {
             return Err(InvokeError::InvalidFunctionName.into());
         }
+
+        let client_context = self.client_context(true)?;
+
         let sdk_config = self.remote_config.sdk_config(None).await;
         let client = LambdaClient::new(&sdk_config);
 
@@ -139,6 +192,7 @@ impl Invoke {
             .function_name(&self.function_name)
             .set_qualifier(self.remote_config.alias.clone())
             .payload(Blob::new(data.as_bytes()))
+            .set_client_context(client_context)
             .send()
             .await
             .into_diagnostic()
@@ -170,9 +224,20 @@ impl Invoke {
         );
 
         let client = Client::new();
-        let resp = client
-            .post(url)
-            .body(data.to_string())
+        let mut req = client.post(url).body(data.to_string());
+        if let Some(identity) = &self.cognito {
+            if identity.is_valid() {
+                let ser = serde_json::to_string(&identity)
+                    .into_diagnostic()
+                    .wrap_err("failed to serialize Cognito's identity information")?;
+                req = req.header(LAMBDA_RUNTIME_COGNITO_IDENTITY, ser);
+            }
+        }
+        if let Some(client_context) = self.client_context(false)? {
+            req = req.header(LAMBDA_RUNTIME_CLIENT_CONTEXT, client_context);
+        }
+
+        let resp = req
             .send()
             .await
             .into_diagnostic()
@@ -188,15 +253,35 @@ impl Invoke {
         if success {
             Ok(payload)
         } else {
+            debug!(error = ?payload, "error received from server");
             let err = RemoteInvokeError::try_from(payload.as_str())?;
             Err(err.into())
         }
+    }
+
+    fn client_context(&self, encode: bool) -> Result<Option<String>> {
+        let mut data = if let Some(file) = &self.client_context_file {
+            read_to_string(file)
+                .into_diagnostic()
+                .wrap_err("error reading client context file")?
+        } else if let Some(data) = &self.client_context_ascii {
+            data.clone()
+        } else {
+            return Ok(None);
+        };
+
+        if encode {
+            data = b64::STANDARD.encode(data)
+        }
+
+        Ok(Some(data))
     }
 }
 
 async fn download_example(name: &str, cache: Option<PathBuf>) -> Result<String> {
     let target = format!("{EXAMPLES_URL}/{name}");
 
+    tracing::debug!(?target, "downloading remote example");
     let response = reqwest::get(&target)
         .await
         .into_diagnostic()
@@ -212,6 +297,7 @@ async fn download_example(name: &str, cache: Option<PathBuf>) -> Result<String> 
             .wrap_err("error reading example data")?;
 
         if let Some(cache) = cache {
+            tracing::debug!(?cache, "storing example in cache");
             create_dir_all(cache.parent().unwrap()).into_diagnostic()?;
             let mut dest = File::create(cache).into_diagnostic()?;
             copy(&mut content.as_bytes(), &mut dest).into_diagnostic()?;

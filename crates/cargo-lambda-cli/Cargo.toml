@@ -23,6 +23,7 @@ cargo-lambda-invoke.workspace = true
 cargo-lambda-new.workspace = true
 cargo-lambda-watch.workspace = true
 clap = { workspace = true, features = ["suggestions"] }
+clap-cargo = "0.12.0"
 miette = { workspace = true, features = ["fancy"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing.workspace = true
@@ -36,3 +37,4 @@ cargo-test-macro = { git = "https://github.com/rust-lang/cargo" }
 cargo-test-support = { git = "https://github.com/rust-lang/cargo" }
 dunce = "1.0.3"
 snapbox = { version = "0.4.3", features = ["cmd", "debug"] }
+zip.workspace = true

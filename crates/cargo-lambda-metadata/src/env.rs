@@ -1,12 +1,8 @@
 use aws_sdk_lambda::model::{environment::Builder, Environment};
 use clap::{Args, ValueHint};
-use miette::{IntoDiagnostic, Result, WrapErr};
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{BufRead, BufReader},
-    path::PathBuf,
-};
+use env_file_reader::read_file;
+use miette::Result;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::error::MetadataError;
 
@@ -19,7 +15,7 @@ pub struct EnvOptions {
 
     /// Command separated list of environment variables (--env-vars KEY=VALUE,OTHER=NEW-VALUE)
     /// This option overrides any values set with the --env-var flag that match the same key.
-    #[arg(long)]
+    #[arg(long, value_delimiter = ',')]
     pub env_vars: Option<Vec<String>>,
 
     /// Read environment variables from a file.
@@ -42,7 +38,7 @@ impl EnvOptions {
         }
     }
 
-    pub fn lambda_environment(&self) -> Result<Environment> {
+    pub fn lambda_environment(&self) -> Result<Environment, MetadataError> {
         lambda_environment(None, &self.env_file, self.flag_vars()).map(|e| e.build())
     }
 }
@@ -51,23 +47,14 @@ pub(crate) fn lambda_environment(
     base: Option<&HashMap<String, String>>,
     env_file: &Option<PathBuf>,
     vars: Option<Vec<String>>,
-) -> Result<Builder> {
+) -> Result<Builder, MetadataError> {
     let mut env = Environment::builder().set_variables(base.cloned());
 
     if let Some(path) = env_file {
         if path.is_file() {
-            let file = File::open(path)
-                .into_diagnostic()
-                .wrap_err(format!("failed to open env file: {path:?}"))?;
-            let reader = BufReader::new(file);
-
-            for line in reader.lines() {
-                let line = line.into_diagnostic().wrap_err("failed to read env line")?;
-                if line.is_empty() || line.starts_with('#') {
-                    continue;
-                }
-
-                let (key, value) = extract_var(&line)?;
+            let env_variables =
+                read_file(path).map_err(|e| MetadataError::InvalidEnvFile(path.into(), e))?;
+            for (key, value) in env_variables {
                 env = env.variables(key, value);
             }
         }
@@ -83,7 +70,7 @@ pub(crate) fn lambda_environment(
     Ok(env)
 }
 
-fn extract_var(line: &str) -> Result<(&str, &str)> {
+fn extract_var(line: &str) -> Result<(&str, &str), MetadataError> {
     let mut iter = line.trim().splitn(2, '=');
 
     let key = iter
@@ -160,7 +147,7 @@ mod test {
     #[test]
     fn test_environment_with_file() {
         let file = temp_dir().join(".env");
-        std::fs::write(&file, "BAR=BAZ\n\nQUUX=QUUUX\n#IGNORE=ME").unwrap();
+        std::fs::write(&file, "BAR=BAZ\n\nexport QUUX = 'QUUUX'\n#IGNORE=ME").unwrap();
 
         let mut base = HashMap::new();
         base.insert("FOO".into(), "BAR".into());

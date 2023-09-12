@@ -1,4 +1,4 @@
-use std::num::ParseIntError;
+use std::{num::ParseIntError, path::PathBuf};
 
 use miette::Diagnostic;
 use thiserror::Error;
@@ -26,4 +26,10 @@ pub enum MetadataError {
     #[error("invalid environment variable `{0}`")]
     #[diagnostic()]
     InvalidEnvVar(String),
+    #[error("invalid environment file `{0}`: {1}")]
+    #[diagnostic()]
+    InvalidEnvFile(PathBuf, std::io::Error),
+    #[error(transparent)]
+    #[diagnostic()]
+    FailedCmdExecution(#[from] cargo_metadata::Error),
 }

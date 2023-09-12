@@ -49,4 +49,4 @@ make docs-dev:
 	cd docs && pnpm install && pnpm docs:dev
 
 clippy:
-	cargo clippy --all-features -- -D warnings
+	cargo clippy --workspace --all-features -- -D warnings

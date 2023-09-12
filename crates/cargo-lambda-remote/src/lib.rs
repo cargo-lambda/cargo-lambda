@@ -26,6 +26,10 @@ pub struct RemoteConfig {
     /// Number of attempts to try failed operations
     #[arg(long, default_value = "1")]
     retry_attempts: u32,
+
+    /// Custom endpoint URL to target
+    #[arg(long)]
+    pub endpoint_url: Option<String>,
 }
 
 impl RemoteConfig {
@@ -38,9 +42,16 @@ impl RemoteConfig {
 
         let retry =
             retry.unwrap_or_else(|| RetryConfig::standard().with_max_attempts(self.retry_attempts));
-        let mut config_loader = aws_config::from_env()
-            .region(region_provider)
-            .retry_config(retry);
+        let mut config_loader = if let Some(ref endpoint_url) = self.endpoint_url {
+            aws_config::from_env()
+                .endpoint_url(endpoint_url)
+                .region(region_provider)
+                .retry_config(retry)
+        } else {
+            aws_config::from_env()
+                .region(region_provider)
+                .retry_config(retry)
+        };
 
         if let Some(profile) = &self.profile {
             let profile_region = ProfileFileRegionProvider::builder()
@@ -104,6 +115,7 @@ mod tests {
             region: None,
             alias: None,
             retry_attempts: 1,
+            endpoint_url: None,
         };
 
         let config = args.sdk_config(None).await;
@@ -130,6 +142,7 @@ mod tests {
             region: None,
             alias: None,
             retry_attempts: 1,
+            endpoint_url: None,
         };
 
         let config = args.sdk_config(None).await;
@@ -157,6 +170,7 @@ mod tests {
             region: None,
             alias: None,
             retry_attempts: 1,
+            endpoint_url: None,
         };
 
         let config = args.sdk_config(None).await;
@@ -184,6 +198,7 @@ mod tests {
             region: None,
             alias: None,
             retry_attempts: 1,
+            endpoint_url: None,
         };
 
         let config = args.sdk_config(None).await;
@@ -211,6 +226,7 @@ mod tests {
             region: None,
             alias: None,
             retry_attempts: 1,
+            endpoint_url: None,
         };
 
         let config = args.sdk_config(None).await;

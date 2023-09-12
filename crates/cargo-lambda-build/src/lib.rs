@@ -1,7 +1,7 @@
 use cargo_lambda_interactive::{error::InquireError, is_user_cancellation_error};
 use cargo_lambda_metadata::{
     cargo::{
-        binary_targets_from_metadata, function_build_metadata, load_metadata,
+        binary_targets_from_metadata, function_build_metadata, load_metadata, target_dir,
         target_dir_from_metadata, CompilerOptions,
     },
     fs::copy_and_replace,
@@ -13,7 +13,7 @@ use object::{read::File as ObjectFile, Architecture, Object};
 use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
-    env,
+    env, fmt,
     fs::{create_dir_all, read, File},
     io::Write,
     path::{Path, PathBuf},
@@ -21,6 +21,7 @@ use std::{
 };
 use strum_macros::EnumString;
 use target_arch::TargetArch;
+use toolchain::rustup_cmd;
 use tracing::{debug, warn};
 use zip::{write::FileOptions, ZipWriter};
 
@@ -64,10 +65,18 @@ pub struct Build {
     #[arg(long)]
     extension: bool,
 
+    /// Whether an extension is internal or external
+    #[arg(long, requires = "extension")]
+    internal: bool,
+
     /// Put a bootstrap file in the root of the lambda directory.
     /// Use the name of the compiled binary to choose which file to move.
     #[arg(long)]
     flatten: Option<String>,
+
+    /// Whether to skip the target check
+    #[arg(long)]
+    skip_target_check: bool,
 
     #[arg(short, long, env = "CARGO_LAMBDA_COMPILER")]
     compiler: Option<CompilerFlag>,
@@ -102,8 +111,8 @@ impl Build {
             .as_deref()
             .unwrap_or_else(|| Path::new("Cargo.toml"));
 
-        let metadata = load_metadata(manifest_path)?;
-        let build_config = function_build_metadata(&metadata)?;
+        let metadata = load_metadata(manifest_path).map_err(BuildError::MetadataError)?;
+        let build_config = function_build_metadata(&metadata).map_err(BuildError::MetadataError)?;
         let compiler_option = match (&build_config.compiler, &self.compiler) {
             (None, None) => CompilerOptions::default(),
             (_, Some(c)) => CompilerOptions::from(c.to_string()),
@@ -131,7 +140,7 @@ impl Build {
 
         self.build.target = vec![target_arch.to_string()];
 
-        let binaries = binary_targets_from_metadata(&metadata)?;
+        let binaries = binary_targets_from_metadata(&metadata);
         debug!(binaries = ?binaries, "found new target binaries to build");
 
         if !self.build.bin.is_empty() {
@@ -148,7 +157,7 @@ impl Build {
             // this is not checked
             if target_arch.compatible_host_linker() {
                 target_arch.set_al2_glibc_version();
-            } else {
+            } else if !target_arch.is_static_linking() {
                 return Err(BuildError::InvalidCompilerOption.into());
             }
         }
@@ -178,7 +187,14 @@ impl Build {
 
         let compiler = new_compiler(compiler_option);
         let profile = compiler.build_profile(&self.build);
-        let cmd = compiler.command(&self.build, &target_arch).await;
+        let cmd = compiler
+            .command(
+                &self.build,
+                &target_arch,
+                &metadata,
+                self.skip_target_check(),
+            )
+            .await;
 
         let mut cmd = match cmd {
             Ok(cmd) => cmd,
@@ -190,14 +206,8 @@ impl Build {
             cmd.env("RUSTFLAGS", rust_flags);
         }
 
-        let mut child = cmd
-            .spawn()
-            .into_diagnostic()
-            .wrap_err("Failed to run cargo build")?;
-        let status = child
-            .wait()
-            .into_diagnostic()
-            .wrap_err("Failed to wait on cargo build process")?;
+        let mut child = cmd.spawn().map_err(BuildError::FailedBuildCommand)?;
+        let status = child.wait().map_err(BuildError::FailedBuildCommand)?;
         if !status.success() {
             std::process::exit(status.code().unwrap_or(1));
         }
@@ -245,7 +255,7 @@ impl Build {
                         copy_and_replace(binary, bootstrap_dir.join(bin_name)).into_diagnostic()?;
                     }
                     OutputFormat::Zip => {
-                        let parent = if self.extension {
+                        let parent = if self.extension && !self.internal {
                             Some("extensions")
                         } else {
                             None
@@ -256,10 +266,14 @@ impl Build {
             }
         }
         if !found_binaries {
-            warn!("no binaries found in target after build, try using the --bin or --package options to build specific binaries");
+            warn!(?base, "no binaries found in target directory after build, try using the --bin or --package options to build specific binaries");
         }
 
         Ok(())
+    }
+
+    fn skip_target_check(&self) -> bool {
+        self.skip_target_check || which::which(rustup_cmd()).is_err()
     }
 }
 
@@ -271,13 +285,21 @@ pub struct BinaryArchive {
 
 /// Search for the bootstrap file for a function inside the target directory.
 /// If the binary file exists, it creates the zip archive and extracts its architecture by reading the binary.
-pub fn find_binary_archive<P: AsRef<Path>>(
+pub fn find_binary_archive<M, P>(
     name: &str,
+    manifest_path: M,
     base_dir: &Option<P>,
     is_extension: bool,
-) -> Result<BinaryArchive> {
-    let target_dir = Path::new("target");
-    let (dir_name, binary_name, parent) = if is_extension {
+    is_internal: bool,
+) -> Result<BinaryArchive>
+where
+    M: AsRef<Path> + fmt::Debug,
+    P: AsRef<Path>,
+{
+    let target_dir = target_dir(manifest_path).unwrap_or_else(|_| PathBuf::from("target"));
+    let (dir_name, binary_name, parent) = if is_extension && is_internal {
+        ("extensions", name, None)
+    } else if is_extension && !is_internal {
         ("extensions", name, Some("extensions"))
     } else {
         (name, "bootstrap", None)
@@ -291,7 +313,9 @@ pub fn find_binary_archive<P: AsRef<Path>>(
 
     let binary_path = bootstrap_dir.join(binary_name);
     if !binary_path.exists() {
-        let build_cmd = if is_extension {
+        let build_cmd = if is_extension && is_internal {
+            "build --extension --internal"
+        } else if is_extension && !is_internal {
             "build --extension"
         } else {
             "build"
@@ -315,12 +339,15 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     let path = binary_path.as_ref();
     let dir = destination_directory.as_ref();
     let zipped = dir.join(format!("{name}.zip"));
+    debug!(name, parent, ?path, ?dir, ?zipped, "zipping binary");
 
     let zipped_binary = File::create(&zipped).into_diagnostic()?;
     let binary_data = read(path).into_diagnostic()?;
     let binary_perm = binary_permissions(path)?;
     let binary_data = &*binary_data;
-    let object = ObjectFile::parse(binary_data).into_diagnostic()?;
+    let object = ObjectFile::parse(binary_data)
+        .into_diagnostic()
+        .wrap_err("the provided function file is not a valid Linux binary")?;
 
     let arch = match object.architecture() {
         Architecture::Aarch64 => "arm64",
@@ -341,8 +368,10 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
         PathBuf::from(name)
     };
 
+    let zip_file_name = convert_to_unix_path(&file_name)
+        .ok_or_else(|| BuildError::InvalidUnixFileName(file_name.clone()))?;
     zip.start_file(
-        convert_to_unix_path(&file_name).expect("failed to convert file path"),
+        zip_file_name,
         FileOptions::default().unix_permissions(binary_perm),
     )
     .into_diagnostic()?;

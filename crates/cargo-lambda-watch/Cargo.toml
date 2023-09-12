@@ -19,16 +19,16 @@ description.workspace = true
 [dependencies]
 aws_lambda_events = { version = "0.6.3", features = ["apigw"] }
 axum = "0.5.4"
-base64 = "0.13.0"
+base64.workspace = true
 cargo-lambda-invoke.workspace = true
 cargo-lambda-metadata.workspace = true
 chrono = "0.4.19"
 clap.workspace = true
 dunce.workspace = true
 http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
+http-serde = "1.1.3"
 hyper = "0.14.18"
 ignore-files = "=1.2.0"
-project-origins = "1.2.0"
 miette.workspace = true
 opentelemetry = "0.17.0"
 opentelemetry-aws = "0.5.0"
@@ -39,7 +39,7 @@ serde_json.workspace = true
 tempfile = "3.3.0"
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }
-tokio-graceful-shutdown = "0.5.0"
+tokio-graceful-shutdown = "0.13.0"
 tower-http = { version = "0.3.3", features = [
     "catch-panic",
     "request-id",
@@ -50,5 +50,5 @@ tracing.workspace = true
 tracing-opentelemetry = "0.17.2"
 tracing-subscriber.workspace = true
 uuid.workspace = true
-watchexec = "=2.2.0"
+watchexec = "2.3.0"
 watchexec-filterer-ignore = "1.0.0"
