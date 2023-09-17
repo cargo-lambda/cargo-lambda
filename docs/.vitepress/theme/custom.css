@@ -1,5 +1,11 @@
 :root {
-    --vp-c-brand-1: #BD93F9;
-    --vp-c-brand-2: #916AF9;
+    --purple: #8D6BFA;
+    --purple-dark: #5539AD;
+    --orange: #FAA151;
+
+    --vp-c-brand-1: var(--purple);
+    --vp-c-brand-2: var(--purple-dark);
+    --vp-button-brand-bg: var(--vp-c-brand-1);
+    --vp-button-brand-hover-bg: var(--orange);
     --vp-c-brand-dark: var(--vp-c-brand-2);
 }
