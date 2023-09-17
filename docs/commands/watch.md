@@ -2,7 +2,7 @@
 import SystemMessage from '../components/SystemMessage.vue'
 </script>
 
-# cargo lambda watch
+# Cargo Lambda Watch
 
 The watch subcommand emulates the AWS Lambda control plane API. Run this command at the root of a Rust workspace and cargo-lambda will use cargo-watch to hot compile changes in your Lambda functions.
 

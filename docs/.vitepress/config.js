@@ -33,13 +33,11 @@ export default {
             copyright: 'Copyright © 2022-present David Calavera'
         },
 
-        algolia: {
-            appId: '6B32TYXFEW',
-            apiKey: '93a40dfb46259ad78cd8eec93ee93421',
-            indexName: 'cargo-lambda'
+        search: {
+            provider: 'local'
         }
-    }
-}
+    },
+};
 
 function nav() {
     return [

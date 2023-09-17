@@ -8,3 +8,4 @@ node_modules
 .pnpm-debug.log
 test/integration
 .DS_Store
+docs/.vitepress/cache
