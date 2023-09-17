@@ -13,17 +13,18 @@
   "license": "ISC",
   "devDependencies": {
     "toml": "^3.0.0",
-    "vitepress": "1.0.0-alpha.4",
-    "vue": "^3.2.37"
+    "vitepress": "1.0.0-rc.14",
+    "vue": "^3.3.4"
   },
   "peerDependencies": {
-    "vitepress": "1.0.0-alpha.4",
+    "vitepress": "1.0.0-rc.14",
     "vue": "^3.2.37"
   },
   "pnpm": {
     "peerDependencyRules": {
       "ignoreMissing": [
         "@algolia/client-search",
+        "search-insights",
         "@types/react",
         "react",
         "react-dom"

@@ -1,4 +1,4 @@
-# cargo lambda new
+# Cargo Lambda New
 
 The `new` command creates new Rust packages with a basic skeleton to help you start writing AWS Lambda functions with Rust. This command will create this package in a new sub-directory inside the directory where it's invoked. Run `cargo lambda new PACKAGE-NAME` to generate your new package.
 
