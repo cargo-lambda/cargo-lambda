@@ -1,21 +1,5 @@
 :root {
-    --vp-c-brand: #BD93F9;
-    --vp-c-brand-light: #916AF9;
-    --vp-c-brand-dark: var(--vp-c-brand-light);
-}
-
-
-.dark {
-    --vp-c-bg: #0E1419;
-    --vp-c-bg-soft: #243340;
-    --vp-c-bg-mute: #243340;
-    --vp-c-bg-alt: #243340;
-}
-
-.dark .VPNavBar.has-sidebar .content {
-    background-color: var(--vp-c-bg) !important;
-}
-
-.dark .VPNav.no-sidebar {
-    background-color: var(--vp-c-bg) !important;
+    --vp-c-brand-1: #BD93F9;
+    --vp-c-brand-2: #916AF9;
+    --vp-c-brand-dark: var(--vp-c-brand-2);
 }

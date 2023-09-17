@@ -1,4 +1,4 @@
-# cargo lambda invoke
+# Cargo Lambda Invoke
 
 The `invoke` subcommand helps you send requests to the local Lambda emulator, as well as remote functions. Before you use this command, you need to start the local emulator in a different terminal by calling the [Watch subcommand](/commands/watch).
 

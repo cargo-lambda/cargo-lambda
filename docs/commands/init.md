@@ -1,4 +1,4 @@
-# cargo lambda init
+# Cargo Lambda Init
 
 The `init` command initializes new Rust packages with a basic skeleton to help you start writing AWS Lambda functions with Rust. This command will create this package inside the directory where it's invoked. Run `cargo lambda init` to generate your new package. This command will preserve any files already present in the current directory, it will only add new files.
 

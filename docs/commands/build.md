@@ -1,4 +1,4 @@
-# cargo lambda build
+# Cargo Lambda Build
 
 Within a Rust project that includes a `Cargo.toml` file, run the `cargo lambda build` command to natively cross-compile your Lambda functions in the project to Linux. The resulting artifacts such as binaries or zips, will be placed in the `target/lambda` directory. This is an example of the output produced by this command:
 
