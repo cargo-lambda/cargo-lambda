@@ -36,7 +36,7 @@ pip3 install cargo-lambda
 </SystemMessage>
 </ClientOnly>
 
-See all the ways that you can use to [install Cargo Lambda](/guide/installation) in your system.
+See all the ways that you can [install Cargo Lambda](/guide/installation) in your system.
 
 ## Step 2: Create a new project
 
