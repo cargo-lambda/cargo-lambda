@@ -157,45 +157,21 @@ async fn furls_handler(
 
     let mut builder = Response::builder().status(status_code);
 
-    if is_streaming_response(&info.headers) && status_code == StatusCode::OK {
-        let status = create_streaming_response(&mut builder, &mut body).await?;
+    let response = if status_code == StatusCode::OK {
+        if is_streaming_response(&info.headers) {
+            let status = create_streaming_response(&mut builder, &mut body).await?;
 
-        builder
-            .status(status)
-            .body(body)
-            .map_err(ServerError::ResponseBuild)
-    } else {
-        let body = to_bytes(body)
-            .await
-            .map_err(ServerError::DataDeserialization)?;
-        let resp_event: ApiGatewayV2httpResponse =
-            serde_json::from_slice(&body).map_err(ServerError::SerializationError)?;
+            builder.status(status).body(body)
+        } else {
+            let (status, body) = create_buffered_response(&mut builder, &mut body).await?;
 
-        let is_base64_encoded = resp_event.is_base64_encoded.unwrap_or(false);
-        let resp_body = match resp_event.body.unwrap_or(LambdaBody::Empty) {
-            LambdaBody::Empty => Body::empty(),
-            b if is_base64_encoded => Body::from(
-                b64::STANDARD
-                    .decode(b.as_ref())
-                    .map_err(ServerError::BodyDecodeError)?,
-            ),
-            LambdaBody::Text(s) => Body::from(s),
-            LambdaBody::Binary(b) => Body::from(b),
-        };
-        if let Some(headers) = builder.headers_mut() {
-            headers.extend(resp_event.headers);
-            headers.extend(resp_event.multi_value_headers);
-
-            resp_event.cookies.iter().try_for_each(|cookie| {
-                let header_value = HeaderValue::try_from(cookie)
-                    .map_err(|e| ServerError::ResponseBuild(e.into()))?;
-                headers.append(header::SET_COOKIE, header_value);
-                Ok::<(), ServerError>(())
-            })?;
+            builder.status(status).body(body)
         }
+    } else {
+        builder.body(body)
+    };
 
-        builder.body(resp_body).map_err(ServerError::ResponseBuild)
-    }
+    response.map_err(ServerError::ResponseBuild)
 }
 
 async fn invoke_handler(
@@ -342,6 +318,45 @@ fn is_streaming_response(headers: &HeaderMap) -> bool {
         .get("transfer-encoding")
         .map(|v| v == "chunked")
         .unwrap_or_default()
+}
+
+async fn create_buffered_response(
+    builder: &mut Builder,
+    body: &mut Body,
+) -> Result<(StatusCode, Body), ServerError> {
+    let body = to_bytes(body)
+        .await
+        .map_err(ServerError::DataDeserialization)?;
+    let resp_event: ApiGatewayV2httpResponse =
+        serde_json::from_slice(&body).map_err(ServerError::SerializationError)?;
+
+    let is_base64_encoded = resp_event.is_base64_encoded.unwrap_or(false);
+    let resp_body = match resp_event.body.unwrap_or(LambdaBody::Empty) {
+        LambdaBody::Empty => Body::empty(),
+        b if is_base64_encoded => Body::from(
+            b64::STANDARD
+                .decode(b.as_ref())
+                .map_err(ServerError::BodyDecodeError)?,
+        ),
+        LambdaBody::Text(s) => Body::from(s),
+        LambdaBody::Binary(b) => Body::from(b),
+    };
+    if let Some(headers) = builder.headers_mut() {
+        headers.extend(resp_event.headers);
+        headers.extend(resp_event.multi_value_headers);
+
+        resp_event.cookies.iter().try_for_each(|cookie| {
+            let header_value =
+                HeaderValue::try_from(cookie).map_err(|e| ServerError::ResponseBuild(e.into()))?;
+            headers.append(header::SET_COOKIE, header_value);
+            Ok::<(), ServerError>(())
+        })?;
+    }
+
+    let status: StatusCode = StatusCode::from_u16(resp_event.status_code as u16)
+        .map_err(ServerError::InvalidStatusCode)?;
+
+    Ok((status, resp_body))
 }
 
 #[cfg(test)]

@@ -85,4 +85,8 @@ pub enum ServerError {
     #[error("the streaming prelude is missing from the Lambda response")]
     #[diagnostic()]
     MissingStreamingPrelude,
+
+    #[error(transparent)]
+    #[diagnostic()]
+    InvalidStatusCode(#[from] hyper::http::status::InvalidStatusCode),
 }
