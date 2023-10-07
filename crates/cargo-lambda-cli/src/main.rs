@@ -150,14 +150,19 @@ async fn run_subcommand() -> Result<()> {
     };
 
     let fmt = tracing_subscriber::fmt::layer()
-      .with_target(false)
-      .without_time()
-      .with_ansi(match lambda.color.as_str() {
-          "auto" => std::io::stdout().is_terminal(),
-          "always" => true,
-          "never" => false,
-          _ => return Err(miette!("argument for --color must be auto, always, or never, but found {}", lambda.color))
-      });
+        .with_target(false)
+        .without_time()
+        .with_ansi(match lambda.color.as_str() {
+            "auto" => std::io::stdout().is_terminal(),
+            "always" => true,
+            "never" => false,
+            _ => {
+                return Err(miette!(
+                    "argument for --color must be auto, always, or never, but found {}",
+                    lambda.color
+                ))
+            }
+        });
 
     let subscriber = tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(log_directive))
