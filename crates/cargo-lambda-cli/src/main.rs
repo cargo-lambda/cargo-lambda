@@ -7,7 +7,7 @@ use cargo_lambda_watch::Watch;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_cargo::style::CLAP_STYLING;
 use miette::{miette, IntoDiagnostic, Result};
-use std::{boxed::Box, env, path::PathBuf};
+use std::{boxed::Box, env, io::IsTerminal, path::PathBuf};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
@@ -27,6 +27,9 @@ struct Lambda {
     /// Enable logs in any subcommand. Use `-v` for debug logs, and `-vv` for trace logs
     #[arg(short = 'v', long, action = clap::ArgAction::Count, global = true)]
     verbose: u8,
+    /// Coloring: auto, always, never
+    #[arg(long, default_value = "auto", value_name = "WHEN", global = true)]
+    color: String,
     /// Print version information
     #[arg(short = 'V', long)]
     version: bool,
@@ -148,7 +151,18 @@ async fn run_subcommand() -> Result<()> {
 
     let fmt = tracing_subscriber::fmt::layer()
         .with_target(false)
-        .without_time();
+        .without_time()
+        .with_ansi(match lambda.color.as_str() {
+            "auto" => std::io::stdout().is_terminal(),
+            "always" => true,
+            "never" => false,
+            _ => {
+                return Err(miette!(
+                    "argument for --color must be auto, always, or never, but found {}",
+                    lambda.color
+                ))
+            }
+        });
 
     let subscriber = tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(log_directive))
