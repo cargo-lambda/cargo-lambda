@@ -103,11 +103,14 @@ struct CargoOptions {
     /// Enable release mode when the emulator starts
     #[arg(long, short = 'r')]
     release: bool,
+
+    #[arg(skip)]
+    color: String,
 }
 
 impl Watch {
     #[tracing::instrument(skip(self), target = "cargo_lambda")]
-    pub async fn run(&self) -> Result<()> {
+    pub async fn run(&self, color: &str) -> Result<()> {
         tracing::trace!(options = ?self, "watching project");
 
         let ip = IpAddr::from_str(&self.invoke_address)
@@ -116,7 +119,8 @@ impl Watch {
         let addr = SocketAddr::from((ip, self.invoke_port));
         let ignore_changes = self.ignore_changes;
         let only_lambda_apis = self.only_lambda_apis;
-        let cargo_options = self.cargo_options.clone();
+        let mut cargo_options = self.cargo_options.clone();
+        cargo_options.color = color.into();
 
         let base = dunce::canonicalize(".").into_diagnostic()?;
         let ignore_files = discover_ignore_files(&base).await;
@@ -286,7 +290,7 @@ async fn start_server(
         .with_graceful_shutdown(subsys.on_shutdown_requested())
         .await
     {
-        if error.to_string() != "shutdown timed out" {
+        if !error.is_incomplete_message() {
             return Err(axum::Error::new(error));
         }
     }
