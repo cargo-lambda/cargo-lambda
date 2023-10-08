@@ -58,14 +58,14 @@ enum LambdaSubcommand {
 }
 
 impl LambdaSubcommand {
-    async fn run(self) -> Result<()> {
+    async fn run(self, color: &str) -> Result<()> {
         match self {
             Self::Build(mut b) => b.run().await,
             Self::Deploy(d) => d.run().await,
             Self::Init(mut i) => i.run().await,
             Self::Invoke(i) => i.run().await,
             Self::New(mut n) => n.run().await,
-            Self::Watch(w) => w.run().await,
+            Self::Watch(w) => w.run(color).await,
         }
     }
 }
@@ -174,5 +174,5 @@ async fn run_subcommand() -> Result<()> {
         subscriber.init();
     }
 
-    subcommand.run().await
+    subcommand.run(&lambda.color).await
 }
