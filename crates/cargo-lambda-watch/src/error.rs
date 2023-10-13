@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use cargo_lambda_metadata::error::MetadataError;
 use miette::Diagnostic;
 use thiserror::Error;
@@ -89,4 +91,8 @@ pub enum ServerError {
     #[error(transparent)]
     #[diagnostic()]
     InvalidStatusCode(#[from] hyper::http::status::InvalidStatusCode),
+
+    #[error("invalid manifest path {0}")]
+    #[diagnostic()]
+    InvalidManifest(PathBuf),
 }

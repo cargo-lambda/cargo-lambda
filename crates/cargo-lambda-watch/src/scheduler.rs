@@ -81,7 +81,7 @@ async fn start_function(
 ) -> Result<(), ServerError> {
     info!(function = ?name, manifest = ?cargo_options.manifest_path, "starting lambda function");
 
-    let cmd = cargo_command(&name, &cargo_options);
+    let cmd = cargo_command(&name, &cargo_options)?;
     watcher_config.bin_name = if is_valid_bin_name(&name) {
         Some(name.clone())
     } else {
@@ -115,8 +115,23 @@ fn is_valid_bin_name(name: &str) -> bool {
     !name.is_empty() && name != DEFAULT_PACKAGE_FUNCTION
 }
 
-fn cargo_command(name: &str, cargo_options: &CargoOptions) -> watchexec::command::Command {
-    let mut args = vec!["run".into(), "--color".into(), cargo_options.color.clone()];
+fn cargo_command(
+    name: &str,
+    cargo_options: &CargoOptions,
+) -> Result<watchexec::command::Command, ServerError> {
+    let mp = cargo_options
+        .manifest_path
+        .to_str()
+        .ok_or_else(|| ServerError::InvalidManifest(cargo_options.manifest_path.clone()))?;
+
+    let mut args = vec![
+        "run".into(),
+        "--manifest-path".into(),
+        mp.to_string(),
+        "--color".into(),
+        cargo_options.color.clone(),
+    ];
+
     if let Some(features) = cargo_options.features.as_deref() {
         args.push("--features".into());
         args.push(features.into());
@@ -131,8 +146,8 @@ fn cargo_command(name: &str, cargo_options: &CargoOptions) -> watchexec::command
         args.push(name.into());
     }
 
-    Command::Exec {
+    Ok(Command::Exec {
         prog: "cargo".into(),
         args,
-    }
+    })
 }
