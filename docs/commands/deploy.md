@@ -131,6 +131,14 @@ AWS Lambda has a 50MB limit for Zip file direct uploads. If the Zip file that yo
 cargo lambda deploy --s3-bucket bucket-name
 ```
 
+## Adding extra files to the zip file
+
+In some sitiations, you might want to add extra files inside the zip file uploaded to AWS. You can use the option `--include` to add extra files or directories to the zip file. For example, if you have a directory with configuration files, you can add it to the zip file using the command below:
+
+```
+cargo lambda deploy --include config
+```
+
 ## Other options
 
 Use the `--help` flag to see other options to configure the function's deployment.
