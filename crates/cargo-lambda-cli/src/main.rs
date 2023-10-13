@@ -6,8 +6,9 @@ use cargo_lambda_new::{Init, New};
 use cargo_lambda_watch::Watch;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_cargo::style::CLAP_STYLING;
-use miette::{miette, IntoDiagnostic, Result};
-use std::{boxed::Box, env, io::IsTerminal, path::PathBuf};
+use miette::{miette, ErrorHook, IntoDiagnostic, Result};
+use std::{boxed::Box, env, io::IsTerminal, path::PathBuf, str::FromStr};
+use strum_macros::EnumString;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
@@ -28,11 +29,39 @@ struct Lambda {
     #[arg(short = 'v', long, action = clap::ArgAction::Count, global = true)]
     verbose: u8,
     /// Coloring: auto, always, never
-    #[arg(long, default_value = "auto", value_name = "WHEN", global = true)]
+    #[arg(
+        long,
+        default_value = "auto",
+        value_name = "WHEN",
+        global = true,
+        env = "CARGO_LAMBDA_COLOR"
+    )]
     color: String,
     /// Print version information
     #[arg(short = 'V', long)]
     version: bool,
+}
+
+#[derive(Clone, Debug, strum_macros::Display, EnumString)]
+#[strum(ascii_case_insensitive)]
+enum Color {
+    Auto,
+    Always,
+    Never,
+}
+
+impl Color {
+    fn is_ansi(&self) -> bool {
+        match self {
+            Color::Auto => std::io::stdout().is_terminal(),
+            Color::Always => true,
+            Color::Never => false,
+        }
+    }
+
+    fn write_env_var(&self) {
+        std::env::set_var("CARGO_LAMBDA_COLOR", self.to_string().to_lowercase());
+    }
 }
 
 #[derive(Clone, Debug, Subcommand)]
@@ -105,33 +134,35 @@ async fn main() -> Result<()> {
     let program_path = PathBuf::from(args.next().expect("missing program path"));
     let program_name = program_path.file_stem().expect("missing program name");
 
-    miette::set_hook(Box::new(|_| {
-        Box::new(
-            miette::MietteHandlerOpts::new()
-                .terminal_links(true)
-                .footer("Was this error unexpected?\nOpen an issue in https://github.com/cargo-lambda/cargo-lambda/issues".into())
-                .build(),
-        )
-    }))?;
-
     if program_name.eq_ignore_ascii_case("ar") {
+        miette::set_hook(error_hook(None))?;
+
         let zig = Zig::Ar {
             args: args.collect(),
         };
         zig.execute().map_err(|e| miette!(e))
     } else {
-        run_subcommand().await
+        let app = App::parse();
+
+        match app {
+            App::Zig(zig) => {
+                miette::set_hook(error_hook(None))?;
+
+                zig.execute().map_err(|e| miette!(e))
+            }
+            App::Lambda(lambda) => {
+                let color = Color::from_str(&lambda.color)
+                    .expect("invalid color option, must be auto, always, or never");
+                color.write_env_var();
+                miette::set_hook(error_hook(Some(&color)))?;
+
+                run_subcommand(lambda, color).await
+            }
+        }
     }
 }
 
-async fn run_subcommand() -> Result<()> {
-    let app = App::parse();
-
-    let lambda = match app {
-        App::Zig(zig) => return zig.execute().map_err(|e| miette!(e)),
-        App::Lambda(lambda) => lambda,
-    };
-
+async fn run_subcommand(lambda: Lambda, color: Color) -> Result<()> {
     if lambda.version {
         return print_version();
     }
@@ -152,17 +183,7 @@ async fn run_subcommand() -> Result<()> {
     let fmt = tracing_subscriber::fmt::layer()
         .with_target(false)
         .without_time()
-        .with_ansi(match lambda.color.as_str() {
-            "auto" => std::io::stdout().is_terminal(),
-            "always" => true,
-            "never" => false,
-            _ => {
-                return Err(miette!(
-                    "argument for --color must be auto, always, or never, but found {}",
-                    lambda.color
-                ))
-            }
-        });
+        .with_ansi(color.is_ansi());
 
     let subscriber = tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(log_directive))
@@ -174,5 +195,26 @@ async fn run_subcommand() -> Result<()> {
         subscriber.init();
     }
 
-    subcommand.run(&lambda.color).await
+    subcommand
+        .run(&lambda.color.to_string().to_lowercase())
+        .await
+}
+
+fn error_hook(color: Option<&Color>) -> ErrorHook {
+    let ansi = match color {
+        Some(color) => color.is_ansi(),
+        None => {
+            let color = std::env::var("CARGO_LAMBDA_COLOR");
+            Color::try_from(color.as_deref().unwrap_or("auto"))
+                .expect("invalid color option, must be auto, always, or never")
+                .is_ansi()
+        }
+    };
+    Box::new(move |_| {
+        Box::new(miette::MietteHandlerOpts::new()
+            .terminal_links(true)
+            .footer("Was this error unexpected?\nOpen an issue in https://github.com/cargo-lambda/cargo-lambda/issues".into())
+            .color(ansi)
+            .build())
+    })
 }

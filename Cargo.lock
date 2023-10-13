@@ -856,6 +856,8 @@ dependencies = [
  "dunce",
  "miette 5.10.0",
  "snapbox",
+ "strum",
+ "strum_macros",
  "tokio",
  "tracing",
  "tracing-subscriber",

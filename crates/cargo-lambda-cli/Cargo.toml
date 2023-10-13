@@ -25,6 +25,8 @@ cargo-lambda-watch.workspace = true
 clap = { workspace = true, features = ["suggestions"] }
 clap-cargo = "0.12.0"
 miette = { workspace = true, features = ["fancy"] }
+strum.workspace = true
+strum_macros.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
