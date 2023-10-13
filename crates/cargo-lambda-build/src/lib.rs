@@ -15,14 +15,15 @@ use std::{
     borrow::Cow,
     env, fmt,
     fs::{create_dir_all, read, File},
-    io::Write,
+    io::{self, Read, Write},
     path::{Path, PathBuf},
     str::FromStr,
 };
 use strum_macros::EnumString;
 use target_arch::TargetArch;
 use toolchain::rustup_cmd;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
+use walkdir::WalkDir;
 use zip::{write::FileOptions, ZipWriter};
 
 pub use cargo_zigbuild::Zig;
@@ -260,7 +261,7 @@ impl Build {
                         } else {
                             None
                         };
-                        zip_binary(bin_name, binary, bootstrap_dir, parent)?;
+                        zip_binary(bin_name, binary, bootstrap_dir, parent, None)?;
                     }
                 }
             }
@@ -291,6 +292,7 @@ pub fn find_binary_archive<M, P>(
     base_dir: &Option<P>,
     is_extension: bool,
     is_internal: bool,
+    include: Option<Vec<PathBuf>>,
 ) -> Result<BinaryArchive>
 where
     M: AsRef<Path> + fmt::Debug,
@@ -323,7 +325,7 @@ where
         return Err(BuildError::BinaryMissing(name.into(), build_cmd.into()).into());
     }
 
-    zip_binary(binary_name, binary_path, bootstrap_dir, parent)
+    zip_binary(binary_name, binary_path, bootstrap_dir, parent, include)
 }
 
 /// Create a zip file from a function binary.
@@ -335,6 +337,7 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     binary_path: BP,
     destination_directory: DD,
     parent: Option<&str>,
+    include: Option<Vec<PathBuf>>,
 ) -> Result<BinaryArchive> {
     let path = binary_path.as_ref();
     let dir = destination_directory.as_ref();
@@ -360,6 +363,10 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     let sha256 = format!("{:X}", hasher.finalize());
 
     let mut zip = ZipWriter::new(zipped_binary);
+    if let Some(files) = include {
+        include_files_in_zip(&mut zip, &files)?;
+    }
+
     let file_name = if let Some(parent) = parent {
         zip.add_directory(parent, FileOptions::default())
             .into_diagnostic()?;
@@ -421,6 +428,37 @@ fn downcasted_user_cancellation(err: &Report) -> bool {
         Some(err) => is_user_cancellation_error(err),
         None => false,
     }
+}
+
+fn include_files_in_zip<W>(zip: &mut ZipWriter<W>, files: &Vec<PathBuf>) -> Result<()>
+where
+    W: Write + io::Seek,
+{
+    for file in files {
+        for entry in WalkDir::new(file).into_iter().filter_map(|e| e.ok()) {
+            let path = entry.path();
+            let entry_name = convert_to_unix_path(path)
+                .ok_or_else(|| BuildError::InvalidUnixFileName(path.to_path_buf()))?;
+
+            if path.is_dir() {
+                trace!(?entry_name, "creating directory in zip file");
+
+                zip.add_directory(entry_name, FileOptions::default())
+                    .into_diagnostic()?;
+            } else {
+                let mut content = Vec::new();
+                let mut file = File::open(path).into_diagnostic()?;
+                file.read_to_end(&mut content).into_diagnostic()?;
+
+                trace!(?entry_name, "including file in zip file");
+
+                zip.start_file(entry_name, FileOptions::default())
+                    .into_diagnostic()?;
+                zip.write_all(&content).into_diagnostic()?;
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

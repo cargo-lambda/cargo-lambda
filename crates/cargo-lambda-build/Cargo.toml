@@ -37,6 +37,7 @@ toml = "0.7.5"
 tracing.workspace = true
 which.workspace = true
 zip.workspace = true
+walkdir = "2.4.0"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }

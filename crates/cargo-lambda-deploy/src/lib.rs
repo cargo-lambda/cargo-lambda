@@ -104,6 +104,10 @@ pub struct Deploy {
     #[arg(long, value_delimiter = ',')]
     tags: Option<Vec<String>>,
 
+    /// Option to add one or more files and directories to include in the zip file to upload.
+    #[arg(short, long)]
+    include: Option<Vec<PathBuf>>,
+
     /// Name of the function or extension to deploy
     #[arg(value_name = "NAME")]
     name: Option<String>,
@@ -219,7 +223,7 @@ impl Deploy {
                     None
                 };
 
-                let arc = zip_binary(&name, bp, destination, parent)?;
+                let arc = zip_binary(&name, bp, destination, parent, self.include.clone())?;
                 (name, arc)
             }
             None => {
@@ -235,6 +239,7 @@ impl Deploy {
                     &self.lambda_dir,
                     self.extension,
                     self.internal,
+                    self.include.clone(),
                 )?;
                 (name, arc)
             }
