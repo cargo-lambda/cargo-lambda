@@ -8,6 +8,7 @@ env:
   MATURIN_VERSION: 0.13.6
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
+  CARGO_INCREMENTAL: 0
 
 jobs:
   release-macos:
