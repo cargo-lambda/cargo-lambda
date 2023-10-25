@@ -1,7 +1,9 @@
-use crate::error::BuildError;
+use std::{fmt::Display, str::FromStr};
+
 use miette::{IntoDiagnostic, Result};
 use rustc_version::Channel;
-use std::{env::consts::ARCH, fmt::Display, str::FromStr};
+
+use crate::error::BuildError;
 
 const TARGET_ARM: &str = "aarch64-unknown-linux-gnu";
 const TARGET_X86_64: &str = "x86_64-unknown-linux-gnu";
@@ -15,17 +17,17 @@ pub enum Arch {
 }
 
 impl Arch {
-    pub fn target_cpu(&self) -> String {
+    fn target_cpu(&self) -> &'static str {
         match self {
-            Arch::ARM64 => "neoverse-n1".to_string(),
-            Arch::X86_64 => "haswell".to_string(),
+            Arch::ARM64 => "neoverse-n1",
+            Arch::X86_64 => "haswell",
         }
     }
 }
 
 #[derive(Debug, Default)]
 pub struct TargetArch {
-    pub host: String,
+    host: String,
     pub rustc_target_without_glibc_version: String,
     glibc_version: Option<String>,
     channel: Option<Channel>,
@@ -66,7 +68,7 @@ impl TargetArch {
         }
     }
 
-    pub fn target_cpu(&self) -> String {
+    pub fn target_cpu(&self) -> &'static str {
         self.arch().target_cpu()
     }
 

@@ -175,9 +175,8 @@ impl Build {
                 if !rust_flags.is_empty() {
                     rust_flags += " ";
                 }
-                let target_cpu = target_arch.target_cpu();
                 rust_flags += "-C target-cpu=";
-                rust_flags += target_cpu.as_str();
+                rust_flags += target_arch.target_cpu();
             }
 
             debug!(rust_flags = ?rust_flags, "release RUSTFLAGS");
