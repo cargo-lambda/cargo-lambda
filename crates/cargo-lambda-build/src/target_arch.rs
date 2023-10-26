@@ -1,3 +1,5 @@
+#[cfg(target_os = "linux")]
+use std::env::consts::ARCH;
 use std::{fmt::Display, str::FromStr};
 
 use miette::{IntoDiagnostic, Result};
