@@ -129,7 +129,7 @@ impl Build {
         } else if self.x86_64 {
             TargetArch::x86_64()
         } else {
-            let build_target = self.build.target.get(0).or(build_config.target.as_ref());
+            let build_target = self.build.target.first().or(build_config.target.as_ref());
             match build_target {
                 Some(target) => {
                     validate_linux_target(target)?;
@@ -175,9 +175,8 @@ impl Build {
                 if !rust_flags.is_empty() {
                     rust_flags += " ";
                 }
-                let target_cpu = target_arch.target_cpu();
                 rust_flags += "-C target-cpu=";
-                rust_flags += target_cpu.as_str();
+                rust_flags += target_arch.target_cpu();
             }
 
             debug!(rust_flags = ?rust_flags, "release RUSTFLAGS");
