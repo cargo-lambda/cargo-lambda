@@ -129,7 +129,7 @@ impl Build {
         } else if self.x86_64 {
             TargetArch::x86_64()
         } else {
-            let build_target = self.build.target.first();
+            let build_target = self.build.target.first().or(build_config.target.as_ref());
             match build_target {
                 Some(target) => {
                     validate_linux_target(target)?;
