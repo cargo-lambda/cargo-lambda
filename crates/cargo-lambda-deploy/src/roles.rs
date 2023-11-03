@@ -57,9 +57,7 @@ pub(crate) async fn create(config: &SdkConfig, progress: &Progress) -> Result<St
         .into_diagnostic()
         .wrap_err("failed to attach policy AWSLambdaBasicExecutionRole to function role")?;
 
-    let role_arn = role
-        .arn()
-        .ok_or_else(|| miette::miette!("missing role arn"))?;
+    let role_arn = role.arn();
 
     progress.set_message("verifying role access, this can take up to 20 seconds");
 

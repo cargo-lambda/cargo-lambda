@@ -1,4 +1,4 @@
-use aws_sdk_lambda::model::Environment;
+use aws_sdk_lambda::types::Environment;
 pub use cargo_metadata::Metadata as CargoMetadata;
 use miette::Result;
 use serde::Deserialize;

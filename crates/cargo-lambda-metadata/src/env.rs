@@ -1,4 +1,4 @@
-use aws_sdk_lambda::model::{environment::Builder, Environment};
+use aws_sdk_lambda::types::{builders::EnvironmentBuilder, Environment};
 use clap::{Args, ValueHint};
 use env_file_reader::read_file;
 use miette::Result;
@@ -47,7 +47,7 @@ pub(crate) fn lambda_environment(
     base: Option<&HashMap<String, String>>,
     env_file: &Option<PathBuf>,
     vars: Option<Vec<String>>,
-) -> Result<Builder, MetadataError> {
+) -> Result<EnvironmentBuilder, MetadataError> {
     let mut env = Environment::builder().set_variables(base.cloned());
 
     if let Some(path) = env_file {

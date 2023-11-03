@@ -3,14 +3,14 @@ use std::path::PathBuf;
 use crate::extract_tags;
 
 use super::DeployResult;
-use aws_sdk_s3::{types::ByteStream, Client as S3Client};
+use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::function_deploy_metadata;
 use cargo_lambda_remote::{
     aws_sdk_config::SdkConfig,
     aws_sdk_lambda::{
-        model::{Architecture, LayerVersionContentInput, Runtime},
-        types::Blob,
+        primitives::Blob,
+        types::{Architecture, LayerVersionContentInput, Runtime},
         Client as LambdaClient,
     },
 };
