@@ -129,7 +129,7 @@ impl DeployConfig {
                 for (k, v) in tags {
                     vec.push(format!("{k}={v}"));
                 }
-                Some(vec.join(","))
+                Some(vec.join("&"))
             }
         }
     }
@@ -526,6 +526,7 @@ mod tests {
 
         assert_eq!(Some(tags), env.tags);
         let s3_tags = env.s3_tags().unwrap();
+        assert_eq!(2, s3_tags.split("&").collect::<Vec<_>>().len());
         assert!(s3_tags.contains("organization=aws"), "{s3_tags}");
         assert!(s3_tags.contains("team=lambda"), "{s3_tags}");
     }

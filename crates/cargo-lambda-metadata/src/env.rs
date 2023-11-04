@@ -10,12 +10,12 @@ use crate::error::MetadataError;
 pub struct EnvOptions {
     /// Option to add one or many environment variables, allows multiple repetitions (--env-var KEY=VALUE --env-var OTHER=NEW-VALUE)
     /// This option overrides any values set with the --env-vars flag.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "env_vars")]
     pub env_var: Option<Vec<String>>,
 
     /// Command separated list of environment variables (--env-vars KEY=VALUE,OTHER=NEW-VALUE)
     /// This option overrides any values set with the --env-var flag that match the same key.
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', conflicts_with = "env_var")]
     pub env_vars: Option<Vec<String>>,
 
     /// Read environment variables from a file.
