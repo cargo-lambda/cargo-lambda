@@ -6,45 +6,42 @@ use std::{
 use zip::ZipArchive;
 
 mod harness;
-use harness::{
-    cargo_lambda_build, cargo_lambda_init, cargo_lambda_new, test_project, LambdaProjectExt,
-};
+use harness::{cargo_lambda_build, cargo_lambda_init, cargo_lambda_new, LambdaProjectExt};
 
 #[cargo_test]
 fn test_build_basic_function() {
-    let (root, cmd) = cargo_lambda_new("test-basic-function");
+    let lp = cargo_lambda_new("test-basic-function");
 
-    cmd.arg("--no-interactive")
-        .arg("test-basic-function")
+    lp.new_cmd()
+        .arg("--no-interactive")
+        .arg(&lp.name)
         .assert()
         .success();
 
-    let project = test_project(root);
+    let project = lp.test_project();
     cargo_lambda_build(project.root()).assert().success();
 
-    let bin = project.lambda_function_bin("test-basic-function");
+    let bin = project.lambda_function_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 #[cargo_test]
 fn test_build_basic_zip_function() {
-    let (root, cmd) = cargo_lambda_new("test-basic-function");
+    let lp = cargo_lambda_new("test-basic-function");
 
-    cmd.arg("--no-interactive")
-        .arg("test-basic-function")
+    lp.new_cmd()
+        .arg("--no-interactive")
+        .arg(&lp.name)
         .assert()
         .success();
 
-    let project = test_project(root);
+    let project = lp.test_project();
     cargo_lambda_build(project.root())
         .args(["--output-format", "zip"])
         .assert()
         .success();
 
-    let bin = project
-        .lambda_dir()
-        .join("test-basic-function")
-        .join("bootstrap.zip");
+    let bin = project.lambda_dir().join(&lp.name).join("bootstrap.zip");
     assert!(bin.exists(), "{:?} doesn't exist", bin);
     let file = File::open(bin).expect("failed to open zip file");
     let mut zip = ZipArchive::new(file).expect("failed to initialize the zip archive");
@@ -57,134 +54,139 @@ fn test_build_basic_zip_function() {
 
 #[cargo_test]
 fn test_build_http_function() {
-    let (root, cmd) = cargo_lambda_new("test-http-function");
+    let lp = cargo_lambda_new("test-http-function");
 
-    cmd.arg("--http")
-        .arg("test-http-function")
-        .assert()
-        .success();
+    lp.new_cmd().arg("--http").arg(&lp.name).assert().success();
 
-    let project = test_project(root);
+    let project = lp.test_project();
     cargo_lambda_build(project.root()).assert().success();
 
-    let bin = project.lambda_function_bin("test-http-function");
+    let bin = project.lambda_function_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 #[cargo_test]
 fn test_build_http_feature_function() {
-    let (root, cmd) = cargo_lambda_new("test-http-function");
+    let lp = cargo_lambda_new("test-http-function");
 
-    cmd.arg("--http-feature")
+    lp.new_cmd()
+        .arg("--http-feature")
         .arg("apigw_rest")
-        .arg("test-http-function")
+        .arg(&lp.name)
         .assert()
         .success();
 
-    let project = test_project(root);
+    let project = lp.test_project();
     cargo_lambda_build(project.root()).assert().success();
 
-    let bin = project.lambda_function_bin("test-http-function");
+    let bin = project.lambda_function_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 #[cargo_test]
 fn test_build_event_type_function() {
-    let (root, cmd) = cargo_lambda_new("test-event-type-function");
+    let lp = cargo_lambda_new("test-event-type-function");
 
-    cmd.arg("--event-type")
+    lp.new_cmd()
+        .arg("--event-type")
         .arg("s3::S3Event")
-        .arg("test-event-type-function")
+        .arg(&lp.name)
         .assert()
         .success();
 
-    let project = test_project(root);
+    let project = lp.test_project();
     cargo_lambda_build(project.root()).assert().success();
 
-    let bin = project.lambda_function_bin("test-event-type-function");
+    let bin = project.lambda_function_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 #[cargo_test]
 fn test_build_basic_extension() {
-    let (root, cmd) = cargo_lambda_new("test-basic-extension");
+    let lp = cargo_lambda_new("test-basic-extension");
 
-    cmd.arg("--extension")
-        .arg("test-basic-extension")
+    lp.new_cmd()
+        .arg("--extension")
+        .arg(&lp.name)
         .assert()
         .success();
 
-    let project = test_project(root);
+    let project = lp.test_project();
     cargo_lambda_build(project.root())
         .arg("--extension")
         .assert()
         .success();
 
-    let bin = project.lambda_extension_bin("test-basic-extension");
+    let bin = project.lambda_extension_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 #[cargo_test]
 fn test_build_logs_extension() {
-    let (root, cmd) = cargo_lambda_new("test-logs-extension");
+    let lp = cargo_lambda_new("test-logs-extension");
 
-    cmd.arg("--extension")
+    lp.new_cmd()
+        .arg("--extension")
         .arg("--logs")
-        .arg("test-logs-extension")
+        .arg(&lp.name)
         .assert()
         .success();
 
-    let project = test_project(root);
+    let project = lp.test_project();
     cargo_lambda_build(project.root())
         .arg("--extension")
         .assert()
         .success();
 
-    let bin = project.lambda_extension_bin("test-logs-extension");
+    let bin = project.lambda_extension_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 #[cargo_test]
 fn test_build_telemetry_extension() {
-    let (root, cmd) = cargo_lambda_new("test-telemetry-extension");
+    let lp = cargo_lambda_new("test-telemetry-extension");
 
-    cmd.arg("--extension")
+    lp.new_cmd()
+        .arg("--extension")
         .arg("--telemetry")
-        .arg("test-telemetry-extension")
+        .arg(&lp.name)
         .assert()
         .success();
 
-    let project = test_project(root);
+    let project = lp.test_project();
     cargo_lambda_build(project.root())
         .arg("--extension")
         .assert()
         .success();
 
-    let bin = project.lambda_extension_bin("test-telemetry-extension");
+    let bin = project.lambda_extension_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 #[cargo_test]
 fn test_init_subcommand() {
-    let (root, cmd) = cargo_lambda_init("test-basic-function");
+    let lp = cargo_lambda_init("test-basic-function");
+    let root = lp.root();
 
-    cmd.arg("--no-interactive").assert().success();
+    lp.init_cmd().arg("--no-interactive").assert().success();
     assert!(root.join("Cargo.toml").exists(), "missing Cargo.toml");
     assert!(
         root.join("src").join("main.rs").exists(),
         "missing src/main.rs"
     );
 
-    let project = test_project(root);
+    let project = lp.test_project();
     cargo_lambda_build(project.root()).assert().success();
 
-    let bin = project.lambda_function_bin("test-basic-function");
+    let bin = project.lambda_function_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
 #[cargo_test]
 fn test_init_subcommand_without_override() {
-    let (root, cmd) = cargo_lambda_init("test-basic-function");
+    let lp = cargo_lambda_init("test-basic-function");
+    let root = lp.root();
+
     let src = root.join("src");
     let main = src.join("main.rs");
     create_dir_all(src).expect("failed to create src directory");
@@ -198,7 +200,8 @@ fn test_init_subcommand_without_override() {
         .expect("failed to create main content");
     main_file.flush().unwrap();
 
-    cmd.arg("--no-interactive").assert().success();
+    lp.init_cmd().arg("--no-interactive").assert().success();
+
     assert!(root.join("Cargo.toml").exists(), "missing Cargo.toml");
     assert!(
         root.join("src").join("main.rs").exists(),
@@ -211,41 +214,44 @@ fn test_init_subcommand_without_override() {
 
 #[cargo_test]
 fn test_build_basic_zip_extension() {
-    let (root, cmd) = cargo_lambda_new("test-basic-extension");
+    let lp = cargo_lambda_new("test-basic-extension");
 
-    cmd.arg("--extension")
-        .arg("test-basic-extension")
+    lp.new_cmd()
+        .arg("--extension")
+        .arg(&lp.name)
         .assert()
         .success();
 
-    let project = test_project(root);
+    let project = lp.test_project();
     cargo_lambda_build(project.root())
         .arg("--extension")
         .args(["--output-format", "zip"])
         .assert()
         .success();
 
-    let bin = project.lambda_extension_bin("test-basic-extension.zip");
+    let bin = project.lambda_extension_bin(&lp.zip_name());
     assert!(bin.exists(), "{:?} doesn't exist", &bin);
     let file = File::open(bin).expect("failed to open zip file");
     let mut zip = ZipArchive::new(file).expect("failed to initialize the zip archive");
     assert!(
-        zip.by_name("extensions/test-basic-extension").is_ok(),
-        "test-basic-extension is not in the zip archive. Files in zip: {:?}",
+        zip.by_name(&lp.extension_path()).is_ok(),
+        "{} is not in the zip archive. Files in zip: {}",
+        &lp.extension_path(),
         zip.file_names().collect::<Vec<&str>>().join(", ")
     );
 }
 
 #[cargo_test]
 fn test_build_internal_zip_extension() {
-    let (root, cmd) = cargo_lambda_new("test-internal-extension");
+    let lp = cargo_lambda_new("test-internal-extension");
 
-    cmd.arg("--extension")
-        .arg("test-internal-extension")
+    lp.new_cmd()
+        .arg("--extension")
+        .arg(&lp.name)
         .assert()
         .success();
 
-    let project = test_project(root);
+    let project = lp.test_project();
     cargo_lambda_build(project.root())
         .arg("--extension")
         .arg("--internal")
@@ -253,13 +259,14 @@ fn test_build_internal_zip_extension() {
         .assert()
         .success();
 
-    let bin = project.lambda_extension_bin("test-internal-extension.zip");
+    let bin = project.lambda_extension_bin(&lp.zip_name());
     assert!(bin.exists(), "{:?} doesn't exist", &bin);
     let file = File::open(bin).expect("failed to open zip file");
     let mut zip = ZipArchive::new(file).expect("failed to initialize the zip archive");
     assert!(
-        zip.by_name("test-internal-extension").is_ok(),
-        "test-internal-extension is not in the zip archive. Files in zip: {:?}",
+        zip.by_name(&lp.name).is_ok(),
+        "{} is not in the zip archive. Files in zip: {}",
+        &lp.name,
         zip.file_names().collect::<Vec<&str>>().join(", ")
     );
 }
