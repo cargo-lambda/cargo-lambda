@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tracing::{debug, enabled, trace, Level};
+use urlencoding::encode;
 
 use crate::{
     env::lambda_environment,
@@ -127,7 +128,7 @@ impl DeployConfig {
             Some(tags) => {
                 let mut vec = Vec::new();
                 for (k, v) in tags {
-                    vec.push(format!("{k}={v}"));
+                    vec.push(format!("{}={}", encode(k), encode(v)));
                 }
                 Some(vec.join("&"))
             }
@@ -671,6 +672,32 @@ mod tests {
         assert_eq!(
             "there are more than one binary in the project, you must specify a binary name",
             err.to_string()
+        );
+    }
+
+    #[test]
+    fn test_s3_tags_encoding() {
+        let mut tags = HashMap::new();
+        tags.insert(
+            "organization".to_string(),
+            "Amazon Web Services".to_string(),
+        );
+        tags.insert("team".to_string(), "Simple Storage Service".to_string());
+
+        let config = DeployConfig {
+            tags: Some(tags),
+            ..Default::default()
+        };
+
+        let s3_tags = config.s3_tags().unwrap();
+        assert_eq!(2, s3_tags.split("&").collect::<Vec<_>>().len());
+        assert!(
+            s3_tags.contains("organization=Amazon%20Web%20Services"),
+            "{s3_tags}"
+        );
+        assert!(
+            s3_tags.contains("team=Simple%20Storage%20Service"),
+            "{s3_tags}"
         );
     }
 }
