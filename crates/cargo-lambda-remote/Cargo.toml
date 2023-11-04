@@ -20,5 +20,5 @@ aws-types.workspace = true
 clap.workspace = true
 
 [dev-dependencies]
-aws-credential-types = "0.53.0"
+aws-credential-types = "0.57.1"
 tokio = { workspace = true, features = ["macros", "rt"] }

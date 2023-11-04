@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose as b64, Engine as _};
 use cargo_lambda_remote::{
-    aws_sdk_lambda::{types::Blob, Client as LambdaClient},
+    aws_sdk_lambda::{primitives::Blob, Client as LambdaClient},
     RemoteConfig,
 };
 use clap::{Args, ValueHint};

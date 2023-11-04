@@ -86,7 +86,7 @@ pub use aws_sdk_lambda;
 #[cfg(test)]
 mod tests {
     use aws_credential_types::provider::ProvideCredentials;
-    use aws_sdk_lambda::Region;
+    use aws_sdk_lambda::config::Region;
 
     use crate::RemoteConfig;
 

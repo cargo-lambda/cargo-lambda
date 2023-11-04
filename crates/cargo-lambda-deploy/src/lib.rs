@@ -3,7 +3,7 @@ use cargo_lambda_build::{find_binary_archive, zip_binary, BinaryArchive};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::main_binary;
 use cargo_lambda_remote::{
-    aws_sdk_lambda::model::{Architecture, Runtime},
+    aws_sdk_lambda::types::{Architecture, Runtime},
     RemoteConfig,
 };
 use clap::{Args, ValueHint};

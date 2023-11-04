@@ -1,6 +1,6 @@
 use super::DeployResult;
 use crate::{extract_tags, roles};
-use aws_sdk_s3::{types::ByteStream, Client as S3Client};
+use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::{
     cargo::{function_deploy_metadata, DeployConfig},
@@ -10,16 +10,19 @@ use cargo_lambda_metadata::{
 use cargo_lambda_remote::{
     aws_sdk_config::SdkConfig,
     aws_sdk_lambda::{
-        error::{
-            CreateFunctionError, DeleteFunctionUrlConfigError, GetAliasError, GetFunctionError,
-            GetFunctionUrlConfigError,
+        error::SdkError,
+        operation::{
+            create_function::CreateFunctionError,
+            delete_function_url_config::DeleteFunctionUrlConfigError,
+            get_alias::GetAliasError,
+            get_function::{GetFunctionError, GetFunctionOutput},
+            get_function_url_config::GetFunctionUrlConfigError,
         },
-        model::{
+        primitives::Blob,
+        types::{
             Architecture, Environment, FunctionCode, FunctionConfiguration, FunctionUrlAuthType,
             LastUpdateStatus, Runtime, State, TracingConfig, VpcConfig,
         },
-        output::GetFunctionOutput,
-        types::{Blob, SdkError},
         Client as LambdaClient,
     },
     RemoteConfig,
@@ -149,7 +152,7 @@ pub(crate) async fn deploy(
     let function_url = if function_config.enable_function_url {
         progress.set_message("configuring function url");
 
-        upsert_function_url_config(name, &remote_config.alias, &client).await?
+        Some(upsert_function_url_config(name, &remote_config.alias, &client).await?)
     } else {
         None
     };
@@ -585,10 +588,10 @@ pub(crate) fn should_update_layers(
     conf: &FunctionConfiguration,
 ) -> bool {
     match (conf.layers(), layer_arn) {
-        (None, None) => false,
-        (Some(_), None) => true,
-        (None, Some(_)) => true,
-        (Some(cl), Some(nl)) => {
+        ([], None) => false,
+        (_cl, None) => true,
+        ([], Some(_)) => true,
+        (cl, Some(nl)) => {
             let mut c = cl
                 .iter()
                 .cloned()
@@ -653,7 +656,7 @@ pub(crate) async fn upsert_function_url_config(
     name: &str,
     alias: &Option<String>,
     client: &LambdaClient,
-) -> Result<Option<String>> {
+) -> Result<String> {
     let result = client
         .get_function_url_config()
         .function_name(name)
