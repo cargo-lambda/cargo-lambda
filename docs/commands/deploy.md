@@ -28,6 +28,42 @@ cargo lambda deploy --iam-role FULL_ROLE_ARN http-lambda
 
 If you're updating the code in a function, you don't need to pass this flag again, unless you want to update the execution role for the function.
 
+## User Profile
+
+You can run this command with a different user profile using the `-p` or `--profile` flags. The minimum policy document is below:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "iam:AttachRolePolicy",
+                "iam:UpdateAssumeRolePolicy",
+                "iam:PassRole"
+            ],
+            "Resource": [
+                "arn:aws:iam::{AWS:Account}:role/AWSLambdaBasicExecutionRole",
+                "arn:aws:iam::{AWS:Account}:role/cargo-lambda-role*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "lambda:CreateFunction",
+                "lambda:UpdateFunctionCode",
+                "lambda:GetFunction"
+            ],
+            "Resource": "arn:aws:lambda::{AWS:Account}:function:{function-name}"
+        }
+    ]
+}
+```
+
+Make sure to replace the items in curly braces (`{}`) with the appropriate values.
+
 ## Function URLs
 
 This subcommand can enable Lambda function URLs for your lambda. Use the flag `--enable-function-url` when you deploy your function, and when the operation completes, the command will print the function URL in the terminal.
