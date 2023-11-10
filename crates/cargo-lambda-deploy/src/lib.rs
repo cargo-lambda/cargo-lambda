@@ -85,7 +85,7 @@ pub struct Deploy {
     #[arg(
         long,
         value_delimiter = ',',
-        default_value = "provided.al2",
+        default_value = "provided.al2,provided.al2023",
         requires = "extension"
     )]
     compatible_runtimes: Vec<String>,

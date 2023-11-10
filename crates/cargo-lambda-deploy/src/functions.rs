@@ -30,7 +30,7 @@ use cargo_lambda_remote::{
 use clap::Args;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 use tokio::time::{sleep, Duration};
 use tracing::debug;
 use uuid::Uuid;
@@ -80,6 +80,11 @@ pub struct FunctionDeployConfig {
     /// Security Group IDs to associate the deployed function
     #[arg(long, value_delimiter = ',')]
     pub security_group_ids: Option<Vec<String>>,
+
+    /// Choose a different Lambda runtime to deploy with.
+    /// The only other option that might work is `provided.al2`.
+    #[arg(long, default_value = "provided.al2023")]
+    pub runtime: String,
 }
 
 impl FunctionDeployConfig {
@@ -243,6 +248,8 @@ async fn upsert_function(
                 }
             };
 
+            let runtime = Runtime::from_str(&deploy_metadata.runtime).unwrap();
+
             let mut output = None;
             for attempt in 2..5 {
                 let memory = deploy_metadata.memory.clone().map(Into::into);
@@ -256,7 +263,7 @@ async fn upsert_function(
                             .set_subnet_ids(deploy_metadata.subnet_ids.clone())
                             .build(),
                     )
-                    .runtime(Runtime::Providedal2)
+                    .runtime(runtime.clone())
                     .handler("bootstrap")
                     .function_name(name)
                     .role(iam_role.clone())
@@ -523,6 +530,8 @@ fn merge_configuration(
             deploy_metadata.use_for_update = true;
         }
     }
+
+    deploy_metadata.runtime = function_config.runtime.clone();
 
     Ok((environment, deploy_metadata))
 }

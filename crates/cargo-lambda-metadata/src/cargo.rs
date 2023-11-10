@@ -107,6 +107,12 @@ pub struct DeployConfig {
     pub subnet_ids: Option<Vec<String>>,
     #[serde(default)]
     pub security_group_ids: Option<Vec<String>>,
+    #[serde(default = "default_runtime")]
+    pub runtime: String,
+}
+
+fn default_runtime() -> String {
+    "provided.al2023".to_string()
 }
 
 impl DeployConfig {
@@ -419,6 +425,8 @@ fn merge_deploy_config(base: &DeployConfig, package_deploy: &DeployConfig) -> De
     if package_deploy.security_group_ids.is_some() {
         new_config.security_group_ids = package_deploy.security_group_ids.clone();
     }
+    new_config.runtime = package_deploy.runtime.clone();
+
     tracing::debug!(ws_metadata = ?new_config, package_metadata = ?package_deploy, "finished merging deploy metadata");
     new_config
 }
