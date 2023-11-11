@@ -82,6 +82,13 @@ pub struct Build {
     #[arg(short, long, env = "CARGO_LAMBDA_COMPILER")]
     compiler: Option<CompilerFlag>,
 
+    /// Ensure that the binary is compatible with the `provided.al2` runtime.
+    /// This option only matters if you're using the option `--compiler cargo`,
+    /// and you want to deploy in the old `provided.al2` runtime, instead of
+    /// the more modern `provided.al2023`
+    #[arg(long)]
+    al2: bool,
+
     #[command(flatten)]
     build: CargoBuild,
 }
@@ -157,7 +164,9 @@ impl Build {
             // If the build host was ever going to be remote, like in a container,
             // this is not checked
             if target_arch.compatible_host_linker() {
-                target_arch.set_al2_glibc_version();
+                if self.al2 {
+                    target_arch.set_al2_glibc_version();
+                }
             } else if !target_arch.is_static_linking() {
                 return Err(BuildError::InvalidCompilerOption.into());
             }
@@ -242,7 +251,11 @@ impl Build {
                         _ => lambda_dir.join(name),
                     }
                 };
-                create_dir_all(&bootstrap_dir).into_diagnostic()?;
+                create_dir_all(&bootstrap_dir)
+                    .into_diagnostic()
+                    .with_context(|| {
+                        format!("error creating lambda directory {bootstrap_dir:?}")
+                    })?;
 
                 let bin_name = if self.extension {
                     name.as_str()
@@ -252,7 +265,12 @@ impl Build {
 
                 match self.output_format {
                     OutputFormat::Binary => {
-                        copy_and_replace(binary, bootstrap_dir.join(bin_name)).into_diagnostic()?;
+                        let output_location = bootstrap_dir.join(bin_name);
+                        copy_and_replace(&binary, &output_location)
+                            .into_diagnostic()
+                            .with_context(|| {
+                                format!("error moving the binary `{binary:?}` into the output location `{output_location:?}`")
+                            })?;
                     }
                     OutputFormat::Zip => {
                         let parent = if self.extension && !self.internal {
