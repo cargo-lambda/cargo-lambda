@@ -68,6 +68,11 @@ Make sure to replace the items in curly braces (`{}`) with the appropriate value
 
 This subcommand can enable Lambda function URLs for your lambda. Use the flag `--enable-function-url` when you deploy your function, and when the operation completes, the command will print the function URL in the terminal.
 
+Note that you would need to add the following IAM Actions to use this flag:
+- `lambda:GetFunctionUrlConfig`
+- `lambda:CreateFunctionUrlConfig`
+- `lambda:AddPermission`
+
 ::: warning
 This flag always configures the function URL without any kind of authorization. Don't use it if you'd like to keep the URL secure.
 :::
