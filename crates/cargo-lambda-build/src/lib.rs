@@ -251,7 +251,11 @@ impl Build {
                         _ => lambda_dir.join(name),
                     }
                 };
-                create_dir_all(&bootstrap_dir).into_diagnostic()?;
+                create_dir_all(&bootstrap_dir)
+                    .into_diagnostic()
+                    .with_context(|| {
+                        format!("error creating lambda directory {bootstrap_dir:?}")
+                    })?;
 
                 let bin_name = if self.extension {
                     name.as_str()
@@ -261,7 +265,12 @@ impl Build {
 
                 match self.output_format {
                     OutputFormat::Binary => {
-                        copy_and_replace(binary, bootstrap_dir.join(bin_name)).into_diagnostic()?;
+                        let output_location = bootstrap_dir.join(bin_name);
+                        copy_and_replace(&binary, &output_location)
+                            .into_diagnostic()
+                            .with_context(|| {
+                                format!("error moving the binary `{binary:?}` into the output location `{output_location:?}`")
+                            })?;
                     }
                     OutputFormat::Zip => {
                         let parent = if self.extension && !self.internal {
