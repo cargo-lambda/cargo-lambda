@@ -11,7 +11,7 @@ use crate::target_arch::TargetArch;
 /// Check if the target component is installed in the host toolchain, and add
 /// it with `rustup` as needed.
 pub async fn check_target_component_with_rustc_meta(target_arch: &TargetArch) -> Result<()> {
-    let component = &target_arch.rustc_target_without_glibc_version;
+    let component = target_arch.rustc_target_without_glibc_version();
 
     // convert `Channel` enum to a lower-cased string representation
     let toolchain = match target_arch.channel()? {
