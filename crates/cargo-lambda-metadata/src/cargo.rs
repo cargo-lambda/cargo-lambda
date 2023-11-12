@@ -5,7 +5,7 @@ use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
-    fs,
+    fs::{metadata, read_to_string},
     path::{Path, PathBuf},
 };
 use tracing::{debug, enabled, trace, Level};
@@ -22,6 +22,8 @@ use crate::{
 pub struct Metadata {
     #[serde(default)]
     pub lambda: LambdaMetadata,
+    #[serde(default)]
+    profile: Option<CargoProfile>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -81,6 +83,20 @@ pub struct CargoCompilerOptions {
     pub subcommand: Option<Vec<String>>,
     #[serde(default)]
     pub extra_args: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoProfile {
+    pub release: Option<CargoProfileRelease>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoProfileRelease {
+    strip: Option<toml::Value>,
+    lto: Option<toml::Value>,
+    #[serde(rename = "codegen-units")]
+    codegen_units: Option<toml::Value>,
+    panic: Option<toml::Value>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -204,6 +220,47 @@ pub fn target_dir<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<PathBuf> {
 
 pub fn target_dir_from_metadata(metadata: &CargoMetadata) -> Result<PathBuf> {
     Ok(metadata.target_directory.clone().into_std_path_buf())
+}
+
+/// Attempt to read the releaes profile section in the Cargo manifest.
+/// Cargo metadata doesn't expose profile information, so we try
+/// to read it from the Cargo.toml file directly.
+pub fn cargo_release_profile_config<P: AsRef<Path> + Debug>(
+    manifest_path: P,
+) -> Result<Vec<String>, MetadataError> {
+    let path = manifest_path.as_ref();
+    let file = read_to_string(path)
+        .map_err(|e| MetadataError::InvalidManifestFile(path.to_path_buf(), e))?;
+
+    let metadata: Metadata = toml::from_str(&file).map_err(MetadataError::InvalidTomlManifest)?;
+
+    let mut config = HashMap::new();
+    config.insert("strip", "profile.release.strip=\"symbols\"");
+    config.insert("lto", "profile.release.lto=\"thin\"");
+    config.insert("codegen-units", "profile.release.codegen-units=1");
+    config.insert("panic", "profile.release.panic=\"abort\"");
+
+    let Some(profile) = metadata.profile else {
+        return Ok(config.values().map(|s| s.to_string()).collect::<Vec<_>>());
+    };
+    let Some(release) = profile.release else {
+        return Ok(config.values().map(|s| s.to_string()).collect::<Vec<_>>());
+    };
+
+    if release.strip.is_some() {
+        config.remove("strip");
+    }
+    if release.lto.is_some() {
+        config.remove("lto");
+    }
+    if release.codegen_units.is_some() {
+        config.remove("codegen-units");
+    }
+    if release.panic.is_some() {
+        config.remove("panic");
+    }
+
+    return Ok(config.values().map(|s| s.to_string()).collect::<Vec<_>>());
 }
 
 /// Create metadata about the root package in the Cargo manifest, without any dependencies.
@@ -442,7 +499,7 @@ fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
 }
 
 fn is_project_metadata_ok(path: &Path) -> bool {
-    path.is_dir() && fs::metadata(path).is_ok()
+    path.is_dir() && metadata(path).is_ok()
 }
 
 #[cfg(test)]

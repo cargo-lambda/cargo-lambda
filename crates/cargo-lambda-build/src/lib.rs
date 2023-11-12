@@ -1,8 +1,8 @@
 use cargo_lambda_interactive::{error::InquireError, is_user_cancellation_error};
 use cargo_lambda_metadata::{
     cargo::{
-        binary_targets_from_metadata, function_build_metadata, load_metadata, target_dir,
-        target_dir_from_metadata, CompilerOptions,
+        binary_targets_from_metadata, cargo_release_profile_config, function_build_metadata,
+        load_metadata, target_dir, target_dir_from_metadata, CompilerOptions,
     },
     fs::copy_and_replace,
 };
@@ -106,9 +106,8 @@ impl Build {
     pub async fn run(&mut self) -> Result<()> {
         tracing::trace!(options = ?self, "building project");
 
-        let manifest_path = self
-            .build
-            .manifest_path
+        let manifest_path = self.build.manifest_path.clone();
+        let manifest_path = manifest_path
             .as_deref()
             .unwrap_or_else(|| Path::new("Cargo.toml"));
 
@@ -162,13 +161,11 @@ impl Build {
         }
 
         let rust_flags = if self.build.release {
+            let release_optimizations =
+                cargo_release_profile_config(manifest_path).map_err(BuildError::MetadataError)?;
+            self.build.config.extend(release_optimizations);
+
             let mut rust_flags = env::var("RUSTFLAGS").unwrap_or_default();
-            if !rust_flags.contains("-C strip=") {
-                if !rust_flags.is_empty() {
-                    rust_flags += " ";
-                }
-                rust_flags += "-C strip=symbols";
-            }
             if !rust_flags.contains("-C target-cpu=") {
                 if !rust_flags.is_empty() {
                     rust_flags += " ";
@@ -177,7 +174,7 @@ impl Build {
                 rust_flags += target_arch.target_cpu();
             }
 
-            debug!(rust_flags = ?rust_flags, "release RUSTFLAGS");
+            debug!(?rust_flags, config = ?self.build.config, "release optimizations");
             Some(rust_flags)
         } else {
             None

@@ -32,4 +32,10 @@ pub enum MetadataError {
     #[error(transparent)]
     #[diagnostic()]
     FailedCmdExecution(#[from] cargo_metadata::Error),
+    #[error("invalid manifest file `{0}`: {1}")]
+    #[diagnostic()]
+    InvalidManifestFile(PathBuf, std::io::Error),
+    #[error(transparent)]
+    #[diagnostic()]
+    InvalidTomlManifest(toml::de::Error),
 }
