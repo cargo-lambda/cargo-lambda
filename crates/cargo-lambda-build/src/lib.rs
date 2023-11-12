@@ -244,7 +244,7 @@ impl Build {
                 };
                 create_dir_all(&bootstrap_dir)
                     .into_diagnostic()
-                    .with_context(|| {
+                    .wrap_err_with(|| {
                         format!("error creating lambda directory {bootstrap_dir:?}")
                     })?;
 
@@ -259,7 +259,7 @@ impl Build {
                         let output_location = bootstrap_dir.join(bin_name);
                         copy_and_replace(&binary, &output_location)
                             .into_diagnostic()
-                            .with_context(|| {
+                            .wrap_err_with(|| {
                                 format!("error moving the binary `{binary:?}` into the output location `{output_location:?}`")
                             })?;
                     }
@@ -354,10 +354,10 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
 
     let zipped_binary = File::create(&zipped)
         .into_diagnostic()
-        .with_context(|| format!("failed to create zip file `{zipped:?}`"))?;
+        .wrap_err_with(|| format!("failed to create zip file `{zipped:?}`"))?;
     let binary_data = read(path)
         .into_diagnostic()
-        .with_context(|| format!("failed to read binary file `{path:?}`"))?;
+        .wrap_err_with(|| format!("failed to read binary file `{path:?}`"))?;
     let binary_perm = binary_permissions(path)?;
     let binary_data = &*binary_data;
     let object = ObjectFile::parse(binary_data)
@@ -382,7 +382,7 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     let file_name = if let Some(parent) = parent {
         zip.add_directory(parent, FileOptions::default())
             .into_diagnostic()
-            .with_context(|| {
+            .wrap_err_with(|| {
                 format!("failed to add directory `{parent}` to zip file `{zipped:?}`")
             })?;
         Path::new(parent).join(name)
@@ -397,13 +397,13 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
         FileOptions::default().unix_permissions(binary_perm),
     )
     .into_diagnostic()
-    .with_context(|| format!("failed to start zip file `{zip_file_name:?}`"))?;
+    .wrap_err_with(|| format!("failed to start zip file `{zip_file_name:?}`"))?;
     zip.write_all(binary_data)
         .into_diagnostic()
-        .with_context(|| format!("failed to write data into zip file `{zip_file_name:?}`"))?;
+        .wrap_err_with(|| format!("failed to write data into zip file `{zip_file_name:?}`"))?;
     zip.finish()
         .into_diagnostic()
-        .with_context(|| format!("failed to finish zip file `{zip_file_name:?}`"))?;
+        .wrap_err_with(|| format!("failed to finish zip file `{zip_file_name:?}`"))?;
 
     Ok(BinaryArchive {
         architecture: arch.into(),
@@ -417,7 +417,7 @@ fn binary_permissions(path: &Path) -> Result<u32> {
     use std::os::unix::prelude::PermissionsExt;
     let meta = std::fs::metadata(path)
         .into_diagnostic()
-        .with_context(|| format!("failed to get binary permissions from file `{path:?}`"))?;
+        .wrap_err_with(|| format!("failed to get binary permissions from file `{path:?}`"))?;
     Ok(meta.permissions().mode())
 }
 
@@ -467,27 +467,29 @@ where
 
                 zip.add_directory(entry_name.to_string(), FileOptions::default())
                     .into_diagnostic()
-                    .with_context(|| {
+                    .wrap_err_with(|| {
                         format!("failed to add directory `{entry_name}` to zip file")
                     })?;
             } else {
                 let mut content = Vec::new();
                 let mut file = File::open(path)
                     .into_diagnostic()
-                    .with_context(|| format!("failed to open file `{path:?}`"))?;
+                    .wrap_err_with(|| format!("failed to open file `{path:?}`"))?;
                 file.read_to_end(&mut content)
                     .into_diagnostic()
-                    .with_context(|| format!("failed to read file `{path:?}`"))?;
+                    .wrap_err_with(|| format!("failed to read file `{path:?}`"))?;
 
                 trace!(?entry_name, "including file in zip file");
 
                 zip.start_file(entry_name.to_string(), FileOptions::default())
                     .into_diagnostic()
-                    .with_context(|| format!("failed to start zip file `{entry_name:?}`"))?;
+                    .wrap_err_with(|| format!("failed to start zip file `{entry_name:?}`"))?;
 
-                zip.write_all(&content).into_diagnostic().with_context(|| {
-                    format!("failed to write data into zip file `{entry_name:?}`")
-                })?;
+                zip.write_all(&content)
+                    .into_diagnostic()
+                    .wrap_err_with(|| {
+                        format!("failed to write data into zip file `{entry_name:?}`")
+                    })?;
             }
         }
     }
