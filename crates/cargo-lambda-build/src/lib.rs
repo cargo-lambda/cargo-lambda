@@ -82,13 +82,6 @@ pub struct Build {
     #[arg(short, long, env = "CARGO_LAMBDA_COMPILER")]
     compiler: Option<CompilerFlag>,
 
-    /// Ensure that the binary is compatible with the `provided.al2` runtime.
-    /// This option only matters if you're using the option `--compiler cargo`,
-    /// and you want to deploy in the old `provided.al2` runtime, instead of
-    /// the more modern `provided.al2023`
-    #[arg(long)]
-    al2: bool,
-
     #[command(flatten)]
     build: CargoBuild,
 }
@@ -131,7 +124,7 @@ impl Build {
             Err(BuildError::InvalidTargetOptions)?;
         }
 
-        let mut target_arch = if self.arm64 {
+        let target_arch = if self.arm64 {
             TargetArch::arm64()
         } else if self.x86_64 {
             TargetArch::x86_64()
@@ -163,11 +156,7 @@ impl Build {
             // This check only makes sense when the build host is local.
             // If the build host was ever going to be remote, like in a container,
             // this is not checked
-            if target_arch.compatible_host_linker() {
-                if self.al2 {
-                    target_arch.set_al2_glibc_version();
-                }
-            } else if !target_arch.is_static_linking() {
+            if !target_arch.compatible_host_linker() && !target_arch.is_static_linking() {
                 return Err(BuildError::InvalidCompilerOption.into());
             }
         }
@@ -232,7 +221,7 @@ impl Build {
         };
 
         let base = target_dir
-            .join(target_arch.rustc_target_without_glibc_version)
+            .join(target_arch.rustc_target_without_glibc_version())
             .join(profile);
 
         let mut found_binaries = false;
