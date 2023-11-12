@@ -79,8 +79,13 @@ pub struct Build {
     #[arg(long)]
     skip_target_check: bool,
 
+    /// Backend to build the project with
     #[arg(short, long, env = "CARGO_LAMBDA_COMPILER")]
     compiler: Option<CompilerFlag>,
+
+    /// Disable all default release optimizations
+    #[arg(long)]
+    disable_optimizations: bool,
 
     #[command(flatten)]
     build: CargoBuild,
@@ -160,7 +165,7 @@ impl Build {
             }
         }
 
-        let rust_flags = if self.build.release {
+        let rust_flags = if self.build.release && !self.disable_optimizations {
             let release_optimizations =
                 cargo_release_profile_config(manifest_path).map_err(BuildError::MetadataError)?;
             self.build.config.extend(release_optimizations);
