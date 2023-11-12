@@ -60,7 +60,7 @@ By default, cargo-lambda compiles the code in `debug` mode. If you want to chang
 cargo lambda build --release
 ```
 
-When you compile your code in release mode, cargo-lambda will strip the binaries from all debug symbols to reduce the binary size.
+When you compile your code in release mode, cargo-lambda will apply some optimizations to make the binary size smaller. Check out the [Release Optimizations](/guide/release-optimizations) guide for more details.
 
 ## Extensions
 
