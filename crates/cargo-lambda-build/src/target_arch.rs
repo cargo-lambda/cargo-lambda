@@ -2,7 +2,7 @@
 use std::env::consts::ARCH;
 use std::{fmt::Display, str::FromStr};
 
-use miette::{IntoDiagnostic, Result};
+use miette::{Context, IntoDiagnostic, Result};
 use rustc_version::Channel;
 
 use crate::error::BuildError;
@@ -48,7 +48,9 @@ impl TargetArch {
     }
 
     pub fn from_host() -> Result<Self> {
-        let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
+        let rustc_meta = rustc_version::version_meta()
+            .into_diagnostic()
+            .wrap_err("error reading Rust Metadata information")?;
         let mut target = TargetArch::from_str(&rustc_meta.host)?;
         if !target.compatible_host_linker() {
             target = TargetArch::x86_64();
@@ -89,7 +91,8 @@ impl TargetArch {
             Some(c) => Ok(c),
             None => rustc_version::version_meta()
                 .map(|m| m.channel)
-                .into_diagnostic(),
+                .into_diagnostic()
+                .wrap_err("error reading Rust version information"),
         }
     }
 
