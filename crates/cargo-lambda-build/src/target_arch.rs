@@ -1,11 +1,14 @@
-use crate::error::BuildError;
-use miette::{IntoDiagnostic, Result};
+#[cfg(target_os = "linux")]
+use std::env::consts::ARCH;
+use std::{fmt::Display, str::FromStr};
+
+use miette::{Context, IntoDiagnostic, Result};
 use rustc_version::Channel;
-use std::{env::consts::ARCH, fmt::Display, str::FromStr};
+
+use crate::error::BuildError;
 
 const TARGET_ARM: &str = "aarch64-unknown-linux-gnu";
 const TARGET_X86_64: &str = "x86_64-unknown-linux-gnu";
-const AL2_GLIBC: &str = "2.26";
 
 #[derive(Debug, Default, PartialEq)]
 pub enum Arch {
@@ -15,41 +18,39 @@ pub enum Arch {
 }
 
 impl Arch {
-    pub fn target_cpu(&self) -> String {
+    fn target_cpu(&self) -> &'static str {
         match self {
-            Arch::ARM64 => "neoverse-n1".to_string(),
-            Arch::X86_64 => "haswell".to_string(),
+            Arch::ARM64 => "neoverse-n1",
+            Arch::X86_64 => "haswell",
         }
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TargetArch {
-    pub host: String,
-    pub rustc_target_without_glibc_version: String,
-    glibc_version: Option<String>,
+    rustc_target: String,
     channel: Option<Channel>,
 }
 
 impl TargetArch {
     pub fn arm64() -> Self {
         Self {
-            host: TARGET_ARM.into(),
-            rustc_target_without_glibc_version: TARGET_ARM.into(),
-            ..Default::default()
+            rustc_target: TARGET_ARM.into(),
+            channel: None,
         }
     }
 
     pub fn x86_64() -> Self {
         Self {
-            host: TARGET_X86_64.into(),
-            rustc_target_without_glibc_version: TARGET_X86_64.into(),
-            ..Default::default()
+            rustc_target: TARGET_X86_64.into(),
+            channel: None,
         }
     }
 
     pub fn from_host() -> Result<Self> {
-        let rustc_meta = rustc_version::version_meta().into_diagnostic()?;
+        let rustc_meta = rustc_version::version_meta()
+            .into_diagnostic()
+            .wrap_err("error reading Rust Metadata information")?;
         let mut target = TargetArch::from_str(&rustc_meta.host)?;
         if !target.compatible_host_linker() {
             target = TargetArch::x86_64();
@@ -59,29 +60,25 @@ impl TargetArch {
     }
 
     pub fn arch(&self) -> Arch {
-        if self.host.starts_with("aarch64-unknown-linux") {
+        if self.rustc_target.starts_with("aarch64-unknown-linux") {
             Arch::ARM64
         } else {
             Arch::X86_64
         }
     }
 
-    pub fn target_cpu(&self) -> String {
+    pub fn target_cpu(&self) -> &'static str {
         self.arch().target_cpu()
     }
 
-    pub fn set_al2_glibc_version(&mut self) {
-        self.glibc_version = Some(AL2_GLIBC.into());
-    }
-
     pub fn compatible_host_linker(&self) -> bool {
-        self.rustc_target_without_glibc_version == TARGET_ARM
-            || self.rustc_target_without_glibc_version == TARGET_X86_64
+        let target = self.rustc_target_without_glibc_version();
+        target == TARGET_ARM || target == TARGET_X86_64
     }
 
     #[cfg(target_os = "linux")]
     pub fn is_static_linking(&self) -> bool {
-        self.rustc_target_without_glibc_version == format!("{}-unknown-linux-musl", ARCH)
+        self.rustc_target == format!("{}-unknown-linux-musl", ARCH)
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -94,17 +91,23 @@ impl TargetArch {
             Some(c) => Ok(c),
             None => rustc_version::version_meta()
                 .map(|m| m.channel)
-                .into_diagnostic(),
+                .into_diagnostic()
+                .wrap_err("error reading Rust version information"),
         }
+    }
+
+    pub fn rustc_target_without_glibc_version(&self) -> &str {
+        let Some((rustc_target_without_glibc_version, _)) = self.rustc_target.split_once('.')
+        else {
+            return self.rustc_target.as_str();
+        };
+        rustc_target_without_glibc_version
     }
 }
 
 impl Display for TargetArch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.rustc_target_without_glibc_version)?;
-        if let Some(glibc_version) = self.glibc_version.as_ref() {
-            write!(f, ".{glibc_version}")?;
-        }
+        write!(f, "{}", self.rustc_target)?;
         Ok(())
     }
 }
@@ -113,16 +116,10 @@ impl FromStr for TargetArch {
     type Err = miette::Report;
 
     fn from_str(host: &str) -> Result<Self, Self::Err> {
-        let mut target = Self {
-            host: host.into(),
-            rustc_target_without_glibc_version: host.into(),
-            ..Default::default()
-        };
-        if let Some((rustc_target_without_glibc_version, glibc_version)) = host.split_once('.') {
-            target.rustc_target_without_glibc_version = rustc_target_without_glibc_version.into();
-            target.glibc_version = Some(glibc_version.into());
-        }
-        Ok(target)
+        Ok(Self {
+            rustc_target: host.into(),
+            channel: None,
+        })
     }
 }
 
@@ -149,23 +146,6 @@ mod test {
     fn test_target_arch_from_str() {
         let t = TargetArch::from_str("x86_64-unknown-linux-gnu").unwrap();
         assert_eq!("x86_64-unknown-linux-gnu", t.to_string().as_str());
-    }
-
-    #[test]
-    fn test_target_arch_set_al2_glibc_version() {
-        let mut t = TargetArch::from_str("x86_64-unknown-linux-gnu").unwrap();
-        t.set_al2_glibc_version();
-        assert_eq!("x86_64-unknown-linux-gnu.2.26", t.to_string().as_str());
-    }
-
-    #[test]
-    fn test_target_arch_rustc_without_glibc_version() {
-        let t = TargetArch::from_str("x86_64-unknown-linux-gnu.2.27").unwrap();
-        assert_eq!(
-            "x86_64-unknown-linux-gnu",
-            t.rustc_target_without_glibc_version
-        );
-        assert_eq!(Some("2.27".into()), t.glibc_version);
     }
 
     #[test]

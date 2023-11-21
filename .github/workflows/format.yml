@@ -16,6 +16,9 @@ on:
       - 'rustfmt.toml'
       - '.github/workflows/format.yml'
 
+permissions:
+  pull-requests: write
+
 jobs:
   format:
     runs-on: ubuntu-latest

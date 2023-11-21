@@ -57,6 +57,7 @@ function sidebar() {
                 { text: 'Installation', link: '/guide/installation' },
                 { text: 'Getting Started', link: '/guide/getting-started' },
                 { text: 'Cross Compiling', link: '/guide/cross-compiling' },
+                { text: 'Release Optimizations', link: '/guide/release-optimizations' },
                 { text: 'Lambda Extensions', link: '/guide/lambda-extensions' },
                 { text: 'Automating deployments', link: '/guide/automating-deployments' },
                 { text: 'Screencasts', link: '/guide/screencasts' },

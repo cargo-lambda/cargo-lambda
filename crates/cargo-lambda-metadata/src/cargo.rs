@@ -1,14 +1,15 @@
-use aws_sdk_lambda::model::Environment;
+use aws_sdk_lambda::types::Environment;
 pub use cargo_metadata::Metadata as CargoMetadata;
 use miette::Result;
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
-    fs,
+    fs::{metadata, read_to_string},
     path::{Path, PathBuf},
 };
 use tracing::{debug, enabled, trace, Level};
+use urlencoding::encode;
 
 use crate::{
     env::lambda_environment,
@@ -21,6 +22,8 @@ use crate::{
 pub struct Metadata {
     #[serde(default)]
     pub lambda: LambdaMetadata,
+    #[serde(default)]
+    profile: Option<CargoProfile>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -82,6 +85,20 @@ pub struct CargoCompilerOptions {
     pub extra_args: Option<Vec<String>>,
 }
 
+#[derive(Debug, Deserialize)]
+struct CargoProfile {
+    pub release: Option<CargoProfileRelease>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoProfileRelease {
+    strip: Option<toml::Value>,
+    lto: Option<toml::Value>,
+    #[serde(rename = "codegen-units")]
+    codegen_units: Option<toml::Value>,
+    panic: Option<toml::Value>,
+}
+
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct DeployConfig {
     #[serde(default)]
@@ -106,6 +123,12 @@ pub struct DeployConfig {
     pub subnet_ids: Option<Vec<String>>,
     #[serde(default)]
     pub security_group_ids: Option<Vec<String>>,
+    #[serde(default = "default_runtime")]
+    pub runtime: String,
+}
+
+fn default_runtime() -> String {
+    "provided.al2023".to_string()
 }
 
 impl DeployConfig {
@@ -127,9 +150,9 @@ impl DeployConfig {
             Some(tags) => {
                 let mut vec = Vec::new();
                 for (k, v) in tags {
-                    vec.push(format!("{k}={v}"));
+                    vec.push(format!("{}={}", encode(k), encode(v)));
                 }
-                Some(vec.join(","))
+                Some(vec.join("&"))
             }
         }
     }
@@ -197,6 +220,47 @@ pub fn target_dir<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<PathBuf> {
 
 pub fn target_dir_from_metadata(metadata: &CargoMetadata) -> Result<PathBuf> {
     Ok(metadata.target_directory.clone().into_std_path_buf())
+}
+
+/// Attempt to read the releaes profile section in the Cargo manifest.
+/// Cargo metadata doesn't expose profile information, so we try
+/// to read it from the Cargo.toml file directly.
+pub fn cargo_release_profile_config<P: AsRef<Path> + Debug>(
+    manifest_path: P,
+) -> Result<Vec<String>, MetadataError> {
+    let path = manifest_path.as_ref();
+    let file = read_to_string(path)
+        .map_err(|e| MetadataError::InvalidManifestFile(path.to_path_buf(), e))?;
+
+    let metadata: Metadata = toml::from_str(&file).map_err(MetadataError::InvalidTomlManifest)?;
+
+    let mut config = HashMap::new();
+    config.insert("strip", "profile.release.strip=\"symbols\"");
+    config.insert("lto", "profile.release.lto=\"thin\"");
+    config.insert("codegen-units", "profile.release.codegen-units=1");
+    config.insert("panic", "profile.release.panic=\"abort\"");
+
+    let Some(profile) = metadata.profile else {
+        return Ok(config.values().map(|s| s.to_string()).collect::<Vec<_>>());
+    };
+    let Some(release) = profile.release else {
+        return Ok(config.values().map(|s| s.to_string()).collect::<Vec<_>>());
+    };
+
+    if release.strip.is_some() {
+        config.remove("strip");
+    }
+    if release.lto.is_some() {
+        config.remove("lto");
+    }
+    if release.codegen_units.is_some() {
+        config.remove("codegen-units");
+    }
+    if release.panic.is_some() {
+        config.remove("panic");
+    }
+
+    return Ok(config.values().map(|s| s.to_string()).collect::<Vec<_>>());
 }
 
 /// Create metadata about the root package in the Cargo manifest, without any dependencies.
@@ -418,6 +482,8 @@ fn merge_deploy_config(base: &DeployConfig, package_deploy: &DeployConfig) -> De
     if package_deploy.security_group_ids.is_some() {
         new_config.security_group_ids = package_deploy.security_group_ids.clone();
     }
+    new_config.runtime = package_deploy.runtime.clone();
+
     tracing::debug!(ws_metadata = ?new_config, package_metadata = ?package_deploy, "finished merging deploy metadata");
     new_config
 }
@@ -433,7 +499,7 @@ fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
 }
 
 fn is_project_metadata_ok(path: &Path) -> bool {
-    path.is_dir() && fs::metadata(path).is_ok()
+    path.is_dir() && metadata(path).is_ok()
 }
 
 #[cfg(test)]
@@ -526,6 +592,7 @@ mod tests {
 
         assert_eq!(Some(tags), env.tags);
         let s3_tags = env.s3_tags().unwrap();
+        assert_eq!(2, s3_tags.split("&").collect::<Vec<_>>().len());
         assert!(s3_tags.contains("organization=aws"), "{s3_tags}");
         assert!(s3_tags.contains("team=lambda"), "{s3_tags}");
     }
@@ -670,6 +737,32 @@ mod tests {
         assert_eq!(
             "there are more than one binary in the project, you must specify a binary name",
             err.to_string()
+        );
+    }
+
+    #[test]
+    fn test_s3_tags_encoding() {
+        let mut tags = HashMap::new();
+        tags.insert(
+            "organization".to_string(),
+            "Amazon Web Services".to_string(),
+        );
+        tags.insert("team".to_string(), "Simple Storage Service".to_string());
+
+        let config = DeployConfig {
+            tags: Some(tags),
+            ..Default::default()
+        };
+
+        let s3_tags = config.s3_tags().unwrap();
+        assert_eq!(2, s3_tags.split("&").collect::<Vec<_>>().len());
+        assert!(
+            s3_tags.contains("organization=Amazon%20Web%20Services"),
+            "{s3_tags}"
+        );
+        assert!(
+            s3_tags.contains("team=Simple%20Storage%20Service"),
+            "{s3_tags}"
         );
     }
 }

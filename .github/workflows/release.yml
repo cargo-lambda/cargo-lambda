@@ -6,6 +6,9 @@ on:
 
 env:
   MATURIN_VERSION: 0.13.6
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  CARGO_INCREMENTAL: 0
 
 jobs:
   release-macos:
@@ -16,11 +19,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           target: aarch64-apple-darwin
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: cargo-lambda
-          shared-key: macos-latest
+      - name: Configure cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
       - name: Build
         uses: messense/maturin-action@v1
         with:
@@ -53,11 +54,9 @@ jobs:
       - uses: actions/setup-python@v3
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: cargo-lambda
-          shared-key: windows-latest
+      - name: Configure cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
       - name: Build
         uses: messense/maturin-action@v1
         with:
@@ -97,12 +96,8 @@ jobs:
       - name: Store git commit
         run: |
           echo "CARGO_LAMBDA_RELEASE_GIT_SHA=$GITHUB_SHA" >> $GITHUB_ENV
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: cargo-lambda
-          shared-key: ubuntu-latest
-          key: ${{ matrix.platform.target }}
+      - name: Configure cache
+        uses: mozilla-actions/sccache-action@v0.0.3
       - name: Build
         uses: messense/maturin-action@v1
         with:

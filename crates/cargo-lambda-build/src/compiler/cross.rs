@@ -26,7 +26,7 @@ impl Compiler for Cross {
         cmd.args(args);
 
         if let Some((name, image)) = default_cross_image(
-            &target_arch.rustc_target_without_glibc_version,
+            target_arch.rustc_target_without_glibc_version(),
             cargo_metadata,
         ) {
             cmd.env(name, image);

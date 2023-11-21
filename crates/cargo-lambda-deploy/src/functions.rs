@@ -1,6 +1,6 @@
 use super::DeployResult;
 use crate::{extract_tags, roles};
-use aws_sdk_s3::{types::ByteStream, Client as S3Client};
+use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::{
     cargo::{function_deploy_metadata, DeployConfig},
@@ -10,16 +10,19 @@ use cargo_lambda_metadata::{
 use cargo_lambda_remote::{
     aws_sdk_config::SdkConfig,
     aws_sdk_lambda::{
-        error::{
-            CreateFunctionError, DeleteFunctionUrlConfigError, GetAliasError, GetFunctionError,
-            GetFunctionUrlConfigError,
+        error::SdkError,
+        operation::{
+            create_function::CreateFunctionError,
+            delete_function_url_config::DeleteFunctionUrlConfigError,
+            get_alias::GetAliasError,
+            get_function::{GetFunctionError, GetFunctionOutput},
+            get_function_url_config::GetFunctionUrlConfigError,
         },
-        model::{
+        primitives::Blob,
+        types::{
             Architecture, Environment, FunctionCode, FunctionConfiguration, FunctionUrlAuthType,
             LastUpdateStatus, Runtime, State, TracingConfig, VpcConfig,
         },
-        output::GetFunctionOutput,
-        types::{Blob, SdkError},
         Client as LambdaClient,
     },
     RemoteConfig,
@@ -27,7 +30,7 @@ use cargo_lambda_remote::{
 use clap::Args;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 use tokio::time::{sleep, Duration};
 use tracing::debug;
 use uuid::Uuid;
@@ -77,6 +80,11 @@ pub struct FunctionDeployConfig {
     /// Security Group IDs to associate the deployed function
     #[arg(long, value_delimiter = ',')]
     pub security_group_ids: Option<Vec<String>>,
+
+    /// Choose a different Lambda runtime to deploy with.
+    /// The only other option that might work is `provided.al2`.
+    #[arg(long, default_value = "provided.al2023")]
+    pub runtime: String,
 }
 
 impl FunctionDeployConfig {
@@ -149,7 +157,7 @@ pub(crate) async fn deploy(
     let function_url = if function_config.enable_function_url {
         progress.set_message("configuring function url");
 
-        upsert_function_url_config(name, &remote_config.alias, &client).await?
+        Some(upsert_function_url_config(name, &remote_config.alias, &client).await?)
     } else {
         None
     };
@@ -240,6 +248,8 @@ async fn upsert_function(
                 }
             };
 
+            let runtime = Runtime::from_str(&deploy_metadata.runtime).unwrap();
+
             let mut output = None;
             for attempt in 2..5 {
                 let memory = deploy_metadata.memory.clone().map(Into::into);
@@ -253,7 +263,7 @@ async fn upsert_function(
                             .set_subnet_ids(deploy_metadata.subnet_ids.clone())
                             .build(),
                     )
-                    .runtime(Runtime::Providedal2)
+                    .runtime(runtime.clone())
                     .handler("bootstrap")
                     .function_name(name)
                     .role(iam_role.clone())
@@ -521,6 +531,8 @@ fn merge_configuration(
         }
     }
 
+    deploy_metadata.runtime = function_config.runtime.clone();
+
     Ok((environment, deploy_metadata))
 }
 
@@ -585,10 +597,10 @@ pub(crate) fn should_update_layers(
     conf: &FunctionConfiguration,
 ) -> bool {
     match (conf.layers(), layer_arn) {
-        (None, None) => false,
-        (Some(_), None) => true,
-        (None, Some(_)) => true,
-        (Some(cl), Some(nl)) => {
+        ([], None) => false,
+        (_cl, None) => true,
+        ([], Some(_)) => true,
+        (cl, Some(nl)) => {
             let mut c = cl
                 .iter()
                 .cloned()
@@ -653,7 +665,7 @@ pub(crate) async fn upsert_function_url_config(
     name: &str,
     alias: &Option<String>,
     client: &LambdaClient,
-) -> Result<Option<String>> {
+) -> Result<String> {
     let result = client
         .get_function_url_config()
         .function_name(name)

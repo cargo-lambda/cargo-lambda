@@ -1,8 +1,8 @@
 use cargo_lambda_interactive::{error::InquireError, is_user_cancellation_error};
 use cargo_lambda_metadata::{
     cargo::{
-        binary_targets_from_metadata, function_build_metadata, load_metadata, target_dir,
-        target_dir_from_metadata, CompilerOptions,
+        binary_targets_from_metadata, cargo_release_profile_config, function_build_metadata,
+        load_metadata, target_dir, target_dir_from_metadata, CompilerOptions,
     },
     fs::copy_and_replace,
 };
@@ -79,8 +79,13 @@ pub struct Build {
     #[arg(long)]
     skip_target_check: bool,
 
+    /// Backend to build the project with
     #[arg(short, long, env = "CARGO_LAMBDA_COMPILER")]
     compiler: Option<CompilerFlag>,
+
+    /// Disable all default release optimizations
+    #[arg(long)]
+    disable_optimizations: bool,
 
     #[command(flatten)]
     build: CargoBuild,
@@ -106,9 +111,8 @@ impl Build {
     pub async fn run(&mut self) -> Result<()> {
         tracing::trace!(options = ?self, "building project");
 
-        let manifest_path = self
-            .build
-            .manifest_path
+        let manifest_path = self.build.manifest_path.clone();
+        let manifest_path = manifest_path
             .as_deref()
             .unwrap_or_else(|| Path::new("Cargo.toml"));
 
@@ -124,12 +128,12 @@ impl Build {
             Err(BuildError::InvalidTargetOptions)?;
         }
 
-        let mut target_arch = if self.arm64 {
+        let target_arch = if self.arm64 {
             TargetArch::arm64()
         } else if self.x86_64 {
             TargetArch::x86_64()
         } else {
-            let build_target = self.build.target.get(0).or(build_config.target.as_ref());
+            let build_target = self.build.target.first().or(build_config.target.as_ref());
             match build_target {
                 Some(target) => {
                     validate_linux_target(target)?;
@@ -156,31 +160,26 @@ impl Build {
             // This check only makes sense when the build host is local.
             // If the build host was ever going to be remote, like in a container,
             // this is not checked
-            if target_arch.compatible_host_linker() {
-                target_arch.set_al2_glibc_version();
-            } else if !target_arch.is_static_linking() {
+            if !target_arch.compatible_host_linker() && !target_arch.is_static_linking() {
                 return Err(BuildError::InvalidCompilerOption.into());
             }
         }
 
-        let rust_flags = if self.build.release {
+        let rust_flags = if self.build.release && !self.disable_optimizations {
+            let release_optimizations =
+                cargo_release_profile_config(manifest_path).map_err(BuildError::MetadataError)?;
+            self.build.config.extend(release_optimizations);
+
             let mut rust_flags = env::var("RUSTFLAGS").unwrap_or_default();
-            if !rust_flags.contains("-C strip=") {
-                if !rust_flags.is_empty() {
-                    rust_flags += " ";
-                }
-                rust_flags += "-C strip=symbols";
-            }
             if !rust_flags.contains("-C target-cpu=") {
                 if !rust_flags.is_empty() {
                     rust_flags += " ";
                 }
-                let target_cpu = target_arch.target_cpu();
                 rust_flags += "-C target-cpu=";
-                rust_flags += target_cpu.as_str();
+                rust_flags += target_arch.target_cpu();
             }
 
-            debug!(rust_flags = ?rust_flags, "release RUSTFLAGS");
+            debug!(?rust_flags, config = ?self.build.config, "release optimizations");
             Some(rust_flags)
         } else {
             None
@@ -224,7 +223,7 @@ impl Build {
         };
 
         let base = target_dir
-            .join(target_arch.rustc_target_without_glibc_version)
+            .join(target_arch.rustc_target_without_glibc_version())
             .join(profile);
 
         let mut found_binaries = false;
@@ -243,7 +242,11 @@ impl Build {
                         _ => lambda_dir.join(name),
                     }
                 };
-                create_dir_all(&bootstrap_dir).into_diagnostic()?;
+                create_dir_all(&bootstrap_dir)
+                    .into_diagnostic()
+                    .wrap_err_with(|| {
+                        format!("error creating lambda directory {bootstrap_dir:?}")
+                    })?;
 
                 let bin_name = if self.extension {
                     name.as_str()
@@ -253,7 +256,12 @@ impl Build {
 
                 match self.output_format {
                     OutputFormat::Binary => {
-                        copy_and_replace(binary, bootstrap_dir.join(bin_name)).into_diagnostic()?;
+                        let output_location = bootstrap_dir.join(bin_name);
+                        copy_and_replace(&binary, &output_location)
+                            .into_diagnostic()
+                            .wrap_err_with(|| {
+                                format!("error moving the binary `{binary:?}` into the output location `{output_location:?}`")
+                            })?;
                     }
                     OutputFormat::Zip => {
                         let parent = if self.extension && !self.internal {
@@ -344,8 +352,12 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     let zipped = dir.join(format!("{name}.zip"));
     debug!(name, parent, ?path, ?dir, ?zipped, "zipping binary");
 
-    let zipped_binary = File::create(&zipped).into_diagnostic()?;
-    let binary_data = read(path).into_diagnostic()?;
+    let zipped_binary = File::create(&zipped)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to create zip file `{zipped:?}`"))?;
+    let binary_data = read(path)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to read binary file `{path:?}`"))?;
     let binary_perm = binary_permissions(path)?;
     let binary_data = &*binary_data;
     let object = ObjectFile::parse(binary_data)
@@ -369,7 +381,10 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
 
     let file_name = if let Some(parent) = parent {
         zip.add_directory(parent, FileOptions::default())
-            .into_diagnostic()?;
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!("failed to add directory `{parent}` to zip file `{zipped:?}`")
+            })?;
         Path::new(parent).join(name)
     } else {
         PathBuf::from(name)
@@ -378,12 +393,17 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     let zip_file_name = convert_to_unix_path(&file_name)
         .ok_or_else(|| BuildError::InvalidUnixFileName(file_name.clone()))?;
     zip.start_file(
-        zip_file_name,
+        zip_file_name.to_string(),
         FileOptions::default().unix_permissions(binary_perm),
     )
-    .into_diagnostic()?;
-    zip.write_all(binary_data).into_diagnostic()?;
-    zip.finish().into_diagnostic()?;
+    .into_diagnostic()
+    .wrap_err_with(|| format!("failed to start zip file `{zip_file_name:?}`"))?;
+    zip.write_all(binary_data)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to write data into zip file `{zip_file_name:?}`"))?;
+    zip.finish()
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to finish zip file `{zip_file_name:?}`"))?;
 
     Ok(BinaryArchive {
         architecture: arch.into(),
@@ -395,7 +415,9 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
 #[cfg(unix)]
 fn binary_permissions(path: &Path) -> Result<u32> {
     use std::os::unix::prelude::PermissionsExt;
-    let meta = std::fs::metadata(path).into_diagnostic()?;
+    let meta = std::fs::metadata(path)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to get binary permissions from file `{path:?}`"))?;
     Ok(meta.permissions().mode())
 }
 
@@ -443,18 +465,31 @@ where
             if path.is_dir() {
                 trace!(?entry_name, "creating directory in zip file");
 
-                zip.add_directory(entry_name, FileOptions::default())
-                    .into_diagnostic()?;
+                zip.add_directory(entry_name.to_string(), FileOptions::default())
+                    .into_diagnostic()
+                    .wrap_err_with(|| {
+                        format!("failed to add directory `{entry_name}` to zip file")
+                    })?;
             } else {
                 let mut content = Vec::new();
-                let mut file = File::open(path).into_diagnostic()?;
-                file.read_to_end(&mut content).into_diagnostic()?;
+                let mut file = File::open(path)
+                    .into_diagnostic()
+                    .wrap_err_with(|| format!("failed to open file `{path:?}`"))?;
+                file.read_to_end(&mut content)
+                    .into_diagnostic()
+                    .wrap_err_with(|| format!("failed to read file `{path:?}`"))?;
 
                 trace!(?entry_name, "including file in zip file");
 
-                zip.start_file(entry_name, FileOptions::default())
-                    .into_diagnostic()?;
-                zip.write_all(&content).into_diagnostic()?;
+                zip.start_file(entry_name.to_string(), FileOptions::default())
+                    .into_diagnostic()
+                    .wrap_err_with(|| format!("failed to start zip file `{entry_name:?}`"))?;
+
+                zip.write_all(&content)
+                    .into_diagnostic()
+                    .wrap_err_with(|| {
+                        format!("failed to write data into zip file `{entry_name:?}`")
+                    })?;
             }
         }
     }

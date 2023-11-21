@@ -25,6 +25,9 @@ on:
 
 env:
   RUST_BACKTRACE: full
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  CARGO_INCREMENTAL: 0
 
 jobs:
   test:
@@ -44,12 +47,10 @@ jobs:
 
       - uses: korandoru/setup-zig@v1
         with:
-          zig-version: 0.10.0
+          zig-version: 0.11.0
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: cargo-lambda
-          shared-key: ${{ matrix.os }}
+      - name: Configure cache
+        uses: mozilla-actions/sccache-action@v0.0.3
 
       - name: Run cargo test
         run: cargo test --all-features

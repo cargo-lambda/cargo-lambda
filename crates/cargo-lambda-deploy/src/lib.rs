@@ -3,7 +3,7 @@ use cargo_lambda_build::{find_binary_archive, zip_binary, BinaryArchive};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::main_binary;
 use cargo_lambda_remote::{
-    aws_sdk_lambda::model::{Architecture, Runtime},
+    aws_sdk_lambda::types::{Architecture, Runtime},
     RemoteConfig,
 };
 use clap::{Args, ValueHint};
@@ -85,7 +85,7 @@ pub struct Deploy {
     #[arg(
         long,
         value_delimiter = ',',
-        default_value = "provided.al2",
+        default_value = "provided.al2,provided.al2023",
         requires = "extension"
     )]
     compatible_runtimes: Vec<String>,
@@ -96,12 +96,12 @@ pub struct Deploy {
 
     /// Option to add one or many tags, allows multiple repetitions (--tag organization=aws --tag team=lambda)
     /// This option overrides any values set with the --tags flag.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "tags")]
     tag: Option<Vec<String>>,
 
     /// Comma separated list of tags to apply to the function or extension (--tags organization=aws,team=lambda)
     /// This option overrides any values set with the --tag flag.
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', conflicts_with = "tag")]
     tags: Option<Vec<String>>,
 
     /// Option to add one or more files and directories to include in the zip file to upload.
