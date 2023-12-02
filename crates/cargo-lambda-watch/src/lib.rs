@@ -15,7 +15,7 @@ use std::{
     str::FromStr,
 };
 use tokio::time::Duration;
-use tokio_graceful_shutdown::{SubsystemHandle, Toplevel};
+use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle, Toplevel};
 use tower_http::{
     catch_panic::CatchPanicLayer,
     cors::CorsLayer,
@@ -145,14 +145,15 @@ impl Watch {
             ..Default::default()
         };
 
-        Toplevel::new()
-            .start("Lambda server", move |s| {
+        Toplevel::new(move |s| async move {
+            s.start(SubsystemBuilder::new("Lambda server", move |s| {
                 start_server(s, addr, cargo_options, watcher_config, start_function)
-            })
-            .catch_signals()
-            .handle_shutdown_requests(Duration::from_millis(1000))
-            .await
-            .into_diagnostic()
+            }));
+        })
+        .catch_signals()
+        .handle_shutdown_requests(Duration::from_millis(1000))
+        .await
+        .into_diagnostic()
     }
 
     pub fn xray_layer<S>(&self) -> OpenTelemetryLayer<S, Tracer>
