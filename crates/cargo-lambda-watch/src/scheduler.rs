@@ -7,7 +7,7 @@ use crate::{
 };
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
 use tokio::sync::mpsc::{self, Receiver, Sender};
-use tokio_graceful_shutdown::SubsystemHandle;
+use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle};
 use tracing::{error, info};
 use watchexec::command::Command;
 
@@ -19,9 +19,9 @@ pub(crate) async fn init_scheduler(
 ) -> Sender<Action> {
     let (req_tx, req_rx) = mpsc::channel::<Action>(100);
 
-    subsys.start("lambda scheduler", move |s| async move {
-        start_scheduler(s, state, cargo_options, watcher_config, req_rx).await
-    });
+    subsys.start(SubsystemBuilder::new("lambda scheduler", move |s| {
+        start_scheduler(s, state, cargo_options, watcher_config, req_rx)
+    }));
 
     req_tx
 }
@@ -55,7 +55,7 @@ async fn start_scheduler(
                         let cargo_options = cargo_options.clone();
                         let watcher_config = watcher_config.clone();
                         let ext_cache = state.ext_cache.clone();
-                        subsys.start("lambda runtime", move |s| start_function(s, name, runtime_api, cargo_options, watcher_config, gc_tx, ext_cache));
+                        subsys.start(SubsystemBuilder::new("lambda runtime", move |s| start_function(s, name, runtime_api, cargo_options, watcher_config, gc_tx, ext_cache)));
                     }
                 }
             }
