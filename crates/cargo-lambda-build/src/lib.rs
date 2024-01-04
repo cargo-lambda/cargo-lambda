@@ -29,13 +29,14 @@ use zip::{write::FileOptions, ZipWriter};
 pub use cargo_zigbuild::Zig;
 
 mod compiler;
-use compiler::new_compiler;
 
 mod error;
 use error::BuildError;
 
 mod target_arch;
 use target_arch::validate_linux_target;
+
+use crate::compiler::{build_command, build_profile};
 
 mod toolchain;
 mod zig;
@@ -185,16 +186,15 @@ impl Build {
             None
         };
 
-        let compiler = new_compiler(compiler_option);
-        let profile = compiler.build_profile(&self.build);
-        let cmd = compiler
-            .command(
-                &self.build,
-                &target_arch,
-                &metadata,
-                self.skip_target_check(),
-            )
-            .await;
+        let profile = build_profile(&self.build, &compiler_option);
+        let cmd = build_command(
+            &compiler_option,
+            &self.build,
+            &target_arch,
+            &metadata,
+            self.skip_target_check(),
+        )
+        .await;
 
         let mut cmd = match cmd {
             Ok(cmd) => cmd,
