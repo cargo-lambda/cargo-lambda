@@ -1,4 +1,3 @@
-use super::{build_profile, Compiler};
 use crate::TargetArch;
 use cargo_lambda_metadata::cargo::CargoMetadata;
 use cargo_options::Build;
@@ -8,11 +7,9 @@ use std::process::Command;
 
 pub(crate) struct CargoZigbuild;
 
-#[async_trait::async_trait]
-impl Compiler for CargoZigbuild {
-    #[tracing::instrument(skip(self), target = "cargo_lambda")]
-    async fn command(
-        &self,
+impl CargoZigbuild {
+    #[tracing::instrument(target = "cargo_lambda")]
+    pub(crate) async fn command(
         cargo: &Build,
         target_arch: &TargetArch,
         _cargo_metadata: &CargoMetadata,
@@ -40,21 +37,5 @@ impl Compiler for CargoZigbuild {
         }
 
         zig_build.build_command().map_err(|e| miette::miette!(e))
-    }
-
-    #[cfg(windows)]
-    fn build_profile<'a>(&self, cargo: &'a Build) -> &'a str {
-        // To understand why we need this,
-        // see https://github.com/cargo-lambda/cargo-lambda/issues/77
-        if !cargo.release {
-            "release"
-        } else {
-            build_profile(cargo.profile.as_deref(), cargo.release)
-        }
-    }
-
-    #[cfg(not(windows))]
-    fn build_profile<'a>(&self, cargo: &'a Build) -> &'a str {
-        build_profile(cargo.profile.as_deref(), cargo.release)
     }
 }

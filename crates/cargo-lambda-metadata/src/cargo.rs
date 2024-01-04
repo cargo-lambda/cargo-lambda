@@ -75,6 +75,10 @@ impl CompilerOptions {
     pub fn is_local_cargo(&self) -> bool {
         matches!(self, CompilerOptions::Cargo(_))
     }
+
+    pub fn is_cargo_zigbuild(&self) -> bool {
+        matches!(self, CompilerOptions::CargoZigbuild)
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]

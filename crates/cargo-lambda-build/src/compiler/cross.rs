@@ -1,4 +1,3 @@
-use super::Compiler;
 use crate::TargetArch;
 use cargo_lambda_metadata::cargo::CargoMetadata;
 use cargo_options::Build;
@@ -7,15 +6,12 @@ use std::{collections::VecDeque, env, ffi::OsStr, fs, process::Command};
 
 pub(crate) struct Cross;
 
-#[async_trait::async_trait]
-impl Compiler for Cross {
-    #[tracing::instrument(skip(self), target = "cargo_lambda")]
-    async fn command(
-        &self,
+impl Cross {
+    #[tracing::instrument(target = "cargo_lambda")]
+    pub(crate) async fn command(
         cargo: &Build,
         target_arch: &TargetArch,
         cargo_metadata: &CargoMetadata,
-        _skip_target_check: bool,
     ) -> Result<Command> {
         tracing::debug!(?target_arch, "compiling with Cross");
 
