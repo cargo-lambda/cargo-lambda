@@ -186,17 +186,7 @@ pub fn binary_targets<P: AsRef<Path> + Debug>(
     manifest_path: P,
 ) -> Result<HashSet<String>, MetadataError> {
     let metadata = load_metadata(manifest_path)?;
-    let bins = metadata
-        .packages
-        .iter()
-        .flat_map(|p| {
-            p.targets
-                .iter()
-                .filter(|target| target.kind.iter().any(|k| k == "bin"))
-        })
-        .map(|target| target.name.clone())
-        .collect::<_>();
-    Ok(bins)
+    Ok(binary_targets_from_metadata(&metadata))
 }
 
 pub fn binary_targets_from_metadata(metadata: &CargoMetadata) -> HashSet<String> {
@@ -206,7 +196,7 @@ pub fn binary_targets_from_metadata(metadata: &CargoMetadata) -> HashSet<String>
         .flat_map(|p| {
             p.targets
                 .iter()
-                .filter(|target| target.kind.iter().any(|k| k == "bin"))
+                .filter(|target| target.crate_types.contains(&"bin".to_owned()))
         })
         .map(|target| target.name.clone())
         .collect::<_>()

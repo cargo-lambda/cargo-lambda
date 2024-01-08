@@ -228,54 +228,56 @@ impl Build {
 
         let mut found_binaries = false;
         for name in &binaries {
-            let binary = base.join(name);
-            debug!(binary = ?binary, exists = binary.exists(), "checking function binary");
+            for base in [&base, &base.join("examples")] {
+                let binary = base.join(name);
+                debug!(binary = ?binary, exists = binary.exists(), "checking function binary");
 
-            if binary.exists() {
-                found_binaries = true;
+                if binary.exists() {
+                    found_binaries = true;
 
-                let bootstrap_dir = if self.extension {
-                    lambda_dir.join("extensions")
-                } else {
-                    match self.flatten {
-                        Some(ref n) if n == name => lambda_dir.clone(),
-                        _ => lambda_dir.join(name),
-                    }
-                };
-                create_dir_all(&bootstrap_dir)
-                    .into_diagnostic()
-                    .wrap_err_with(|| {
-                        format!("error creating lambda directory {bootstrap_dir:?}")
-                    })?;
+                    let bootstrap_dir = if self.extension {
+                        lambda_dir.join("extensions")
+                    } else {
+                        match self.flatten {
+                            Some(ref n) if n == name => lambda_dir.clone(),
+                            _ => lambda_dir.join(name),
+                        }
+                    };
+                    create_dir_all(&bootstrap_dir)
+                        .into_diagnostic()
+                        .wrap_err_with(|| {
+                            format!("error creating lambda directory {bootstrap_dir:?}")
+                        })?;
 
-                let bin_name = if self.extension {
-                    name.as_str()
-                } else {
-                    "bootstrap"
-                };
+                    let bin_name = if self.extension {
+                        name.as_str()
+                    } else {
+                        "bootstrap"
+                    };
 
-                match self.output_format {
-                    OutputFormat::Binary => {
-                        let output_location = bootstrap_dir.join(bin_name);
-                        copy_and_replace(&binary, &output_location)
+                    match self.output_format {
+                        OutputFormat::Binary => {
+                            let output_location = bootstrap_dir.join(bin_name);
+                            copy_and_replace(&binary, &output_location)
                             .into_diagnostic()
                             .wrap_err_with(|| {
                                 format!("error moving the binary `{binary:?}` into the output location `{output_location:?}`")
                             })?;
-                    }
-                    OutputFormat::Zip => {
-                        let parent = if self.extension && !self.internal {
-                            Some("extensions")
-                        } else {
-                            None
-                        };
-                        zip_binary(bin_name, binary, bootstrap_dir, parent, None)?;
+                        }
+                        OutputFormat::Zip => {
+                            let parent = if self.extension && !self.internal {
+                                Some("extensions")
+                            } else {
+                                None
+                            };
+                            zip_binary(bin_name, binary, bootstrap_dir, parent, None)?;
+                        }
                     }
                 }
             }
         }
         if !found_binaries {
-            warn!(?base, "no binaries found in target directory after build, try using the --bin or --package options to build specific binaries");
+            warn!(?base, "no binaries found in target directory after build, try using the --bin, --example, or --package options to build specific binaries");
         }
 
         Ok(())
