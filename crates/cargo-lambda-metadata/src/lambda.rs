@@ -50,6 +50,8 @@ pub enum Memory {
     Mb256,
     #[strum(to_string = "512")]
     Mb512,
+    #[strum(to_string = "640")]
+    Mb640,
     #[strum(to_string = "1024")]
     Mb1024,
     #[strum(to_string = "1536")]
@@ -80,6 +82,7 @@ impl From<Memory> for i32 {
             Memory::Mb128 => 128,
             Memory::Mb256 => 256,
             Memory::Mb512 => 512,
+            Memory::Mb640 => 640,
             Memory::Mb1024 => 1024,
             Memory::Mb1536 => 1536,
             Memory::Mb2048 => 2048,
@@ -103,6 +106,7 @@ impl TryFrom<i32> for Memory {
             128 => Ok(Memory::Mb128),
             256 => Ok(Memory::Mb256),
             512 => Ok(Memory::Mb512),
+            640 => Ok(Memory::Mb640),
             1024 => Ok(Memory::Mb1024),
             1536 => Ok(Memory::Mb1536),
             2048 => Ok(Memory::Mb2048),
