@@ -273,6 +273,8 @@ impl Build {
                             zip_binary(bin_name, binary, bootstrap_dir, parent, None)?;
                         }
                     }
+
+                    break;
                 }
             }
         }
