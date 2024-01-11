@@ -216,7 +216,7 @@ async fn respond_to_invocation(
     let keys = cache.keys().await;
 
     if let Some(key) = keys.first() {
-        if let Some(invoke_request) = cache.pop(&key).await {
+        if let Some(invoke_request) = cache.pop(key).await {
             req.extensions_mut().insert(response_status);
 
             invoke_request
