@@ -81,27 +81,14 @@ pub fn cargo_lambda_init(project_name: &str) -> LambdaProject {
 }
 
 pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {
-    let path = path.as_ref(); // /home/david/src/cargo-lambda/target/tmp/cit/t8/case
-    let cache = path
-        .parent()
-        .unwrap() // /home/david/src/cargo-lambda/target/tmp/cit/t8
-        .parent()
-        .unwrap() // /home/david/src/cargo-lambda/target/tmp/cit
-        .parent()
-        .unwrap() // /home/david/src/cargo-lambda/target/tmp
-        .parent()
-        .unwrap() // /home/david/src/cargo-lambda/target
-        .as_os_str();
+    let path = path.as_ref();
 
     Command::cargo_lambda()
         .arg("lambda")
         .arg("build")
         .arg("-vv")
-        .arg("--lambda-dir")
-        .arg(path.join("target").join("lambda"))
         .env("RUST_BACKTRACE", "full")
-        .env("CARGO_ZIGBUILD_CACHE_DIR", cache)
-        .env("CARGO_TARGET_DIR", cache)
+        .env("CARGO_ZIGBUILD_CACHE_DIR", path.as_os_str())
         .current_dir(path)
 }
 
