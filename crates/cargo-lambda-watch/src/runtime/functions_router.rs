@@ -49,6 +49,11 @@ pub(crate) fn routes() -> Router {
             "/2018-06-01/runtime/invocation/:req_id/error",
             post(bare_next_invocation_error),
         )
+        .route(
+            "/:function_name/2018-06-01/runtime/init/error",
+            post(init_error),
+        )
+        .route("/2018-06-01/runtime/init/error", post(bare_init_error))
 }
 
 async fn next_request(
@@ -183,6 +188,42 @@ async fn respond_to_next_invocation(
         resp_tx
             .send(req)
             .map_err(|_| ServerError::SendFunctionMessage)?;
+    }
+
+    Ok(Response::new(Body::empty()))
+}
+
+async fn init_error(
+    Extension(cache): Extension<RequestCache>,
+    Path(_function_name): Path<String>,
+    req: Request<Body>,
+) -> Result<Response<Body>, ServerError> {
+    respond_to_invocation(&cache, req, StatusCode::OK).await
+}
+
+async fn bare_init_error(
+    Extension(cache): Extension<RequestCache>,
+    req: Request<Body>,
+) -> Result<Response<Body>, ServerError> {
+    respond_to_invocation(&cache, req, StatusCode::OK).await
+}
+
+async fn respond_to_invocation(
+    cache: &RequestCache,
+    mut req: Request<Body>,
+    response_status: StatusCode,
+) -> Result<Response<Body>, ServerError> {
+    let keys = cache.keys().await;
+
+    if let Some(key) = keys.first() {
+        if let Some(invoke_request) = cache.pop(key).await {
+            req.extensions_mut().insert(response_status);
+
+            invoke_request
+                .resp_tx
+                .send(req)
+                .map_err(|_| ServerError::SendFunctionMessage)?;
+        }
     }
 
     Ok(Response::new(Body::empty()))

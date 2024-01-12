@@ -108,6 +108,11 @@ impl RequestCache {
         inner.remove(function_name);
         debug!(function_name, "request stack cleaned");
     }
+
+    pub async fn keys(&self) -> Vec<String> {
+        let inner = self.inner.read().await;
+        inner.keys().cloned().collect()
+    }
 }
 
 #[derive(Clone)]
