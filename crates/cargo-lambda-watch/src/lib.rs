@@ -82,6 +82,10 @@ pub struct Watch {
     #[arg(long, short)]
     wait: bool,
 
+    /// Disable the default CORS configuration
+    #[arg(long)]
+    disable_cors: bool,
+
     #[command(flatten)]
     cargo_options: CargoOptions,
 
@@ -145,9 +149,17 @@ impl Watch {
             ..Default::default()
         };
 
+        let disable_cors = self.disable_cors;
         Toplevel::new(move |s| async move {
             s.start(SubsystemBuilder::new("Lambda server", move |s| {
-                start_server(s, addr, cargo_options, watcher_config, start_function)
+                start_server(
+                    s,
+                    addr,
+                    cargo_options,
+                    watcher_config,
+                    start_function,
+                    disable_cors,
+                )
             }));
         })
         .catch_signals()
@@ -224,6 +236,7 @@ async fn start_server(
     cargo_options: CargoOptions,
     watcher_config: WatcherConfig,
     init_function: bool,
+    disable_cors: bool,
 ) -> Result<(), axum::Error> {
     let server_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
 
@@ -241,7 +254,7 @@ async fn start_server(
 
     let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
 
-    let app = Router::new()
+    let mut app = Router::new()
         .merge(trigger_router::routes())
         .nest(RUNTIME_EMULATOR_PATH, runtime::routes())
         .layer(SetRequestIdLayer::new(
@@ -254,8 +267,10 @@ async fn start_server(
         .layer(Extension(req_cache))
         .layer(Extension(ResponseCache::new()))
         .layer(TraceLayer::new_for_http())
-        .layer(CatchPanicLayer::new())
-        .layer(CorsLayer::very_permissive());
+        .layer(CatchPanicLayer::new());
+    if !disable_cors {
+        app = app.layer(CorsLayer::very_permissive());
+    }
 
     info!("invoke server listening on {}", addr);
     if only_lambda_apis {
