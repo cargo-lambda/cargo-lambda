@@ -56,7 +56,7 @@ dunce = "1.0.3"
 home = "0.5.3"
 miette = { version = "5.10.0" }
 reqwest = { version = "0.11.10", default-features = false, features = [
-    "rustls-tls",
+    "rustls-tls-native-roots",
 ] }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
