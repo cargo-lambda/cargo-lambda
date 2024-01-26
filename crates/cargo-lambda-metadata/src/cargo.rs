@@ -449,15 +449,17 @@ pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig, 
 pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String, MetadataError> {
     let targets = binary_targets(manifest_path, true)?;
     if targets.len() > 1 {
-        Err(MetadataError::MultipleBinariesInProject)?;
+        let mut vec = targets.into_iter().collect::<Vec<_>>();
+        vec.sort();
+        Err(MetadataError::MultipleBinariesInProject(vec.join(", ")))
     } else if targets.is_empty() {
-        Err(MetadataError::MissingBinaryInProject)?;
+        Err(MetadataError::MissingBinaryInProject)
+    } else {
+        targets
+            .into_iter()
+            .next()
+            .ok_or_else(|| MetadataError::MissingBinaryInProject)
     }
-
-    targets
-        .into_iter()
-        .next()
-        .ok_or_else(|| MetadataError::MissingBinaryInProject)
 }
 
 fn merge_deploy_config(base: &DeployConfig, package_deploy: &DeployConfig) -> DeployConfig {
@@ -742,7 +744,7 @@ mod tests {
         let manifest_path = fixture("multi-binary-package");
         let err = main_binary(manifest_path).unwrap_err();
         assert_eq!(
-            "there are more than one binary in the project, you must specify a binary name",
+            "there are more than one binary in the project, please specify a binary name with --binary-name or --binary-path. This is the list of binaries I found: delete-product, dynamodb-streams, get-product, get-products, put-product",
             err.to_string()
         );
     }
