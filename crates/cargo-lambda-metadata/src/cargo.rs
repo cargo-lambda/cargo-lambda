@@ -778,7 +778,8 @@ mod tests {
     #[test]
     fn test_example_packages() {
         let bins = binary_targets(fixture("examples-package"), true).unwrap();
-        assert_eq!(1, bins.len());
+        assert_eq!(2, bins.len());
         assert!(bins.contains("example-lambda"));
+        assert!(bins.contains("basic-lambda"));
     }
 }
