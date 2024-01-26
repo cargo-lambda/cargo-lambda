@@ -6,7 +6,8 @@ use zip::ZipArchive;
 
 mod harness;
 use harness::{
-    cargo_lambda_build, cargo_lambda_init, cargo_lambda_new, init_root, LambdaProjectExt,
+    cargo_lambda_build, cargo_lambda_init, cargo_lambda_new, init_root, CargoPathExt,
+    LambdaProjectExt,
 };
 
 #[test]
@@ -310,6 +311,7 @@ fn test_build_example() {
         .expect("failed to create example content");
     example_file.flush().unwrap();
 
+    // Build examples and check that only the example is in the Lambda directory.
     cargo_lambda_build(project.root())
         .arg("--examples")
         .assert()
@@ -318,6 +320,22 @@ fn test_build_example() {
     let bin = project.lambda_function_bin("example-lambda");
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 
-    let bin = project.lambda_function_bin("test-example");
+    let bin = project.lambda_function_bin(&lp.name);
     assert!(!bin.exists(), "{:?} exists, but it shoudn't", bin);
+
+    project.lambda_dir().rm_rf();
+
+    // Build project and check that only the main binary is in the Lambda directory.
+    cargo_lambda_build(project.root()).assert().success();
+
+    let bin = project.lambda_function_bin("example-lambda");
+    assert!(!bin.exists(), "{:?} exists, but it shouldn't", bin);
+
+    let bin = project.lambda_function_bin(&lp.name);
+    assert!(
+        bin.exists(),
+        "{:?} doesn't exist in directory: {:?}",
+        &lp.name,
+        project.lambda_dir().ls_r()
+    );
 }

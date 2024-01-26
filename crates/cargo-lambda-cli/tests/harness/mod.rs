@@ -6,8 +6,8 @@ use std::{
 use snapbox::cmd::Command;
 
 mod project;
-pub use project::paths::init_root;
 use project::Project;
+pub use project::{paths::init_root, CargoPathExt};
 
 pub struct LambdaProject {
     pub name: String,

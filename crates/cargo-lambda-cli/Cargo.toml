@@ -39,4 +39,5 @@ dunce = "1.0.3"
 snapbox = { version = "0.4.3", features = ["cmd", "debug", "path"] }
 url = "2.5.0"
 uuid.workspace = true
+walkdir = "2.4.0"
 zip.workspace = true

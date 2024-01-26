@@ -131,6 +131,10 @@ impl FileBuilder {
 pub trait CargoPathExt {
     fn rm_rf(&self);
     fn mkdir_p(&self);
+
+    /// Returns a list of all files and directories underneath the given
+    /// directory, recursively, including the starting path.
+    fn ls_r(&self) -> Vec<PathBuf>;
 }
 
 impl CargoPathExt for Path {
@@ -159,6 +163,14 @@ impl CargoPathExt for Path {
     fn mkdir_p(&self) {
         fs::create_dir_all(self)
             .unwrap_or_else(|e| panic!("failed to mkdir_p {}: {}", self.display(), e))
+    }
+
+    fn ls_r(&self) -> Vec<PathBuf> {
+        walkdir::WalkDir::new(self)
+            .sort_by_file_name()
+            .into_iter()
+            .filter_map(|e| e.map(|e| e.path().to_owned()).ok())
+            .collect()
     }
 }
 
