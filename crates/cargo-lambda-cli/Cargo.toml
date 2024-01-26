@@ -35,9 +35,10 @@ tracing-subscriber.workspace = true
 build-data = "0.1"
 
 [dev-dependencies]
-cargo-test-macro = { git = "https://github.com/rust-lang/cargo" }
-cargo-test-support = { git = "https://github.com/rust-lang/cargo" }
+#cargo-test-macro = { git = "https://github.com/rust-lang/cargo" }
+#cargo-test-support = { git = "https://github.com/rust-lang/cargo" }
 dunce = "1.0.3"
-snapbox = { version = "0.4.3", features = ["cmd", "debug"] }
+snapbox = { version = "0.4.3", features = ["cmd", "debug", "path"] }
+url = "2.5.0"
 uuid.workspace = true
 zip.workspace = true

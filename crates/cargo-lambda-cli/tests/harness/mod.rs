@@ -3,8 +3,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use cargo_test_support::Project;
 use snapbox::cmd::Command;
+
+mod project;
+pub use project::paths::init_root;
+use project::Project;
 
 pub struct LambdaProject {
     pub name: String,
@@ -56,7 +59,7 @@ pub fn test_project<P: AsRef<Path>>(path: P) -> Project {
 }
 
 pub fn cargo_lambda_new(project_name: &str) -> LambdaProject {
-    let project = project();
+    let project = project::project().build();
 
     let cwd = dunce::canonicalize(project.root()).expect("failed to create canonical path");
     let name = format!("{}-{}", project_name, uuid::Uuid::new_v4());
@@ -66,7 +69,7 @@ pub fn cargo_lambda_new(project_name: &str) -> LambdaProject {
 }
 
 pub fn cargo_lambda_init(project_name: &str) -> LambdaProject {
-    let project = project();
+    let project = project::project().build();
 
     let cwd = dunce::canonicalize(project.root()).expect("failed to create canonical path");
     fs::create_dir_all(&cwd).expect("failed to create project directory");
@@ -92,10 +95,6 @@ pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {
         .current_dir(path)
 }
 
-pub fn project() -> Project {
-    cargo_test_support::project().no_manifest().build()
-}
-
 fn cargo_exe() -> std::path::PathBuf {
     snapbox::cmd::cargo_bin("cargo-lambda")
 }
@@ -106,7 +105,7 @@ pub trait LambdaCommandExt {
 
 impl LambdaCommandExt for Command {
     fn cargo_lambda() -> Self {
-        Self::new(cargo_exe()).with_assert(cargo_test_support::compare::assert_ui())
+        Self::new(cargo_exe()).with_assert(project::assert_ui())
     }
 }
 

@@ -1,4 +1,3 @@
-use cargo_test_macro::cargo_test;
 use std::{
     fs::{create_dir_all, read_to_string, File},
     io::Write,
@@ -6,10 +5,13 @@ use std::{
 use zip::ZipArchive;
 
 mod harness;
-use harness::{cargo_lambda_build, cargo_lambda_init, cargo_lambda_new, LambdaProjectExt};
+use harness::{
+    cargo_lambda_build, cargo_lambda_init, cargo_lambda_new, init_root, LambdaProjectExt,
+};
 
-#[cargo_test]
+#[test]
 fn test_build_basic_function() {
+    let _guard = init_root();
     let lp = cargo_lambda_new("test-basic-function");
 
     lp.new_cmd()
@@ -25,8 +27,9 @@ fn test_build_basic_function() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
+#[test]
 fn test_build_basic_zip_function() {
+    let _guard = init_root();
     let lp = cargo_lambda_new("test-basic-function");
 
     lp.new_cmd()
@@ -52,8 +55,9 @@ fn test_build_basic_zip_function() {
     );
 }
 
-#[cargo_test]
+#[test]
 fn test_build_http_function() {
+    let _guard = init_root();
     let lp = cargo_lambda_new("test-http-function");
 
     lp.new_cmd().arg("--http").arg(&lp.name).assert().success();
@@ -65,8 +69,9 @@ fn test_build_http_function() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
+#[test]
 fn test_build_http_feature_function() {
+    let _guard = init_root();
     let lp = cargo_lambda_new("test-http-function");
 
     lp.new_cmd()
@@ -83,8 +88,9 @@ fn test_build_http_feature_function() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
+#[test]
 fn test_build_event_type_function() {
+    let _guard = init_root();
     let lp = cargo_lambda_new("test-event-type-function");
 
     lp.new_cmd()
@@ -101,8 +107,9 @@ fn test_build_event_type_function() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
+#[test]
 fn test_build_basic_extension() {
+    let _guard = init_root();
     let lp = cargo_lambda_new("test-basic-extension");
 
     lp.new_cmd()
@@ -121,8 +128,9 @@ fn test_build_basic_extension() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
+#[test]
 fn test_build_logs_extension() {
+    let _guard = init_root();
     let lp = cargo_lambda_new("test-logs-extension");
 
     lp.new_cmd()
@@ -142,8 +150,9 @@ fn test_build_logs_extension() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
+#[test]
 fn test_build_telemetry_extension() {
+    let _guard = init_root();
     let lp = cargo_lambda_new("test-telemetry-extension");
 
     lp.new_cmd()
@@ -163,8 +172,9 @@ fn test_build_telemetry_extension() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
+#[test]
 fn test_init_subcommand() {
+    let _guard = init_root();
     let lp = cargo_lambda_init("test-basic-function");
     let root = lp.root();
 
@@ -182,8 +192,9 @@ fn test_init_subcommand() {
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 }
 
-#[cargo_test]
+#[test]
 fn test_init_subcommand_without_override() {
+    let _guard = init_root();
     let lp = cargo_lambda_init("test-basic-function");
     let root = lp.root();
 
@@ -212,8 +223,9 @@ fn test_init_subcommand_without_override() {
     assert_eq!(content, out);
 }
 
-#[cargo_test]
+#[test]
 fn test_build_basic_zip_extension() {
+    let _guard = init_root();
     let lp = cargo_lambda_new("test-basic-extension");
 
     lp.new_cmd()
@@ -241,8 +253,9 @@ fn test_build_basic_zip_extension() {
     );
 }
 
-#[cargo_test]
+#[test]
 fn test_build_internal_zip_extension() {
+    let _guard = init_root();
     let lp = cargo_lambda_new("test-internal-extension");
 
     lp.new_cmd()
