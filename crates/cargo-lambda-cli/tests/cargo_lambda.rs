@@ -283,3 +283,41 @@ fn test_build_internal_zip_extension() {
         zip.file_names().collect::<Vec<&str>>().join(", ")
     );
 }
+
+#[test]
+fn test_build_example() {
+    let _guard = init_root();
+    let lp = cargo_lambda_new("test-example");
+    lp.new_cmd()
+        .arg("--no-interactive")
+        .arg(&lp.name)
+        .assert()
+        .success();
+
+    let project = lp.test_project();
+    let root = project.root();
+
+    let examples_dir = root.join("examples");
+    let example = examples_dir.join("example-lambda.rs");
+    create_dir_all(examples_dir).expect("failed to create examples directory");
+
+    let mut example_file = File::create(&example).expect("failed to create main.rs file");
+    let content = r#"fn main() {
+        println!("Hello, world!");
+    }"#;
+    example_file
+        .write_all(content.as_bytes())
+        .expect("failed to create example content");
+    example_file.flush().unwrap();
+
+    cargo_lambda_build(project.root())
+        .arg("--examples")
+        .assert()
+        .success();
+
+    let bin = project.lambda_function_bin("example-lambda");
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
+
+    let bin = project.lambda_function_bin("test-example");
+    assert!(!bin.exists(), "{:?} exists, but it shoudn't", bin);
+}
