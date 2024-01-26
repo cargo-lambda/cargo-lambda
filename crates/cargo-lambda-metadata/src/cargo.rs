@@ -197,10 +197,13 @@ pub fn binary_targets_from_metadata(
 ) -> HashSet<String> {
     let condition = |target: &&Target| {
         if build_examples {
-            return target.kind.iter().any(|k| k == "example")
+            // Several targets can have `crate_type` be `bin`, we're only
+            // interested in the ones which `kind` is `bin` or `example`.
+            // See https://doc.rust-lang.org/cargo/commands/cargo-metadata.html?highlight=targets%20metadata#json-format
+            return target.kind.iter().any(|k| k == "bin" || k == "example")
                 && target.crate_types.iter().any(|t| t == "bin");
         } else {
-            return target.kind.iter().any(|t| t == "bin");
+            return target.kind.iter().any(|k| k == "bin");
         }
     };
 
@@ -444,7 +447,7 @@ pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig, 
 /// Use this function when the user didn't provide any funcion name
 /// assuming that there is only one binary in the project
 pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String, MetadataError> {
-    let targets = binary_targets(manifest_path, false)?;
+    let targets = binary_targets(manifest_path, true)?;
     if targets.len() > 1 {
         Err(MetadataError::MultipleBinariesInProject)?;
     } else if targets.is_empty() {
