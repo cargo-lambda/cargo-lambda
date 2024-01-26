@@ -131,7 +131,7 @@ impl Watch {
 
         let env = self.env_options.lambda_environment().into_diagnostic()?;
 
-        let binary_packages = binary_targets(&cargo_options.manifest_path)
+        let binary_packages = binary_targets(&cargo_options.manifest_path, false)
             .map_err(ServerError::FailedToReadMetadata)?;
         let start_function = match binary_packages.len() {
             0 => Err(ServerError::NoBinaryPackages)?,

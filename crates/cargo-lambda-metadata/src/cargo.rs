@@ -1,5 +1,6 @@
 use aws_sdk_lambda::types::Environment;
 pub use cargo_metadata::Metadata as CargoMetadata;
+use cargo_metadata::Target;
 use miette::Result;
 use serde::Deserialize;
 use std::{
@@ -184,20 +185,29 @@ impl DeployConfig {
 /// Extract all the binary target names from a Cargo.toml file
 pub fn binary_targets<P: AsRef<Path> + Debug>(
     manifest_path: P,
+    build_examples: bool,
 ) -> Result<HashSet<String>, MetadataError> {
     let metadata = load_metadata(manifest_path)?;
-    Ok(binary_targets_from_metadata(&metadata))
+    Ok(binary_targets_from_metadata(&metadata, build_examples))
 }
 
-pub fn binary_targets_from_metadata(metadata: &CargoMetadata) -> HashSet<String> {
+pub fn binary_targets_from_metadata(
+    metadata: &CargoMetadata,
+    build_examples: bool,
+) -> HashSet<String> {
+    let condition = |target: &&Target| {
+        if build_examples {
+            return target.kind.iter().any(|k| k == "example")
+                && target.crate_types.iter().any(|t| t == "bin");
+        } else {
+            return target.kind.iter().any(|t| t == "bin");
+        }
+    };
+
     metadata
         .packages
         .iter()
-        .flat_map(|p| {
-            p.targets
-                .iter()
-                .filter(|target| target.crate_types.contains(&"bin".to_owned()))
-        })
+        .flat_map(|p| p.targets.iter().filter(condition))
         .map(|target| target.name.clone())
         .collect::<_>()
 }
@@ -434,7 +444,7 @@ pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig, 
 /// Use this function when the user didn't provide any funcion name
 /// assuming that there is only one binary in the project
 pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String, MetadataError> {
-    let targets = binary_targets(manifest_path)?;
+    let targets = binary_targets(manifest_path, false)?;
     if targets.len() > 1 {
         Err(MetadataError::MultipleBinariesInProject)?;
     } else if targets.is_empty() {
@@ -507,14 +517,14 @@ mod tests {
 
     #[test]
     fn test_binary_packages() {
-        let bins = binary_targets(fixture("single-binary-package")).unwrap();
+        let bins = binary_targets(fixture("single-binary-package"), false).unwrap();
         assert_eq!(1, bins.len());
         assert!(bins.contains("basic-lambda"));
     }
 
     #[test]
     fn test_binary_packages_with_mutiple_bin_entries() {
-        let bins = binary_targets(fixture("multi-binary-package")).unwrap();
+        let bins = binary_targets(fixture("multi-binary-package"), false).unwrap();
         assert_eq!(5, bins.len());
         assert!(bins.contains("delete-product"));
         assert!(bins.contains("get-product"));
@@ -525,7 +535,7 @@ mod tests {
 
     #[test]
     fn test_binary_packages_with_workspace() {
-        let bins = binary_targets(fixture("workspace-package")).unwrap();
+        let bins = binary_targets(fixture("workspace-package"), false).unwrap();
         assert_eq!(2, bins.len());
         assert!(bins.contains("basic-lambda-1"));
         assert!(bins.contains("basic-lambda-2"));
@@ -533,14 +543,14 @@ mod tests {
 
     #[test]
     fn test_binary_packages_with_mixed_workspace() {
-        let bins = binary_targets(fixture("mixed-workspace-package")).unwrap();
+        let bins = binary_targets(fixture("mixed-workspace-package"), false).unwrap();
         assert_eq!(1, bins.len());
         assert!(bins.contains("function-crate"), "{:?}", bins);
     }
 
     #[test]
     fn test_binary_packages_with_missing_binary_info() {
-        let err = binary_targets(fixture("missing-binary-package")).unwrap_err();
+        let err = binary_targets(fixture("missing-binary-package"), false).unwrap_err();
         assert!(err
             .to_string()
             .contains("a [lib] section, or [[bin]] section must be present"));
@@ -758,5 +768,12 @@ mod tests {
             s3_tags.contains("team=Simple%20Storage%20Service"),
             "{s3_tags}"
         );
+    }
+
+    #[test]
+    fn test_example_packages() {
+        let bins = binary_targets(fixture("examples-package"), true).unwrap();
+        assert_eq!(1, bins.len());
+        assert!(bins.contains("example-lambda"));
     }
 }

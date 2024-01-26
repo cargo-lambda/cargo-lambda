@@ -146,7 +146,8 @@ impl Build {
 
         self.build.target = vec![target_arch.to_string()];
 
-        let binaries = binary_targets_from_metadata(&metadata);
+        let build_examples = self.build.examples || !self.build.example.is_empty();
+        let binaries = binary_targets_from_metadata(&metadata, build_examples);
         debug!(binaries = ?binaries, "found new target binaries to build");
 
         if !self.build.bin.is_empty() {
@@ -222,59 +223,58 @@ impl Build {
             target_dir.join("lambda")
         };
 
-        let base = target_dir
+        let mut base = target_dir
             .join(target_arch.rustc_target_without_glibc_version())
             .join(profile);
+        if build_examples {
+            base = base.join("examples");
+        }
 
         let mut found_binaries = false;
         for name in &binaries {
-            for base in [&base, &base.join("examples")] {
-                let binary = base.join(name);
-                debug!(binary = ?binary, exists = binary.exists(), "checking function binary");
+            let binary = base.join(name);
+            debug!(binary = ?binary, exists = binary.exists(), "checking function binary");
 
-                if binary.exists() {
-                    found_binaries = true;
+            if binary.exists() {
+                found_binaries = true;
 
-                    let bootstrap_dir = if self.extension {
-                        lambda_dir.join("extensions")
-                    } else {
-                        match self.flatten {
-                            Some(ref n) if n == name => lambda_dir.clone(),
-                            _ => lambda_dir.join(name),
-                        }
-                    };
-                    create_dir_all(&bootstrap_dir)
-                        .into_diagnostic()
-                        .wrap_err_with(|| {
-                            format!("error creating lambda directory {bootstrap_dir:?}")
-                        })?;
+                let bootstrap_dir = if self.extension {
+                    lambda_dir.join("extensions")
+                } else {
+                    match self.flatten {
+                        Some(ref n) if n == name => lambda_dir.clone(),
+                        _ => lambda_dir.join(name),
+                    }
+                };
+                create_dir_all(&bootstrap_dir)
+                    .into_diagnostic()
+                    .wrap_err_with(|| {
+                        format!("error creating lambda directory {bootstrap_dir:?}")
+                    })?;
 
-                    let bin_name = if self.extension {
-                        name.as_str()
-                    } else {
-                        "bootstrap"
-                    };
+                let bin_name = if self.extension {
+                    name.as_str()
+                } else {
+                    "bootstrap"
+                };
 
-                    match self.output_format {
-                        OutputFormat::Binary => {
-                            let output_location = bootstrap_dir.join(bin_name);
-                            copy_and_replace(&binary, &output_location)
+                match self.output_format {
+                    OutputFormat::Binary => {
+                        let output_location = bootstrap_dir.join(bin_name);
+                        copy_and_replace(&binary, &output_location)
                             .into_diagnostic()
                             .wrap_err_with(|| {
                                 format!("error moving the binary `{binary:?}` into the output location `{output_location:?}`")
                             })?;
-                        }
-                        OutputFormat::Zip => {
-                            let parent = if self.extension && !self.internal {
-                                Some("extensions")
-                            } else {
-                                None
-                            };
-                            zip_binary(bin_name, binary, bootstrap_dir, parent, None)?;
-                        }
                     }
-
-                    break;
+                    OutputFormat::Zip => {
+                        let parent = if self.extension && !self.internal {
+                            Some("extensions")
+                        } else {
+                            None
+                        };
+                        zip_binary(bin_name, binary, bootstrap_dir, parent, None)?;
+                    }
                 }
             }
         }
