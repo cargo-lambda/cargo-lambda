@@ -200,7 +200,7 @@ pub fn binary_targets_from_metadata(
             // Several targets can have `crate_type` be `bin`, we're only
             // interested in the ones which `kind` is `bin` or `example`.
             // See https://doc.rust-lang.org/cargo/commands/cargo-metadata.html?highlight=targets%20metadata#json-format
-            return target.kind.iter().any(|k| k == "bin" || k == "example")
+            return target.kind.iter().any(|k| k == "example")
                 && target.crate_types.iter().any(|t| t == "bin");
         } else {
             return target.kind.iter().any(|k| k == "bin");
@@ -447,7 +447,7 @@ pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig, 
 /// Use this function when the user didn't provide any funcion name
 /// assuming that there is only one binary in the project
 pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String, MetadataError> {
-    let targets = binary_targets(manifest_path, true)?;
+    let targets = binary_targets(manifest_path, false)?;
     if targets.len() > 1 {
         let mut vec = targets.into_iter().collect::<Vec<_>>();
         vec.sort();
@@ -778,8 +778,7 @@ mod tests {
     #[test]
     fn test_example_packages() {
         let bins = binary_targets(fixture("examples-package"), true).unwrap();
-        assert_eq!(2, bins.len());
+        assert_eq!(1, bins.len());
         assert!(bins.contains("example-lambda"));
-        assert!(bins.contains("basic-lambda"));
     }
 }
