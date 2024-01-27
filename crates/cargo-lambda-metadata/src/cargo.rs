@@ -1,5 +1,6 @@
 use aws_sdk_lambda::types::Environment;
 pub use cargo_metadata::Metadata as CargoMetadata;
+use cargo_metadata::Target;
 use miette::Result;
 use serde::Deserialize;
 use std::{
@@ -184,20 +185,32 @@ impl DeployConfig {
 /// Extract all the binary target names from a Cargo.toml file
 pub fn binary_targets<P: AsRef<Path> + Debug>(
     manifest_path: P,
+    build_examples: bool,
 ) -> Result<HashSet<String>, MetadataError> {
     let metadata = load_metadata(manifest_path)?;
-    Ok(binary_targets_from_metadata(&metadata))
+    Ok(binary_targets_from_metadata(&metadata, build_examples))
 }
 
-pub fn binary_targets_from_metadata(metadata: &CargoMetadata) -> HashSet<String> {
+pub fn binary_targets_from_metadata(
+    metadata: &CargoMetadata,
+    build_examples: bool,
+) -> HashSet<String> {
+    let condition = |target: &&Target| {
+        if build_examples {
+            // Several targets can have `crate_type` be `bin`, we're only
+            // interested in the ones which `kind` is `bin` or `example`.
+            // See https://doc.rust-lang.org/cargo/commands/cargo-metadata.html?highlight=targets%20metadata#json-format
+            return target.kind.iter().any(|k| k == "bin" || k == "example")
+                && target.crate_types.iter().any(|t| t == "bin");
+        } else {
+            return target.kind.iter().any(|k| k == "bin");
+        }
+    };
+
     metadata
         .packages
         .iter()
-        .flat_map(|p| {
-            p.targets
-                .iter()
-                .filter(|target| target.crate_types.contains(&"bin".to_owned()))
-        })
+        .flat_map(|p| p.targets.iter().filter(condition))
         .map(|target| target.name.clone())
         .collect::<_>()
 }
@@ -434,17 +447,19 @@ pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig, 
 /// Use this function when the user didn't provide any funcion name
 /// assuming that there is only one binary in the project
 pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String, MetadataError> {
-    let targets = binary_targets(manifest_path)?;
+    let targets = binary_targets(manifest_path, true)?;
     if targets.len() > 1 {
-        Err(MetadataError::MultipleBinariesInProject)?;
+        let mut vec = targets.into_iter().collect::<Vec<_>>();
+        vec.sort();
+        Err(MetadataError::MultipleBinariesInProject(vec.join(", ")))
     } else if targets.is_empty() {
-        Err(MetadataError::MissingBinaryInProject)?;
+        Err(MetadataError::MissingBinaryInProject)
+    } else {
+        targets
+            .into_iter()
+            .next()
+            .ok_or_else(|| MetadataError::MissingBinaryInProject)
     }
-
-    targets
-        .into_iter()
-        .next()
-        .ok_or_else(|| MetadataError::MissingBinaryInProject)
 }
 
 fn merge_deploy_config(base: &DeployConfig, package_deploy: &DeployConfig) -> DeployConfig {
@@ -507,14 +522,14 @@ mod tests {
 
     #[test]
     fn test_binary_packages() {
-        let bins = binary_targets(fixture("single-binary-package")).unwrap();
+        let bins = binary_targets(fixture("single-binary-package"), false).unwrap();
         assert_eq!(1, bins.len());
         assert!(bins.contains("basic-lambda"));
     }
 
     #[test]
     fn test_binary_packages_with_mutiple_bin_entries() {
-        let bins = binary_targets(fixture("multi-binary-package")).unwrap();
+        let bins = binary_targets(fixture("multi-binary-package"), false).unwrap();
         assert_eq!(5, bins.len());
         assert!(bins.contains("delete-product"));
         assert!(bins.contains("get-product"));
@@ -525,7 +540,7 @@ mod tests {
 
     #[test]
     fn test_binary_packages_with_workspace() {
-        let bins = binary_targets(fixture("workspace-package")).unwrap();
+        let bins = binary_targets(fixture("workspace-package"), false).unwrap();
         assert_eq!(2, bins.len());
         assert!(bins.contains("basic-lambda-1"));
         assert!(bins.contains("basic-lambda-2"));
@@ -533,14 +548,14 @@ mod tests {
 
     #[test]
     fn test_binary_packages_with_mixed_workspace() {
-        let bins = binary_targets(fixture("mixed-workspace-package")).unwrap();
+        let bins = binary_targets(fixture("mixed-workspace-package"), false).unwrap();
         assert_eq!(1, bins.len());
         assert!(bins.contains("function-crate"), "{:?}", bins);
     }
 
     #[test]
     fn test_binary_packages_with_missing_binary_info() {
-        let err = binary_targets(fixture("missing-binary-package")).unwrap_err();
+        let err = binary_targets(fixture("missing-binary-package"), false).unwrap_err();
         assert!(err
             .to_string()
             .contains("a [lib] section, or [[bin]] section must be present"));
@@ -729,7 +744,7 @@ mod tests {
         let manifest_path = fixture("multi-binary-package");
         let err = main_binary(manifest_path).unwrap_err();
         assert_eq!(
-            "there are more than one binary in the project, you must specify a binary name",
+            "there are more than one binary in the project, please specify a binary name with --binary-name or --binary-path. This is the list of binaries I found: delete-product, dynamodb-streams, get-product, get-products, put-product",
             err.to_string()
         );
     }
@@ -758,5 +773,13 @@ mod tests {
             s3_tags.contains("team=Simple%20Storage%20Service"),
             "{s3_tags}"
         );
+    }
+
+    #[test]
+    fn test_example_packages() {
+        let bins = binary_targets(fixture("examples-package"), true).unwrap();
+        assert_eq!(2, bins.len());
+        assert!(bins.contains("example-lambda"));
+        assert!(bins.contains("basic-lambda"));
     }
 }
