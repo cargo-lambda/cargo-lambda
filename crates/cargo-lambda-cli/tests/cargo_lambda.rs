@@ -6,8 +6,8 @@ use zip::ZipArchive;
 
 mod harness;
 use harness::{
-    cargo_lambda_build, cargo_lambda_init, cargo_lambda_new, init_root, CargoPathExt,
-    LambdaProjectExt,
+    cargo_lambda_build, cargo_lambda_dry_deploy, cargo_lambda_init, cargo_lambda_new, init_root,
+    CargoPathExt, LambdaProjectExt,
 };
 
 #[test]
@@ -26,6 +26,13 @@ fn test_build_basic_function() {
 
     let bin = project.lambda_function_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
+
+    cargo_lambda_dry_deploy(project.root()).assert().success();
+    cargo_lambda_dry_deploy(project.root())
+        .arg("--binary-name")
+        .arg(&lp.name)
+        .assert()
+        .success();
 }
 
 #[test]
@@ -68,6 +75,13 @@ fn test_build_http_function() {
 
     let bin = project.lambda_function_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
+
+    cargo_lambda_dry_deploy(project.root()).assert().success();
+    cargo_lambda_dry_deploy(project.root())
+        .arg("--binary-name")
+        .arg(&lp.name)
+        .assert()
+        .success();
 }
 
 #[test]
@@ -127,6 +141,12 @@ fn test_build_basic_extension() {
 
     let bin = project.lambda_extension_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
+
+    cargo_lambda_dry_deploy(project.root())
+        .arg("--extension")
+        .arg(&lp.name)
+        .assert()
+        .success();
 }
 
 #[test]
@@ -323,6 +343,12 @@ fn test_build_example() {
     let bin = project.lambda_function_bin(&lp.name);
     assert!(!bin.exists(), "{:?} exists, but it shoudn't", bin);
 
+    cargo_lambda_dry_deploy(project.root())
+        .arg("--binary-name")
+        .arg("example-lambda")
+        .assert()
+        .success();
+
     project.lambda_dir().rm_rf();
 
     // Build project and check that only the main binary is in the Lambda directory.
@@ -338,4 +364,11 @@ fn test_build_example() {
         &lp.name,
         project.lambda_dir().ls_r()
     );
+
+    cargo_lambda_dry_deploy(project.root()).assert().success();
+    cargo_lambda_dry_deploy(project.root())
+        .arg("--binary-name")
+        .arg(&lp.name)
+        .assert()
+        .success();
 }

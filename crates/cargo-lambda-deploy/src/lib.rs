@@ -25,10 +25,29 @@ enum OutputFormat {
 }
 
 #[derive(Serialize)]
+struct DryOutput {
+    kind: String,
+    name: String,
+    path: PathBuf,
+    runtimes: Vec<String>,
+}
+
+impl std::fmt::Display for DryOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "🔍 deployment for {} `{}`:", self.kind, self.name)?;
+        write!(f, "🏠 binary located at {}", self.path.display())?;
+        write!(f, "👟 running on {}", self.runtimes.join(", "))?;
+
+        Ok(())
+    }
+}
+
+#[derive(Serialize)]
 #[serde(untagged)]
 enum DeployResult {
     Extension(extensions::DeployOutput),
     Function(functions::DeployOutput),
+    Dry(DryOutput),
 }
 
 impl std::fmt::Display for DeployResult {
@@ -36,6 +55,7 @@ impl std::fmt::Display for DeployResult {
         match self {
             DeployResult::Extension(o) => o.fmt(f),
             DeployResult::Function(o) => o.fmt(f),
+            DeployResult::Dry(o) => o.fmt(f),
         }
     }
 }
@@ -108,6 +128,10 @@ pub struct Deploy {
     #[arg(short, long)]
     include: Option<Vec<PathBuf>>,
 
+    /// Perform all the operations to locate and package the binary to deploy, but don't do the final deploy.
+    #[arg(long)]
+    dry: bool,
+
     /// Name of the function or extension to deploy
     #[arg(value_name = "NAME")]
     name: Option<String>,
@@ -153,7 +177,9 @@ impl Deploy {
             tags = self.tag.clone();
         }
 
-        let result = if self.extension {
+        let result = if self.dry {
+            Ok(self.dry_output(&name, &archive))
+        } else if self.extension {
             extensions::deploy(
                 &name,
                 &self.manifest_path,
@@ -245,6 +271,28 @@ impl Deploy {
             }
         };
         Ok(arc)
+    }
+
+    fn dry_output(&self, name: &str, archive: &BinaryArchive) -> DeployResult {
+        let (kind, name, runtimes) = if self.extension {
+            (
+                "extension",
+                name.to_owned(),
+                self.compatible_runtimes.clone(),
+            )
+        } else {
+            (
+                "function",
+                self.binary_name.clone().unwrap_or_else(|| name.to_owned()),
+                vec![self.function_config.runtime.clone()],
+            )
+        };
+        DeployResult::Dry(DryOutput {
+            kind: kind.to_string(),
+            path: archive.path.clone(),
+            name,
+            runtimes,
+        })
     }
 }
 
