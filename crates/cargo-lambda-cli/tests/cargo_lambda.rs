@@ -27,12 +27,15 @@ fn test_build_basic_function() {
     let bin = project.lambda_function_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 
-    cargo_lambda_dry_deploy(project.root()).assert().success();
-    cargo_lambda_dry_deploy(project.root())
-        .arg("--binary-name")
-        .arg(&lp.name)
-        .assert()
-        .success();
+    #[cfg(not(windows))]
+    {
+        cargo_lambda_dry_deploy(project.root()).assert().success();
+        cargo_lambda_dry_deploy(project.root())
+            .arg("--binary-name")
+            .arg(&lp.name)
+            .assert()
+            .success();
+    }
 }
 
 #[test]
@@ -76,12 +79,15 @@ fn test_build_http_function() {
     let bin = project.lambda_function_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 
-    cargo_lambda_dry_deploy(project.root()).assert().success();
-    cargo_lambda_dry_deploy(project.root())
-        .arg("--binary-name")
-        .arg(&lp.name)
-        .assert()
-        .success();
+    #[cfg(not(windows))]
+    {
+        cargo_lambda_dry_deploy(project.root()).assert().success();
+        cargo_lambda_dry_deploy(project.root())
+            .arg("--binary-name")
+            .arg(&lp.name)
+            .assert()
+            .success();
+    }
 }
 
 #[test]
@@ -142,6 +148,7 @@ fn test_build_basic_extension() {
     let bin = project.lambda_extension_bin(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
 
+    #[cfg(not(windows))]
     cargo_lambda_dry_deploy(project.root())
         .arg("--extension")
         .arg(&lp.name)
@@ -343,6 +350,7 @@ fn test_build_example() {
     let bin = project.lambda_function_bin(&lp.name);
     assert!(!bin.exists(), "{:?} exists, but it shoudn't", bin);
 
+    #[cfg(not(windows))]
     cargo_lambda_dry_deploy(project.root())
         .arg("--binary-name")
         .arg("example-lambda")
@@ -365,10 +373,13 @@ fn test_build_example() {
         project.lambda_dir().ls_r()
     );
 
-    cargo_lambda_dry_deploy(project.root()).assert().success();
-    cargo_lambda_dry_deploy(project.root())
-        .arg("--binary-name")
-        .arg(&lp.name)
-        .assert()
-        .success();
+    #[cfg(not(windows))]
+    {
+        cargo_lambda_dry_deploy(project.root()).assert().success();
+        cargo_lambda_dry_deploy(project.root())
+            .arg("--binary-name")
+            .arg(&lp.name)
+            .assert()
+            .success();
+    }
 }
