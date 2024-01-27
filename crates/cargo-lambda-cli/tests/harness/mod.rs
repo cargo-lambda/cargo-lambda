@@ -95,6 +95,16 @@ pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {
         .current_dir(path)
 }
 
+pub fn cargo_lambda_dry_deploy<P: AsRef<Path>>(path: P) -> Command {
+    let path = path.as_ref();
+
+    Command::cargo_lambda()
+        .arg("lambda")
+        .arg("deploy")
+        .arg("--dry")
+        .current_dir(path)
+}
+
 fn cargo_exe() -> std::path::PathBuf {
     snapbox::cmd::cargo_bin("cargo-lambda")
 }
