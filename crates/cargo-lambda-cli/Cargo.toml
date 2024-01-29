@@ -41,3 +41,17 @@ url = "2.5.0"
 uuid.workspace = true
 walkdir = "2.4.0"
 zip.workspace = true
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/cargo-lambda-v{ version }.{ target }.tar.gz"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/v{ version }/cargo-lambda-v{ version }.windows-x64.zip"
+pkg-fmt = "zip"
+
+[package.metadata.binstall.overrides.aarch64-apple-darwin]
+pkg-url = "{ repo }/releases/download/v{ version }/cargo-lambda-v{ version }.apple-darwin.tar.gz"
+
+[package.metadata.binstall.overrides.x86_64-apple-darwin]
+pkg-url = "{ repo }/releases/download/v{ version }/cargo-lambda-v{ version }.apple-darwin.tar.gz"

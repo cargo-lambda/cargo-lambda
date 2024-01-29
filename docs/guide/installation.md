@@ -52,6 +52,12 @@ You can also download any Cargo Lambda binary from the [Release page](https://gi
 When you download a binary directly, [Zig](https://ziglang.org) won't be installed for you.
 :::
 
+You can use a tool like [Cargo Binstall](https://github.com/cargo-bins/cargo-binstall) to automatically download a binary package from GitHub:
+
+```sh
+cargo binstall cargo-lambda
+```
+
 ## Building from source
 
 You can install cargo-lambda on your host machine with Cargo itself. This method is not recommended because the binary will be compiled in your system, which we cannot always guarantee. Using a package manager, or pre-built binaries is always more encouraged to have a functional service and avoid installation issues.
