@@ -5,10 +5,7 @@ use std::{
 use zip::ZipArchive;
 
 mod harness;
-use harness::{
-    cargo_lambda_build, cargo_lambda_dry_deploy, cargo_lambda_init, cargo_lambda_new, init_root,
-    CargoPathExt, LambdaProjectExt,
-};
+use harness::*;
 
 #[test]
 fn test_build_basic_function() {
@@ -379,6 +376,62 @@ fn test_build_example() {
         cargo_lambda_dry_deploy(project.root())
             .arg("--binary-name")
             .arg(&lp.name)
+            .assert()
+            .success();
+    }
+}
+
+#[test]
+#[cfg(not(windows))]
+fn test_deploy_workspace() {
+    let _guard = init_root();
+    let workspace = project().build();
+    let crates = workspace.root().join("crates");
+    crates.mkdir_p();
+
+    let lp_1 = cargo_lambda_new_in_root("p1", &crates);
+    lp_1.new_cmd()
+        .arg("--no-interactive")
+        .arg(&lp_1.name)
+        .assert()
+        .success();
+
+    let lp_2 = cargo_lambda_new_in_root("p2", &crates);
+    lp_2.new_cmd()
+        .arg("--no-interactive")
+        .arg(&lp_2.name)
+        .assert()
+        .success();
+
+    let mut manifest = File::create(&workspace.root().join("Cargo.toml"))
+        .expect("failed to create Cargo.toml file");
+    let content = format!(
+        r#"[workspace]
+resolver = "2"
+members = ["crates/{}", "crates/{}"]
+"#,
+        &lp_1.name, &lp_2.name
+    );
+    manifest
+        .write_all(content.as_bytes())
+        .expect("failed to create manifest content");
+    manifest.flush().unwrap();
+
+    cargo_lambda_build(workspace.root())
+        .arg("--package")
+        .arg(&lp_1.name)
+        .assert()
+        .success();
+
+    #[cfg(not(windows))]
+    {
+        cargo_lambda_dry_deploy(workspace.root())
+            .arg(&lp_1.name)
+            .assert()
+            .success();
+        cargo_lambda_dry_deploy(workspace.root())
+            .arg("--binary-name")
+            .arg(&lp_1.name)
             .assert()
             .success();
     }

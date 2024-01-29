@@ -1,13 +1,10 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use snapbox::cmd::Command;
 
 mod project;
 use project::Project;
-pub use project::{paths::init_root, CargoPathExt};
+pub use project::{paths::init_root, project, CargoPathExt};
 
 pub struct LambdaProject {
     pub name: String,
@@ -60,10 +57,13 @@ pub fn test_project<P: AsRef<Path>>(path: P) -> Project {
 
 pub fn cargo_lambda_new(project_name: &str) -> LambdaProject {
     let project = project::project().build();
+    cargo_lambda_new_in_root(project_name, &project.root())
+}
 
-    let cwd = dunce::canonicalize(project.root()).expect("failed to create canonical path");
+pub fn cargo_lambda_new_in_root(project_name: &str, root: &Path) -> LambdaProject {
+    let cwd = dunce::canonicalize(root).expect("failed to create canonical path");
     let name = format!("{}-{}", project_name, uuid::Uuid::new_v4());
-    let root = project.root().join(&name);
+    let root = root.join(&name);
 
     LambdaProject { name, root, cwd }
 }
@@ -72,7 +72,7 @@ pub fn cargo_lambda_init(project_name: &str) -> LambdaProject {
     let project = project::project().build();
 
     let cwd = dunce::canonicalize(project.root()).expect("failed to create canonical path");
-    fs::create_dir_all(&cwd).expect("failed to create project directory");
+    cwd.mkdir_p();
 
     let name = format!("{}-{}", project_name, uuid::Uuid::new_v4());
 
