@@ -382,7 +382,6 @@ fn test_build_example() {
 }
 
 #[test]
-#[cfg(not(windows))]
 fn test_deploy_workspace() {
     let _guard = init_root();
     let workspace = project().build();
