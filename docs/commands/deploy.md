@@ -16,6 +16,34 @@ The following video shows you how to use this subcommand:
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/ICUSfTorBnI" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
+## Working with multiple packages
+
+By default, Cargo Lambda tries to detect the binary that you built before deploying it. This can be challenging if you're working in a workspace with multiple Rust packages. There are multiple ways to provide the information about the package you want to deploy more explicitly in this subcommand.
+
+### Deploying a function with its same package name
+
+If you have multiple packages in a workspace, and you want to deploy one of them with the same name as it's function name, you can provide the name of the package as an argument to the deploy subcommand:
+
+```sh
+cargo lambda deploy PACKAGE_NAME
+```
+
+### Deploying a function with a different name than it's package name
+
+If you want to deploy a function with a different name than it's package name, you use the first argument to the subcommand as the function name, while using the flag `--binary-name` as the name of the package or binary to deploy:
+
+```sh
+cargo lambda deploy --binary-name PACKAGE_NAME FUNCTION_NAME
+```
+
+### Deploying a specific binary with a different function name
+
+You can also deploy a specific binary outside your target and assign a function name to it. You set the function name in the first argument to the subcommand, while using the flag `--binary-path` to provide the path to the binary. Keep in mind that the binary's name MUST be `bootstrap`:
+
+```sh
+cargo lambda deploy --binary-path PATH_TO_BOOTSTRAP_FILE FUNCTION_NAME
+```
+
 ## IAM Roles
 
 If you run this command without any flags, Cargo Lambda will try to create an execution role with Lambda's default service role policy `AWSLambdaBasicExecutionRole`.
