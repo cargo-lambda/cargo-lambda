@@ -31,11 +31,19 @@ env:
 
 jobs:
   test:
-    name: Test ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Test ${{ matrix.os.label }}
+    runs-on: ${{ matrix.os.runner }}
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os:
+          - label: MacOS (Intel)
+            runner: macos-12
+          - label: MacOS (ARM)
+            runner: macos-14
+          - label: Ubuntu Latest
+            runner: ubuntu-latest
+          - label: Windows Latest
+            runner: windows-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3

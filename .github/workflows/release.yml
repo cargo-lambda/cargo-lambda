@@ -12,13 +12,22 @@ env:
 
 jobs:
   release-macos:
-    runs-on: macos-latest
+    name: Release ${{ matrix.platform.label }}
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        platform:
+          - target: aarch64-apple-darwin
+            os: macos-14
+            label: MacOs (ARM)
+          - target: x86_64-apple-darwin
+            os: macos-12
+            label: MacOS (Intel)
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          target: aarch64-apple-darwin
       - name: Configure cache
         uses: mozilla-actions/sccache-action@v0.0.3
 
@@ -26,7 +35,8 @@ jobs:
         uses: messense/maturin-action@v1
         with:
           maturin-version: ${{ env.MATURIN_VERSION }}
-          args: --release --out dist --strip --universal2 -m crates/cargo-lambda-cli/Cargo.toml
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --strip -m crates/cargo-lambda-cli/Cargo.toml
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
@@ -35,7 +45,7 @@ jobs:
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: apple-darwin-${{ github.ref_name }}-bin
+          name: ${{ matrix.platform.target }}-${{ github.ref_name }}-bin
           path: target/release/cargo-lambda
           if-no-files-found: error
 
@@ -140,7 +150,8 @@ jobs:
       - name: Package macOS files
         working-directory: target/github-release
         run: |
-          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=apple-darwin
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=x86_64-apple-darwin
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=aarch64-apple-darwin
 
       - name: Package Linux files
         working-directory: target/github-release
