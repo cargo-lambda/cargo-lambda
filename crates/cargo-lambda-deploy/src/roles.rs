@@ -1,5 +1,6 @@
 use aws_sdk_iam::Client as IamClient;
 use aws_sdk_sts::{Client as StsClient, Error};
+use aws_smithy_types::error::metadata::ProvideErrorMetadata;
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_remote::aws_sdk_config::SdkConfig;
 use miette::{IntoDiagnostic, Result, WrapErr};
@@ -98,10 +99,16 @@ async fn try_assume_role(client: &StsClient, role_arn: &str) -> Result<()> {
 
         match result {
             Ok(_) => return Ok(()),
-            Err(err) if attempt < 3 => match err {
-                Error::Unhandled(_) => sleep(Duration::from_secs(attempt * 5)).await,
-                other => {
-                    return Err(other)
+            Err(err) if attempt < 3 => match err.code() {
+                Some("AccessDenied") => {
+                    tracing::trace!(
+                        ?err,
+                        "role might not be fully propagated yet, waiting before retrying"
+                    );
+                    sleep(Duration::from_secs(attempt * 5)).await
+                }
+                _ => {
+                    return Err(err)
                         .into_diagnostic()
                         .wrap_err("failed to assume new lambda role")
                 }

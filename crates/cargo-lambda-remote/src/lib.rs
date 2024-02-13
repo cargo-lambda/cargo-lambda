@@ -3,6 +3,7 @@ use aws_config::{
     profile::{ProfileFileCredentialsProvider, ProfileFileRegionProvider},
     provider_config::ProviderConfig,
     retry::RetryConfig,
+    BehaviorVersion,
 };
 use aws_types::{region::Region, SdkConfig};
 use clap::Args;
@@ -43,12 +44,12 @@ impl RemoteConfig {
         let retry =
             retry.unwrap_or_else(|| RetryConfig::standard().with_max_attempts(self.retry_attempts));
         let mut config_loader = if let Some(ref endpoint_url) = self.endpoint_url {
-            aws_config::from_env()
+            aws_config::defaults(BehaviorVersion::latest())
                 .endpoint_url(endpoint_url)
                 .region(region_provider)
                 .retry_config(retry)
         } else {
-            aws_config::from_env()
+            aws_config::defaults(BehaviorVersion::latest())
                 .region(region_provider)
                 .retry_config(retry)
         };
@@ -85,8 +86,7 @@ pub use aws_sdk_lambda;
 
 #[cfg(test)]
 mod tests {
-    use aws_credential_types::provider::ProvideCredentials;
-    use aws_sdk_lambda::config::Region;
+    use aws_sdk_lambda::config::{ProvideCredentials, Region};
 
     use crate::RemoteConfig;
 
