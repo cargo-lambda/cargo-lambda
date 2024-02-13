@@ -97,7 +97,7 @@ impl FileBuilder {
         FileBuilder {
             path,
             body: body.to_string(),
-            executable: executable,
+            executable,
         }
     }
 
@@ -232,7 +232,7 @@ pub mod paths {
 
     fn set_global_root() {
         let mut lock = GLOBAL_ROOT
-            .get_or_init(|| Default::default())
+            .get_or_init(Default::default)
             .lock()
             .unwrap();
         if lock.is_none() {
@@ -245,7 +245,7 @@ pub mod paths {
 
     pub fn global_root() -> PathBuf {
         let lock = GLOBAL_ROOT
-            .get_or_init(|| Default::default())
+            .get_or_init(Default::default)
             .lock()
             .unwrap();
         match lock.as_ref() {

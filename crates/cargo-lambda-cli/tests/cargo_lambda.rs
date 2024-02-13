@@ -326,7 +326,7 @@ fn test_build_example() {
     let example = examples_dir.join("example-lambda.rs");
     create_dir_all(examples_dir).expect("failed to create examples directory");
 
-    let mut example_file = File::create(&example).expect("failed to create main.rs file");
+    let mut example_file = File::create(example).expect("failed to create main.rs file");
     let content = r#"fn main() {
         println!("Hello, world!");
     }"#;
@@ -402,7 +402,7 @@ fn test_deploy_workspace() {
         .assert()
         .success();
 
-    let mut manifest = File::create(&workspace.root().join("Cargo.toml"))
+    let mut manifest = File::create(workspace.root().join("Cargo.toml"))
         .expect("failed to create Cargo.toml file");
     let content = format!(
         r#"[workspace]

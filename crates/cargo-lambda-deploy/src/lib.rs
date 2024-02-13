@@ -35,9 +35,9 @@ struct DryOutput {
 
 impl std::fmt::Display for DryOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "🔍 deployment for {} `{}`:\n", self.kind, self.name)?;
-        write!(f, "🏠 binary located at {}\n", self.path.display())?;
-        write!(f, "🔗 architecture {}\n", self.arch)?;
+        writeln!(f, "🔍 deployment for {} `{}`:", self.kind, self.name)?;
+        writeln!(f, "🏠 binary located at {}", self.path.display())?;
+        writeln!(f, "🔗 architecture {}", self.arch)?;
         write!(f, "👟 running on {}", self.runtimes.join(", "))?;
 
         Ok(())
