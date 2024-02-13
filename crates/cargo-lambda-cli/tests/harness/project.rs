@@ -97,7 +97,7 @@ impl FileBuilder {
         FileBuilder {
             path,
             body: body.to_string(),
-            executable: executable,
+            executable,
         }
     }
 
@@ -231,10 +231,7 @@ pub mod paths {
     }
 
     fn set_global_root() {
-        let mut lock = GLOBAL_ROOT
-            .get_or_init(|| Default::default())
-            .lock()
-            .unwrap();
+        let mut lock = GLOBAL_ROOT.get_or_init(Default::default).lock().unwrap();
         if lock.is_none() {
             let mut root = global_root_legacy();
 
@@ -244,10 +241,7 @@ pub mod paths {
     }
 
     pub fn global_root() -> PathBuf {
-        let lock = GLOBAL_ROOT
-            .get_or_init(|| Default::default())
-            .lock()
-            .unwrap();
+        let lock = GLOBAL_ROOT.get_or_init(Default::default).lock().unwrap();
         match lock.as_ref() {
             Some(p) => p.clone(),
             None => unreachable!("GLOBAL_ROOT not set yet"),

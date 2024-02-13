@@ -29,13 +29,15 @@ struct DryOutput {
     kind: String,
     name: String,
     path: PathBuf,
+    arch: String,
     runtimes: Vec<String>,
 }
 
 impl std::fmt::Display for DryOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "🔍 deployment for {} `{}`:", self.kind, self.name)?;
-        write!(f, "🏠 binary located at {}", self.path.display())?;
+        writeln!(f, "🔍 deployment for {} `{}`:", self.kind, self.name)?;
+        writeln!(f, "🏠 binary located at {}", self.path.display())?;
+        writeln!(f, "🔗 architecture {}", self.arch)?;
         write!(f, "👟 running on {}", self.runtimes.join(", "))?;
 
         Ok(())
@@ -291,6 +293,7 @@ impl Deploy {
         DeployResult::Dry(DryOutput {
             kind: kind.to_string(),
             path: archive.path.clone(),
+            arch: archive.architecture.clone(),
             name,
             runtimes,
         })
