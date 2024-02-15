@@ -484,14 +484,17 @@ fn merge_configuration(
     }
 
     if function_config.role.is_some() {
+        deploy_metadata.use_for_update = true;
         deploy_metadata.iam_role = function_config.role.clone();
     }
 
     if function_config.layer.is_some() {
+        deploy_metadata.use_for_update = true;
         deploy_metadata.layers = function_config.layer.clone();
     }
 
     if function_config.memory.is_some() {
+        deploy_metadata.use_for_update = true;
         deploy_metadata.memory = function_config.memory.clone();
     }
 
@@ -505,6 +508,7 @@ fn merge_configuration(
 
     if let Some(timeout) = &function_config.timeout {
         if !timeout.is_zero() {
+            deploy_metadata.use_for_update = true;
             deploy_metadata.timeout = Some(timeout.clone())
         }
     }
@@ -839,7 +843,6 @@ mod tests {
     #[test]
     fn test_load_deploy_environment_empty_config() {
         let flags = FunctionDeployConfig {
-            role: Some("role-arn".into()),
             ..Default::default()
         };
 
@@ -852,8 +855,6 @@ mod tests {
             &Some(tags),
         )
         .unwrap();
-
-        assert_eq!(Some("role-arn".into()), config.iam_role);
 
         let mut tags = HashMap::new();
         tags.insert("team".to_string(), "s3".to_string());
@@ -884,6 +885,25 @@ mod tests {
 
         assert_eq!(Some("role-arn".into()), config.iam_role);
         assert_eq!("BAR", env.variables().unwrap()["FOO"]);
+        assert!(config.use_for_update);
+    }
+
+    #[test]
+    fn test_load_deploy_environment_with_memory_update() {
+        let flags = FunctionDeployConfig {
+            memory: Some(Memory::Mb1024),
+            ..Default::default()
+        };
+
+        let (_env, config) = load_deploy_environment(
+            &fixture("multi-binary-package"),
+            "basic-lambda",
+            &flags,
+            &None,
+        )
+        .unwrap();
+
+        assert_eq!(Some(Memory::Mb1024), config.memory);
         assert!(config.use_for_update);
     }
 }
