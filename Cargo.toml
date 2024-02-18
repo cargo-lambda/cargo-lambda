@@ -19,7 +19,8 @@ exclude = [
     "tests/fixtures/target-dir-set-in-project",
     "tests/fixtures/workspace-package",
     "tests/fixtures/single-binary-different-name",
-    "tests/fixtures/examples-package"
+    "tests/fixtures/examples-package",
+    "tests/fixtures/watch-multi-binary"
 ]
 
 resolver = "2"

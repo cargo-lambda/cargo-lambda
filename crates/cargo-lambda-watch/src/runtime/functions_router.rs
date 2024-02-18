@@ -2,15 +2,14 @@ use crate::{
     error::ServerError,
     requests::*,
     runtime::LAMBDA_RUNTIME_XRAY_TRACE_HEADER,
-    state::{ExtensionCache, RequestCache, ResponseCache},
+    state::{RequestCache, ResponseCache},
+    RefRuntimeState,
 };
 use axum::{
     body::Body,
-    extract::{Extension, Path},
+    extract::{Path, State},
     http::{Request, StatusCode},
     response::Response,
-    routing::{get, post},
-    Router,
 };
 use base64::{engine::general_purpose as b64, Engine as _};
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
@@ -23,69 +22,23 @@ pub(crate) const LAMBDA_RUNTIME_COGNITO_IDENTITY: &str = "lambda-runtime-cognito
 pub(crate) const LAMBDA_RUNTIME_DEADLINE_MS: &str = "lambda-runtime-deadline-ms";
 pub(crate) const LAMBDA_RUNTIME_FUNCTION_ARN: &str = "lambda-runtime-invoked-function-arn";
 
-pub(crate) fn routes() -> Router {
-    Router::new()
-        .route(
-            "/:function_name/2018-06-01/runtime/invocation/next",
-            get(next_request),
-        )
-        .route(
-            "/2018-06-01/runtime/invocation/next",
-            get(bare_next_request),
-        )
-        .route(
-            "/:function_name/2018-06-01/runtime/invocation/:req_id/response",
-            post(next_invocation_response),
-        )
-        .route(
-            "/2018-06-01/runtime/invocation/:req_id/response",
-            post(bare_next_invocation_response),
-        )
-        .route(
-            "/:function_name/2018-06-01/runtime/invocation/:req_id/error",
-            post(next_invocation_error),
-        )
-        .route(
-            "/2018-06-01/runtime/invocation/:req_id/error",
-            post(bare_next_invocation_error),
-        )
-        .route(
-            "/:function_name/2018-06-01/runtime/init/error",
-            post(init_error),
-        )
-        .route("/2018-06-01/runtime/init/error", post(bare_init_error))
-}
-
-async fn next_request(
-    Extension(ext_cache): Extension<ExtensionCache>,
-    Extension(req_cache): Extension<RequestCache>,
-    Extension(resp_cache): Extension<ResponseCache>,
+pub(crate) async fn next_request(
+    State(state): State<RefRuntimeState>,
     Path(function_name): Path<String>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
-    process_next_request(&ext_cache, &req_cache, &resp_cache, &function_name, &req).await
+    process_next_request(&state, &function_name, &req).await
 }
 
-async fn bare_next_request(
-    Extension(ext_cache): Extension<ExtensionCache>,
-    Extension(req_cache): Extension<RequestCache>,
-    Extension(resp_cache): Extension<ResponseCache>,
+pub(crate) async fn bare_next_request(
+    State(state): State<RefRuntimeState>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
-    process_next_request(
-        &ext_cache,
-        &req_cache,
-        &resp_cache,
-        DEFAULT_PACKAGE_FUNCTION,
-        &req,
-    )
-    .await
+    process_next_request(&state, DEFAULT_PACKAGE_FUNCTION, &req).await
 }
 
-async fn process_next_request(
-    ext_cache: &ExtensionCache,
-    req_cache: &RequestCache,
-    resp_cache: &ResponseCache,
+pub(crate) async fn process_next_request(
+    state: &RefRuntimeState,
     function_name: &str,
     req: &Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
@@ -105,7 +58,7 @@ async fn process_next_request(
         .header(LAMBDA_RUNTIME_DEADLINE_MS, 600_000_u32)
         .header(LAMBDA_RUNTIME_FUNCTION_ARN, "function-arn");
 
-    let resp = match req_cache.pop(function_name).await {
+    let resp = match state.req_cache.pop(function_name).await {
         None => builder.status(StatusCode::NO_CONTENT).body(Body::empty()),
         Some(invoke) => {
             let req_id = req_id
@@ -114,12 +67,12 @@ async fn process_next_request(
 
             debug!(req_id = ?req_id, function = ?function_name, "processing request");
             let next_event = NextEvent::invoke(req_id, &invoke);
-            ext_cache.send_event(next_event).await?;
+            state.ext_cache.send_event(next_event).await?;
 
             let (parts, body) = invoke.req.into_parts();
 
             let resp_tx = invoke.resp_tx;
-            resp_cache.push(req_id, resp_tx).await;
+            state.res_cache.push(req_id, resp_tx).await;
 
             let headers = parts.headers;
             if let Some(h) = headers.get(LAMBDA_RUNTIME_CLIENT_CONTEXT) {
@@ -144,36 +97,48 @@ async fn process_next_request(
     resp.map_err(ServerError::ResponseBuild)
 }
 
-async fn next_invocation_response(
-    Extension(cache): Extension<ResponseCache>,
+pub(crate) async fn next_invocation_response(
+    State(state): State<RefRuntimeState>,
     Path((_function_name, req_id)): Path<(String, String)>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
-    respond_to_next_invocation(&cache, &req_id, req, StatusCode::OK).await
+    respond_to_next_invocation(&state.res_cache, &req_id, req, StatusCode::OK).await
 }
 
-async fn bare_next_invocation_response(
-    Extension(cache): Extension<ResponseCache>,
+pub(crate) async fn bare_next_invocation_response(
+    State(state): State<RefRuntimeState>,
     Path(req_id): Path<String>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
-    respond_to_next_invocation(&cache, &req_id, req, StatusCode::OK).await
+    respond_to_next_invocation(&state.res_cache, &req_id, req, StatusCode::OK).await
 }
 
-async fn next_invocation_error(
-    Extension(cache): Extension<ResponseCache>,
+pub(crate) async fn next_invocation_error(
+    State(state): State<RefRuntimeState>,
     Path((_function_name, req_id)): Path<(String, String)>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
-    respond_to_next_invocation(&cache, &req_id, req, StatusCode::INTERNAL_SERVER_ERROR).await
+    respond_to_next_invocation(
+        &state.res_cache,
+        &req_id,
+        req,
+        StatusCode::INTERNAL_SERVER_ERROR,
+    )
+    .await
 }
 
-async fn bare_next_invocation_error(
-    Extension(cache): Extension<ResponseCache>,
+pub(crate) async fn bare_next_invocation_error(
+    State(state): State<RefRuntimeState>,
     Path(req_id): Path<String>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
-    respond_to_next_invocation(&cache, &req_id, req, StatusCode::INTERNAL_SERVER_ERROR).await
+    respond_to_next_invocation(
+        &state.res_cache,
+        &req_id,
+        req,
+        StatusCode::INTERNAL_SERVER_ERROR,
+    )
+    .await
 }
 
 async fn respond_to_next_invocation(
@@ -193,19 +158,19 @@ async fn respond_to_next_invocation(
     Ok(Response::new(Body::empty()))
 }
 
-async fn init_error(
-    Extension(cache): Extension<RequestCache>,
+pub(crate) async fn init_error(
+    State(state): State<RefRuntimeState>,
     Path(_function_name): Path<String>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
-    respond_to_invocation(&cache, req, StatusCode::OK).await
+    respond_to_invocation(&state.req_cache, req, StatusCode::OK).await
 }
 
-async fn bare_init_error(
-    Extension(cache): Extension<RequestCache>,
+pub(crate) async fn bare_init_error(
+    State(state): State<RefRuntimeState>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
-    respond_to_invocation(&cache, req, StatusCode::OK).await
+    respond_to_invocation(&state.req_cache, req, StatusCode::OK).await
 }
 
 async fn respond_to_invocation(

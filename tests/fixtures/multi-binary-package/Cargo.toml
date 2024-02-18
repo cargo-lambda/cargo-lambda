@@ -68,6 +68,5 @@ required-features = ["lambda"]
 [package.metadata.lambda.bin.get-product.env]
 FOO = "BAR"
 
-
 [package.metadata.lambda.bin.delete-product.env]
 BAZ = "QUX"

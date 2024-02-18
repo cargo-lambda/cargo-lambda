@@ -18,7 +18,7 @@ description.workspace = true
 # and it will keep the alphabetic ordering for you.
 [dependencies]
 aws_lambda_events = { version = "0.6.3", features = ["apigw"] }
-axum = "0.5.4"
+axum = "0.6"
 base64.workspace = true
 cargo-lambda-invoke.workspace = true
 cargo-lambda-metadata.workspace = true

@@ -2,6 +2,7 @@ use crate::{
     error::ServerError,
     requests::*,
     runtime::{LAMBDA_RUNTIME_AWS_REQUEST_ID, LAMBDA_RUNTIME_XRAY_TRACE_HEADER},
+    RefRuntimeState,
 };
 use aws_lambda_events::{
     apigw::{
@@ -12,8 +13,7 @@ use aws_lambda_events::{
 };
 use axum::{
     body::Body,
-    extract::{Extension, Path},
-    handler::Handler,
+    extract::{Extension, Path, State},
     http::{response::Builder, HeaderValue, Request},
     response::Response,
     routing::{any, post},
@@ -24,8 +24,7 @@ use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
 use chrono::Utc;
 use hyper::{
     body::{to_bytes, HttpBody},
-    header::{self},
-    HeaderMap, StatusCode,
+    header, HeaderMap, StatusCode,
 };
 use miette::Result;
 use opentelemetry::{
@@ -34,29 +33,43 @@ use opentelemetry::{
     Context, KeyValue,
 };
 use query_map::QueryMap;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tokio::sync::{mpsc::Sender, oneshot};
 
 const LAMBDA_URL_PREFIX: &str = "lambda-url";
 
-pub(crate) fn routes() -> Router {
+pub(crate) fn routes() -> Router<RefRuntimeState> {
     Router::new()
         .route(
             "/2015-03-31/functions/:function_name/invocations",
             post(invoke_handler),
         )
         .route("/lambda-url/:function_name/*path", any(furls_handler))
-        .fallback(furls_handler.into_service())
+        .fallback(furls_handler)
 }
 
 async fn furls_handler(
+    State(state): State<RefRuntimeState>,
     Extension(cmd_tx): Extension<Sender<Action>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
+    tracing::debug!(path = %req.uri().path(), method = %req.method(), "http invocation received");
+
     let (parts, body) = req.into_parts();
     let uri = &parts.uri;
 
     let (function_name, mut path) = extract_path_parameters(uri.path());
+    tracing::trace!(%function_name, %path, "received request in furls handler");
+
+    if function_name == DEFAULT_PACKAGE_FUNCTION && !state.is_default_function_enabled() {
+        return respond_with_disabled_default_function(&state, false);
+    }
+
+    if function_name != DEFAULT_PACKAGE_FUNCTION {
+        if let Err(binaries) = state.is_function_available(&function_name) {
+            return respond_with_missing_function(&binaries);
+        }
+    }
 
     let headers = &parts.headers;
 
@@ -175,10 +188,24 @@ async fn furls_handler(
 }
 
 async fn invoke_handler(
+    State(state): State<RefRuntimeState>,
     Extension(cmd_tx): Extension<Sender<Action>>,
     Path(function_name): Path<String>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
+    tracing::debug!(%function_name, "invocation received");
+
+    if function_name == DEFAULT_PACKAGE_FUNCTION && !state.is_default_function_enabled() {
+        tracing::error!(available_functions = ?state.initial_functions, "the default function route is disabled, use /lambda-url/:function_name to trigger a function call");
+        return respond_with_disabled_default_function(&state, true);
+    }
+
+    if function_name != DEFAULT_PACKAGE_FUNCTION {
+        if let Err(binaries) = state.is_function_available(&function_name) {
+            return respond_with_missing_function(&binaries);
+        }
+    }
+
     let resp = schedule_invocation(&cmd_tx, function_name, req).await?;
     let status_code = resp
         .extensions()
@@ -260,7 +287,12 @@ fn extract_path_parameters(path: &str) -> (String, String) {
             if !new_path.starts_with('/') {
                 new_path = format!("/{new_path}");
             }
-            return (fun_name.to_string(), new_path);
+            let f = if fun_name.is_empty() {
+                DEFAULT_PACKAGE_FUNCTION.to_string()
+            } else {
+                fun_name.to_string()
+            };
+            return (f, new_path);
         }
     }
 
@@ -357,6 +389,49 @@ async fn create_buffered_response(
         .map_err(ServerError::InvalidStatusCode)?;
 
     Ok((status, resp_body))
+}
+
+fn respond_with_disabled_default_function(
+    state: &RefRuntimeState,
+    invoke_call: bool,
+) -> Result<Response<Body>, ServerError> {
+    let detail = if invoke_call {
+        "the default function route is disabled. To trigger a function call, add the name of a function as the invoke argument"
+    } else {
+        "the default function route is disabled, use /lambda-url/:function_name to trigger a function call"
+    };
+    tracing::error!(available_functions = ?state.initial_functions, detail);
+
+    let body = Body::from(
+        serde_json::json!({
+            "title": "Default function disabled",
+            "detail": format!("{}. Available functions: {:?}", detail, state.initial_functions),
+        })
+        .to_string(),
+    );
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(body)
+        .map_err(ServerError::ResponseBuild)
+}
+
+fn respond_with_missing_function(
+    binaries: &HashSet<String>,
+) -> Result<Response<Body>, ServerError> {
+    let detail = "that function doesn't exist as a binary in your project";
+    tracing::error!(available_functions = ?binaries, detail);
+
+    let body = Body::from(
+        serde_json::json!({
+            "title": "Missing function",
+            "detail": format!("{}. Available functions: {:?}", detail, binaries),
+        })
+        .to_string(),
+    );
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(body)
+        .map_err(ServerError::ResponseBuild)
 }
 
 #[cfg(test)]
