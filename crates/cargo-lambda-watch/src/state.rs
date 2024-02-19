@@ -1,11 +1,15 @@
 use crate::{
     error::ServerError,
     requests::{InvokeRequest, LambdaResponse, NextEvent},
+    RUNTIME_EMULATOR_PATH,
 };
+use cargo_lambda_metadata::cargo::binary_targets;
 use miette::Result;
 use mpsc::{channel, Receiver, Sender};
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{hash_map::Entry, HashMap, HashSet},
+    net::SocketAddr,
+    path::PathBuf,
     sync::Arc,
 };
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
@@ -14,9 +18,60 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub(crate) struct RuntimeState {
-    pub server_addr: String,
+    addr: SocketAddr,
+    runtime_addr: String,
+    manifest_path: PathBuf,
+    pub initial_functions: HashSet<String>,
     pub req_cache: RequestCache,
+    pub res_cache: ResponseCache,
     pub ext_cache: ExtensionCache,
+}
+
+pub(crate) type RefRuntimeState = Arc<RuntimeState>;
+
+impl RuntimeState {
+    pub(crate) fn new(
+        addr: SocketAddr,
+        manifest_path: PathBuf,
+        initial_functions: HashSet<String>,
+    ) -> RuntimeState {
+        RuntimeState {
+            addr,
+            manifest_path,
+            initial_functions,
+            runtime_addr: format!("http://{addr}{RUNTIME_EMULATOR_PATH}"),
+            req_cache: RequestCache::new(),
+            res_cache: ResponseCache::new(),
+            ext_cache: ExtensionCache::default(),
+        }
+    }
+
+    pub(crate) fn addresses(&self) -> (SocketAddr, String) {
+        (self.addr, self.runtime_addr.clone())
+    }
+
+    pub(crate) fn function_addr(&self, name: &str) -> String {
+        format!("{}/{}", &self.runtime_addr, name)
+    }
+
+    pub(crate) fn is_default_function_enabled(&self) -> bool {
+        self.initial_functions.len() == 1
+    }
+
+    pub(crate) fn is_function_available(&self, name: &str) -> Result<(), HashSet<String>> {
+        if self.initial_functions.contains(name) {
+            return Ok(());
+        }
+
+        match binary_targets(&self.manifest_path, false) {
+            Err(err) => {
+                tracing::error!(?err, "failed to load the project's binaries");
+                Err(self.initial_functions.clone())
+            }
+            Ok(binaries) if binaries.contains(name) => Ok(()),
+            Ok(binaries) => Err(binaries),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -38,6 +38,7 @@ async fn start_scheduler(
     loop {
         tokio::select! {
             Some(action) = req_rx.recv() => {
+                tracing::trace!(?action, "request action received");
                 let start_function_name = match action {
                     Action::Invoke(req) => {
                         state.req_cache.upsert(req).await?
@@ -45,12 +46,12 @@ async fn start_scheduler(
                     Action::Init => {
                         state.req_cache.init(DEFAULT_PACKAGE_FUNCTION).await;
                         Some(DEFAULT_PACKAGE_FUNCTION.into())
-                    }
+                    },
                 };
 
                 if watcher_config.start_function() {
                     if let Some(name) = start_function_name {
-                        let runtime_api = format!("{}/{}", &state.server_addr, &name);
+                        let runtime_api = state.function_addr(&name);
                         let gc_tx = gc_tx.clone();
                         let cargo_options = cargo_options.clone();
                         let watcher_config = watcher_config.clone();
@@ -79,9 +80,9 @@ async fn start_function(
     gc_tx: Sender<String>,
     ext_cache: ExtensionCache,
 ) -> Result<(), ServerError> {
-    info!(function = ?name, manifest = ?cargo_options.manifest_path, "starting lambda function");
-
     let cmd = cargo_command(&name, &cargo_options)?;
+    info!(function = ?name, manifest = ?cargo_options.manifest_path, ?cmd, "starting lambda function");
+
     watcher_config.bin_name = if is_valid_bin_name(&name) {
         Some(name.clone())
     } else {

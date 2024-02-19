@@ -25,11 +25,16 @@ pub(crate) struct WatcherConfig {
     pub ignore_changes: bool,
     pub only_lambda_apis: bool,
     pub env: HashMap<String, String>,
+    pub wait: bool,
 }
 
 impl WatcherConfig {
     pub(crate) fn start_function(&self) -> bool {
         !self.only_lambda_apis
+    }
+
+    pub(crate) fn send_function_init(&self) -> bool {
+        !self.only_lambda_apis && !self.wait
     }
 }
 

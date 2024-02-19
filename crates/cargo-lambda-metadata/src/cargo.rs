@@ -200,10 +200,10 @@ pub fn binary_targets_from_metadata(
             // Several targets can have `crate_type` be `bin`, we're only
             // interested in the ones which `kind` is `bin` or `example`.
             // See https://doc.rust-lang.org/cargo/commands/cargo-metadata.html?highlight=targets%20metadata#json-format
-            return target.kind.iter().any(|k| k == "example")
-                && target.crate_types.iter().any(|t| t == "bin");
+            target.kind.iter().any(|k| k == "example")
+                && target.crate_types.iter().any(|t| t == "bin")
         } else {
-            return target.kind.iter().any(|k| k == "bin");
+            target.kind.iter().any(|k| k == "bin")
         }
     };
 

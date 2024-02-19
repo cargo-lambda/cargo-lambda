@@ -10,11 +10,6 @@ repository.workspace = true
 keywords.workspace = true
 description.workspace = true
 
-# Use cargo-edit(https://github.com/killercup/cargo-edit#installation)
-# to manage dependencies.
-# Running `cargo add DEPENDENCY_NAME` will
-# add the latest version of a dependency to the list,
-# and it will keep the alphabetic ordering for you.
 [dependencies]
 cargo-lambda-interactive.workspace = true
 cargo-lambda-metadata.workspace = true

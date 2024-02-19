@@ -13,6 +13,7 @@ use std::{
     net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
     str::FromStr,
+    sync::Arc,
 };
 use tokio::time::Duration;
 use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle, Toplevel};
@@ -41,7 +42,7 @@ use watcher::WatcherConfig;
 
 use crate::{error::ServerError, requests::Action};
 
-const RUNTIME_EMULATOR_PATH: &str = "/.rt";
+pub(crate) const RUNTIME_EMULATOR_PATH: &str = "/.rt";
 
 #[derive(Args, Clone, Debug)]
 #[command(
@@ -121,8 +122,7 @@ impl Watch {
             .into_diagnostic()
             .wrap_err("invalid invoke address")?;
         let addr = SocketAddr::from((ip, self.invoke_port));
-        let ignore_changes = self.ignore_changes;
-        let only_lambda_apis = self.only_lambda_apis;
+
         let mut cargo_options = self.cargo_options.clone();
         cargo_options.color = color.into();
 
@@ -133,31 +133,33 @@ impl Watch {
 
         let binary_packages = binary_targets(&cargo_options.manifest_path, false)
             .map_err(ServerError::FailedToReadMetadata)?;
-        let start_function = match binary_packages.len() {
-            0 => Err(ServerError::NoBinaryPackages)?,
-            1 if self.send_function_init() => true,
-            _ => false,
-        };
+
+        if binary_packages.is_empty() {
+            Err(ServerError::NoBinaryPackages)?;
+        }
 
         let watcher_config = WatcherConfig {
             base,
             ignore_files,
-            ignore_changes,
-            only_lambda_apis,
+            ignore_changes: self.ignore_changes,
+            only_lambda_apis: self.only_lambda_apis,
             manifest_path: cargo_options.manifest_path.clone(),
             env: env.variables().cloned().unwrap_or_default(),
+            wait: self.wait,
             ..Default::default()
         };
+
+        let runtime_state =
+            RuntimeState::new(addr, cargo_options.manifest_path.clone(), binary_packages);
 
         let disable_cors = self.disable_cors;
         Toplevel::new(move |s| async move {
             s.start(SubsystemBuilder::new("Lambda server", move |s| {
                 start_server(
                     s,
-                    addr,
+                    runtime_state,
                     cargo_options,
                     watcher_config,
-                    start_function,
                     disable_cors,
                 )
             }));
@@ -185,10 +187,6 @@ impl Watch {
             builder.with_writer(std::io::sink()).install_simple()
         };
         tracing_opentelemetry::layer().with_tracer(tracer)
-    }
-
-    fn send_function_init(&self) -> bool {
-        !self.only_lambda_apis && !self.wait
     }
 }
 
@@ -232,47 +230,47 @@ async fn discover_ignore_files(base: &Path) -> Vec<ignore_files::IgnoreFile> {
 
 async fn start_server(
     subsys: SubsystemHandle,
-    addr: SocketAddr,
+    runtime_state: RuntimeState,
     cargo_options: CargoOptions,
     watcher_config: WatcherConfig,
-    init_function: bool,
     disable_cors: bool,
 ) -> Result<(), axum::Error> {
-    let server_addr = format!("http://{addr}{RUNTIME_EMULATOR_PATH}");
-
     let only_lambda_apis = watcher_config.only_lambda_apis;
+    let init_default_function =
+        runtime_state.is_default_function_enabled() && watcher_config.send_function_init();
 
-    let ext_cache = ExtensionCache::default();
-    let req_cache = RequestCache::new();
-    let runtime_state = RuntimeState {
-        server_addr: server_addr.clone(),
-        req_cache: req_cache.clone(),
-        ext_cache: ext_cache.clone(),
-    };
-
-    let req_tx = init_scheduler(&subsys, runtime_state, cargo_options, watcher_config).await;
+    let (socket_addr, runtime_addr) = runtime_state.addresses();
 
     let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
+    let req_tx = init_scheduler(
+        &subsys,
+        runtime_state.clone(),
+        cargo_options,
+        watcher_config,
+    )
+    .await;
 
+    let state_ref = Arc::new(runtime_state);
     let mut app = Router::new()
-        .merge(trigger_router::routes())
-        .nest(RUNTIME_EMULATOR_PATH, runtime::routes())
+        .merge(trigger_router::routes().with_state(state_ref.clone()))
+        .nest(
+            RUNTIME_EMULATOR_PATH,
+            runtime::routes().with_state(state_ref.clone()),
+        )
         .layer(SetRequestIdLayer::new(
             x_request_id.clone(),
             MakeRequestUuid,
         ))
         .layer(PropagateRequestIdLayer::new(x_request_id))
-        .layer(Extension(ext_cache))
         .layer(Extension(req_tx.clone()))
-        .layer(Extension(req_cache))
-        .layer(Extension(ResponseCache::new()))
         .layer(TraceLayer::new_for_http())
         .layer(CatchPanicLayer::new());
     if !disable_cors {
         app = app.layer(CorsLayer::very_permissive());
     }
+    let app = app.with_state(state_ref);
 
-    info!("invoke server listening on {}", addr);
+    info!(?socket_addr, "invoke server waiting for requests");
     if only_lambda_apis {
         info!("");
         info!("the flag --only_lambda_apis is active, the lambda function will not be started by Cargo Lambda");
@@ -282,10 +280,10 @@ async fn start_server(
         );
         info!("AWS_LAMBDA_FUNCTION_VERSION=1");
         info!("AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096");
-        info!("AWS_LAMBDA_RUNTIME_API={}", server_addr);
+        info!("AWS_LAMBDA_RUNTIME_API={}", runtime_addr);
         info!("AWS_LAMBDA_FUNCTION_NAME={DEFAULT_PACKAGE_FUNCTION}");
     } else {
-        let print_start_info = if init_function {
+        let print_start_info = if init_default_function {
             // This call ignores any error sending the action.
             // The function can still be lazy loaded later if there is any error.
             req_tx.send(Action::Init).await.is_err()
@@ -301,7 +299,7 @@ async fn start_server(
         }
     }
 
-    if let Err(error) = axum::Server::bind(&addr)
+    if let Err(error) = axum::Server::bind(&socket_addr)
         .serve(app.into_make_service())
         .with_graceful_shutdown(subsys.on_shutdown_requested())
         .await
