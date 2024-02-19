@@ -46,7 +46,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.platform.target }}-${{ github.ref_name }}-bin
-          path: target/release/cargo-lambda
+          path: target/${{ matrix.platform.target }}/release/cargo-lambda
           if-no-files-found: error
 
   release-windows:
