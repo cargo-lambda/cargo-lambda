@@ -11,8 +11,6 @@ repository.workspace = true
 keywords.workspace = true
 description.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 aws-config.workspace = true
 aws-sdk-lambda.workspace = true
