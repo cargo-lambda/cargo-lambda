@@ -13,3 +13,5 @@ The [watch](/commands/watch) subcommand boots a development server that emulates
 The [invoke](/commands/invoke) subcommand sends requests to the control plane emulator to test and debug interactions with your Lambda functions. This command can also be used to send requests to remote functions once deployed on AWS Lambda.
 
 The [deploy](/commands/deploy) subcommand uploads functions to AWS Lambda. You can use the same command to create new functions as well as update existent functions code.
+
+Cargo Lambda does not provide a command to delete the lambda once it is deployed. You can use the ```aws lambda delete-function --function-name NAME``` command from the AWS CLI.
