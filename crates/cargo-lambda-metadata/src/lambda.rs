@@ -2,7 +2,7 @@ use serde::{
     de::{Deserializer, Error, Visitor},
     Deserialize,
 };
-use std::{fmt, str::FromStr};
+use std::{fmt, str::FromStr, time::Duration};
 use strum_macros::{Display, EnumString};
 
 use crate::error::MetadataError;
@@ -17,6 +17,10 @@ impl Timeout {
 
     pub fn is_zero(&self) -> bool {
         self.0 == 0
+    }
+
+    pub fn duration(&self) -> Duration {
+        Duration::from_secs(self.0 as u64)
     }
 }
 
