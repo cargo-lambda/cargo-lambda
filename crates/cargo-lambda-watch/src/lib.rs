@@ -1,6 +1,6 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
 use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
-use cargo_lambda_metadata::{cargo::binary_targets, env::EnvOptions};
+use cargo_lambda_metadata::{cargo::binary_targets, env::EnvOptions, lambda::Timeout};
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
@@ -21,6 +21,7 @@ use tower_http::{
     catch_panic::CatchPanicLayer,
     cors::CorsLayer,
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
+    timeout::TimeoutLayer,
     trace::TraceLayer,
 };
 
@@ -87,6 +88,10 @@ pub struct Watch {
     #[arg(long)]
     disable_cors: bool,
 
+    /// How long the invoke request waits for a response
+    #[arg(long)]
+    timeout: Option<Timeout>,
+
     #[command(flatten)]
     cargo_options: CargoOptions,
 
@@ -109,6 +114,7 @@ struct CargoOptions {
     #[arg(long, short = 'r')]
     release: bool,
 
+    /// Change the color options in the `cargo run` command
     #[arg(skip)]
     color: String,
 }
@@ -153,6 +159,8 @@ impl Watch {
             RuntimeState::new(addr, cargo_options.manifest_path.clone(), binary_packages);
 
         let disable_cors = self.disable_cors;
+        let timeout = self.timeout.clone();
+
         Toplevel::new(move |s| async move {
             s.start(SubsystemBuilder::new("Lambda server", move |s| {
                 start_server(
@@ -161,6 +169,7 @@ impl Watch {
                     cargo_options,
                     watcher_config,
                     disable_cors,
+                    timeout,
                 )
             }));
         })
@@ -234,6 +243,7 @@ async fn start_server(
     cargo_options: CargoOptions,
     watcher_config: WatcherConfig,
     disable_cors: bool,
+    timeout: Option<Timeout>,
 ) -> Result<(), axum::Error> {
     let only_lambda_apis = watcher_config.only_lambda_apis;
     let init_default_function =
@@ -267,6 +277,9 @@ async fn start_server(
         .layer(CatchPanicLayer::new());
     if !disable_cors {
         app = app.layer(CorsLayer::very_permissive());
+    }
+    if let Some(timeout) = timeout {
+        app = app.layer(TimeoutLayer::new(timeout.duration()));
     }
     let app = app.with_state(state_ref);
 

@@ -37,9 +37,10 @@ tokio = { workspace = true, features = ["sync", "time"] }
 tokio-graceful-shutdown = "0.14.2"
 tower-http = { version = "0.3.3", features = [
     "catch-panic",
+    "cors",
     "request-id",
     "trace",
-    "cors",
+    "timeout",
 ] }
 tracing.workspace = true
 tracing-opentelemetry = "0.17.2"
