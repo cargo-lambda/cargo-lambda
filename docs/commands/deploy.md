@@ -186,10 +186,10 @@ tracing = "active"             # Tracing mode
 role = "role-full-arn"         # Function's execution role
 env_file = ".env.production"   # File to load environment variables from
 env = { "VAR1" = "VAL1" }      # Additional environment variables
-layers = [                     # List of layers to deploy with your function
-    "layer-full-arn"
-]
+layers = [ "layer-full-arn" ]  # List of layers to deploy with your function
 tags = { "team" = "lambda" }   # List of AWS resource tags for this function
+s3_bucket = "deploy-bucket"    # S3 bucket to upload the Lambda function to
+include = [ "README.md" ]      # Extra list of files to add to the zip bundle
 ```
 
 ## Deploying to S3

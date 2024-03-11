@@ -4,6 +4,7 @@ use crate::extract_tags;
 
 use super::DeployResult;
 use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
+use cargo_lambda_build::BinaryArchive;
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::function_deploy_metadata;
 use cargo_lambda_remote::{
@@ -33,7 +34,7 @@ pub(crate) async fn deploy(
     name: &str,
     manifest_path: &PathBuf,
     sdk_config: &SdkConfig,
-    binary_data: Vec<u8>,
+    binary_archive: &BinaryArchive,
     architecture: Architecture,
     compatible_runtimes: Vec<Runtime>,
     s3_bucket: &Option<String>,
@@ -42,16 +43,26 @@ pub(crate) async fn deploy(
 ) -> Result<DeployResult> {
     let lambda_client = LambdaClient::new(sdk_config);
 
-    let input = match s3_bucket {
+    let mut deploy_metadata = function_deploy_metadata(manifest_path, name)
+        .into_diagnostic()?
+        .unwrap_or_default();
+
+    if let Some(extra_files) = &deploy_metadata.include {
+        binary_archive.add_files(extra_files)?;
+    }
+
+    let deploy_bucket = deploy_metadata
+        .s3_bucket
+        .as_ref()
+        .or(s3_bucket.as_ref())
+        .cloned();
+
+    let input = match &deploy_bucket {
         None => LayerVersionContentInput::builder()
-            .zip_file(Blob::new(binary_data))
+            .zip_file(Blob::new(binary_archive.read()?))
             .build(),
         Some(bucket) => {
             progress.set_message("uploading binary to S3");
-
-            let mut deploy_metadata = function_deploy_metadata(manifest_path, name)
-                .into_diagnostic()?
-                .unwrap_or_default();
 
             if let Some(tags) = tags {
                 deploy_metadata.append_tags(extract_tags(tags));
@@ -62,7 +73,7 @@ pub(crate) async fn deploy(
                 .put_object()
                 .bucket(bucket)
                 .key(name)
-                .body(ByteStream::from(binary_data));
+                .body(ByteStream::from(binary_archive.read()?));
 
             if tags.is_some() {
                 operation = operation.set_tagging(deploy_metadata.s3_tags());

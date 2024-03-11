@@ -296,6 +296,46 @@ pub struct BinaryArchive {
     pub path: PathBuf,
 }
 
+impl BinaryArchive {
+    pub fn read(&self) -> Result<Vec<u8>> {
+        read(&self.path)
+            .into_diagnostic()
+            .wrap_err("failed to read binary archive")
+    }
+
+    pub fn add_files(&self, files: &Vec<PathBuf>) -> Result<()> {
+        trace!(?self.path, ?files, "adding files to zip file");
+        let zipfile = std::fs::File::open(&self.path).into_diagnostic()?;
+
+        let mut archive = zip::ZipArchive::new(zipfile).into_diagnostic()?;
+
+        // Open a new, empty archive for writing to
+        let tmp_dir = tempfile::tempdir().into_diagnostic()?;
+        let tmp_path = tmp_dir
+            .path()
+            .join(self.path.file_name().expect("missing zip file name"));
+        let tmp = File::create(&tmp_path).into_diagnostic()?;
+        let mut new_archive = zip::ZipWriter::new(tmp);
+
+        for i in 0..archive.len() {
+            let file = archive.by_index_raw(i).into_diagnostic()?;
+            new_archive.raw_copy_file(file).into_diagnostic()?;
+        }
+
+        include_files_in_zip(&mut new_archive, files)?;
+
+        new_archive
+            .finish()
+            .into_diagnostic()
+            .wrap_err_with(|| format!("failed to finish zip file `{}`", self.path.display()))?;
+
+        drop(archive);
+        drop(new_archive);
+        copy_and_replace(&tmp_path, &self.path).into_diagnostic()?;
+        Ok(())
+    }
+}
+
 /// Search for the bootstrap file for a function inside the target directory.
 /// If the binary file exists, it creates the zip archive and extracts its architecture by reading the binary.
 pub fn find_binary_archive<M, P>(

@@ -1,6 +1,7 @@
 use super::DeployResult;
 use crate::{extract_tags, roles};
 use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
+use cargo_lambda_build::BinaryArchive;
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::{
     cargo::{function_deploy_metadata, DeployConfig},
@@ -126,7 +127,7 @@ pub(crate) async fn deploy(
     sdk_config: &SdkConfig,
     s3_bucket: &Option<String>,
     tags: &Option<Vec<String>>,
-    binary_data: Vec<u8>,
+    binary_archive: &BinaryArchive,
     architecture: Architecture,
     progress: &Progress,
 ) -> Result<DeployResult> {
@@ -142,7 +143,7 @@ pub(crate) async fn deploy(
         sdk_config,
         s3_bucket,
         tags,
-        binary_data,
+        binary_archive,
         architecture,
         progress,
     )
@@ -185,7 +186,7 @@ async fn upsert_function(
     sdk_config: &SdkConfig,
     s3_bucket: &Option<String>,
     tags: &Option<Vec<String>>,
-    binary_data: Vec<u8>,
+    binary_archive: &BinaryArchive,
     architecture: Architecture,
     progress: &Progress,
 ) -> Result<(String, String)> {
@@ -203,6 +204,10 @@ async fn upsert_function(
                 .wrap_err("failed to fetch lambda function")
         }
     };
+
+    if let Some(extra_files) = &deploy_metadata.include {
+        binary_archive.add_files(extra_files)?;
+    }
 
     let tracing = deploy_metadata.tracing.clone();
     let tracing_config = TracingConfig::builder()
@@ -222,10 +227,11 @@ async fn upsert_function(
             debug!(role_arn = ?iam_role, config = ?deploy_metadata, "creating new function");
             progress.set_message("deploying function");
 
-            let code = match &s3_bucket {
+            let bucket = deploy_metadata.s3_bucket.as_ref().or(s3_bucket.as_ref());
+            let code = match bucket {
                 None => {
                     debug!("uploading zip to Lambda");
-                    let blob = Blob::new(binary_data);
+                    let blob = Blob::new(binary_archive.read()?);
                     FunctionCode::builder().zip_file(blob).build()
                 }
                 Some(bucket) => {
@@ -235,7 +241,7 @@ async fn upsert_function(
                         .put_object()
                         .bucket(bucket)
                         .key(name)
-                        .body(ByteStream::from(binary_data))
+                        .body(ByteStream::from(binary_archive.read()?))
                         .set_tagging(s3_tags)
                         .send()
                         .await
@@ -408,7 +414,7 @@ async fn upsert_function(
             match &s3_bucket {
                 None => {
                     debug!("uploading zip to Lambda");
-                    let blob = Blob::new(binary_data);
+                    let blob = Blob::new(binary_archive.read()?);
                     builder = builder.zip_file(blob)
                 }
                 Some(bucket) => {
@@ -419,7 +425,7 @@ async fn upsert_function(
                         .put_object()
                         .bucket(bucket)
                         .key(name)
-                        .body(ByteStream::from(binary_data));
+                        .body(ByteStream::from(binary_archive.read()?));
 
                     if s3_tags.is_some() {
                         operation = operation.set_tagging(s3_tags);
