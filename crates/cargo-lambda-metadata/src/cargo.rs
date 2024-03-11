@@ -130,6 +130,10 @@ pub struct DeployConfig {
     pub security_group_ids: Option<Vec<String>>,
     #[serde(default = "default_runtime")]
     pub runtime: String,
+    #[serde(default)]
+    pub include: Option<Vec<PathBuf>>,
+    #[serde(default)]
+    pub s3_bucket: Option<String>,
 }
 
 fn default_runtime() -> String {
@@ -492,6 +496,12 @@ fn merge_deploy_config(base: &DeployConfig, package_deploy: &DeployConfig) -> De
         new_config.security_group_ids = package_deploy.security_group_ids.clone();
     }
     new_config.runtime = package_deploy.runtime.clone();
+    if package_deploy.include.is_some() {
+        new_config.include = package_deploy.include.clone();
+    }
+    if package_deploy.s3_bucket.is_some() {
+        new_config.s3_bucket = package_deploy.s3_bucket.clone();
+    }
 
     tracing::debug!(ws_metadata = ?new_config, package_metadata = ?package_deploy, "finished merging deploy metadata");
     new_config

@@ -961,6 +961,7 @@ dependencies = [
  "sha2",
  "strum",
  "strum_macros",
+ "tempfile",
  "thiserror",
  "tokio",
  "toml 0.7.8",

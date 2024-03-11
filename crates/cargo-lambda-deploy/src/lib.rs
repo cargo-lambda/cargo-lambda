@@ -10,7 +10,7 @@ use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
 use serde_json::ser::to_string_pretty;
-use std::{collections::HashMap, fs::read, path::PathBuf, time::Duration};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 use strum_macros::{Display, EnumString};
 
 mod extensions;
@@ -170,10 +170,6 @@ impl Deploy {
             .map(|runtime| Runtime::from(runtime.as_str()))
             .collect::<Vec<_>>();
 
-        let binary_data = read(&archive.path)
-            .into_diagnostic()
-            .wrap_err("failed to read binary archive")?;
-
         let mut tags = self.tags.clone();
         if tags.is_none() {
             tags = self.tag.clone();
@@ -186,7 +182,7 @@ impl Deploy {
                 &name,
                 &self.manifest_path,
                 &sdk_config,
-                binary_data,
+                &archive,
                 architecture,
                 compatible_runtimes,
                 &self.s3_bucket,
@@ -205,7 +201,7 @@ impl Deploy {
                 &sdk_config,
                 &self.s3_bucket,
                 &tags,
-                binary_data,
+                &archive,
                 architecture,
                 &progress,
             )

@@ -31,7 +31,7 @@ query_map = { version = "^0.5", features = ["url-query"] }
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tempfile = "3.3.0"
+tempfile.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }
 tokio-graceful-shutdown = "0.14.2"
