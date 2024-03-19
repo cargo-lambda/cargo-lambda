@@ -1,5 +1,5 @@
 use super::DeployResult;
-use crate::{extract_tags, roles};
+use crate::roles;
 use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
 use cargo_lambda_build::BinaryArchive;
 use cargo_lambda_interactive::progress::Progress;
@@ -193,7 +193,7 @@ async fn upsert_function(
     let current_function = client.get_function().function_name(name).send().await;
 
     let (environment, deploy_metadata) =
-        load_deploy_environment(manifest_path, binary_name, function_config, tags)?;
+        load_deploy_environment(manifest_path, binary_name, function_config, tags, s3_bucket)?;
 
     let action = match current_function {
         Ok(fun) => FunctionAction::Update(Box::new(fun)),
@@ -227,8 +227,7 @@ async fn upsert_function(
             debug!(role_arn = ?iam_role, config = ?deploy_metadata, "creating new function");
             progress.set_message("deploying function");
 
-            let bucket = deploy_metadata.s3_bucket.as_ref().or(s3_bucket.as_ref());
-            let code = match bucket {
+            let code = match &deploy_metadata.s3_bucket {
                 None => {
                     debug!("uploading zip to Lambda");
                     let blob = Blob::new(binary_archive.read()?);
@@ -457,16 +456,22 @@ async fn upsert_function(
     ))
 }
 
-fn load_deploy_environment(
+pub(crate) fn load_deploy_environment(
     manifest_path: &PathBuf,
     binary_name: &str,
     function_config: &FunctionDeployConfig,
     tags: &Option<Vec<String>>,
+    s3_bucket: &Option<String>,
 ) -> Result<(Environment, DeployConfig)> {
-    let base = function_deploy_metadata(manifest_path, binary_name)
-        .into_diagnostic()?
-        .unwrap_or_else(|| function_config.to_deploy_config());
-    let (environment, deploy_metadata) = merge_configuration(&base, function_config, tags)?;
+    let base = function_deploy_metadata(
+        manifest_path,
+        binary_name,
+        tags,
+        s3_bucket,
+        function_config.to_deploy_config(),
+    )
+    .into_diagnostic()?;
+    let (environment, deploy_metadata) = merge_configuration(&base, function_config)?;
 
     debug!(env = ?environment.variables(), metadata = ?deploy_metadata, "loaded function metadata for deployment");
     Ok((environment, deploy_metadata))
@@ -475,13 +480,8 @@ fn load_deploy_environment(
 fn merge_configuration(
     base: &DeployConfig,
     function_config: &FunctionDeployConfig,
-    tags: &Option<Vec<String>>,
 ) -> Result<(Environment, DeployConfig)> {
     let mut deploy_metadata = base.clone();
-
-    if let Some(tags) = tags {
-        deploy_metadata.append_tags(extract_tags(tags));
-    }
 
     if let Some(tracing) = &function_config.tracing {
         if &deploy_metadata.tracing != tracing {
@@ -796,6 +796,7 @@ mod tests {
             "basic-lambda",
             &Default::default(),
             &None,
+            &None,
         )
         .unwrap();
 
@@ -830,6 +831,7 @@ mod tests {
             "basic-lambda",
             &flags,
             &Some(tags),
+            &None,
         )
         .unwrap();
 
@@ -859,6 +861,7 @@ mod tests {
             "basic-lambda",
             &flags,
             &Some(tags),
+            &None,
         )
         .unwrap();
 
@@ -886,6 +889,7 @@ mod tests {
             "basic-lambda",
             &flags,
             &None,
+            &None,
         )
         .unwrap();
 
@@ -905,6 +909,7 @@ mod tests {
             &fixture("multi-binary-package"),
             "basic-lambda",
             &flags,
+            &None,
             &None,
         )
         .unwrap();

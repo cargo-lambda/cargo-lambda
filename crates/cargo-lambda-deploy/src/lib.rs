@@ -1,16 +1,17 @@
 use aws_smithy_types::retry::{RetryConfig, RetryMode};
 use cargo_lambda_build::{find_binary_archive, zip_binary, BinaryArchive};
 use cargo_lambda_interactive::progress::Progress;
-use cargo_lambda_metadata::cargo::main_binary;
+use cargo_lambda_metadata::cargo::{function_deploy_metadata, main_binary, DeployConfig};
 use cargo_lambda_remote::{
     aws_sdk_lambda::types::{Architecture, Runtime},
     RemoteConfig,
 };
 use clap::{Args, ValueHint};
+use functions::load_deploy_environment;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
 use serde_json::ser::to_string_pretty;
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use std::{path::PathBuf, time::Duration};
 use strum_macros::{Display, EnumString};
 
 mod extensions;
@@ -31,6 +32,9 @@ struct DryOutput {
     path: PathBuf,
     arch: String,
     runtimes: Vec<String>,
+    tags: Option<String>,
+    bucket: Option<String>,
+    include: Option<Vec<PathBuf>>,
 }
 
 impl std::fmt::Display for DryOutput {
@@ -38,8 +42,23 @@ impl std::fmt::Display for DryOutput {
         writeln!(f, "🔍 deployment for {} `{}`:", self.kind, self.name)?;
         writeln!(f, "🏠 binary located at {}", self.path.display())?;
         writeln!(f, "🔗 architecture {}", self.arch)?;
-        write!(f, "👟 running on {}", self.runtimes.join(", "))?;
 
+        if let Some(tags) = &self.tags {
+            writeln!(f, "🏷️ tagged with {}", tags.replace(',', ", "))?;
+        }
+
+        if let Some(bucket) = &self.bucket {
+            writeln!(f, "🪣 stored on S3 bucket `{}`", bucket)?;
+        }
+
+        if let Some(paths) = &self.include {
+            writeln!(f, "🗃️ extra files included:")?;
+            for file in paths {
+                writeln!(f, "- {}", file.display())?;
+            }
+        }
+
+        write!(f, "👟 running on {}", self.runtimes.join(", "))?;
         Ok(())
     }
 }
@@ -131,7 +150,7 @@ pub struct Deploy {
     include: Option<Vec<PathBuf>>,
 
     /// Perform all the operations to locate and package the binary to deploy, but don't do the final deploy.
-    #[arg(long)]
+    #[arg(long, alias = "dry-run")]
     dry: bool,
 
     /// Name of the function or extension to deploy
@@ -176,7 +195,7 @@ impl Deploy {
         }
 
         let result = if self.dry {
-            Ok(self.dry_output(&name, &archive))
+            self.dry_output(&name, &archive, &tags)
         } else if self.extension {
             extensions::deploy(
                 &name,
@@ -191,7 +210,7 @@ impl Deploy {
             )
             .await
         } else {
-            let binary_name = self.binary_name.clone().unwrap_or_else(|| name.clone());
+            let binary_name = self.binary_name_or_default(&name);
             functions::deploy(
                 &name,
                 &binary_name,
@@ -256,10 +275,10 @@ impl Deploy {
                     (None, Some(bn)) => bn.clone(),
                     (None, None) => main_binary(&self.manifest_path).into_diagnostic()?,
                 };
-                let binary_name = self.binary_name.as_deref().unwrap_or(&name);
+                let binary_name = self.binary_name_or_default(&name);
 
                 let arc = find_binary_archive(
-                    binary_name,
+                    &binary_name,
                     &self.manifest_path,
                     &self.lambda_dir,
                     self.extension,
@@ -272,39 +291,57 @@ impl Deploy {
         Ok(arc)
     }
 
-    fn dry_output(&self, name: &str, archive: &BinaryArchive) -> DeployResult {
-        let (kind, name, runtimes) = if self.extension {
+    fn dry_output(
+        &self,
+        name: &str,
+        archive: &BinaryArchive,
+        tags: &Option<Vec<String>>,
+    ) -> Result<DeployResult> {
+        let (kind, name, runtimes, meta) = if self.extension {
+            let deploy_metadata = function_deploy_metadata(
+                &self.manifest_path,
+                name,
+                tags,
+                &self.s3_bucket,
+                DeployConfig::default(),
+            )
+            .into_diagnostic()?;
             (
                 "extension",
                 name.to_owned(),
                 self.compatible_runtimes.clone(),
+                deploy_metadata,
             )
         } else {
+            let binary_name = self.binary_name_or_default(name);
+            let (_, deploy_metadata) = load_deploy_environment(
+                &self.manifest_path,
+                &binary_name,
+                &self.function_config,
+                tags,
+                &self.s3_bucket,
+            )?;
             (
                 "function",
-                self.binary_name.clone().unwrap_or_else(|| name.to_owned()),
+                binary_name,
                 vec![self.function_config.runtime.clone()],
+                deploy_metadata,
             )
         };
-        DeployResult::Dry(DryOutput {
+
+        Ok(DeployResult::Dry(DryOutput {
             kind: kind.to_string(),
             path: archive.path.clone(),
             arch: archive.architecture.clone(),
+            bucket: meta.s3_bucket.clone(),
+            tags: meta.s3_tags(),
+            include: meta.include.clone(),
             name,
             runtimes,
-        })
-    }
-}
-
-pub(crate) fn extract_tags(tags: &Vec<String>) -> HashMap<String, String> {
-    let mut map = HashMap::new();
-
-    for var in tags {
-        let mut split = var.splitn(2, '=');
-        if let (Some(k), Some(v)) = (split.next(), split.next()) {
-            map.insert(k.to_string(), v.to_string());
-        }
+        }))
     }
 
-    map
+    fn binary_name_or_default(&self, name: &str) -> String {
+        self.binary_name.clone().unwrap_or_else(|| name.to_string())
+    }
 }

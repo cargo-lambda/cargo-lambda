@@ -142,12 +142,12 @@ fn default_runtime() -> String {
 
 impl DeployConfig {
     pub fn append_tags(&mut self, tags: HashMap<String, String>) {
-        match &self.tags {
-            None => self.tags = Some(tags),
+        self.tags = match &self.tags {
+            None => Some(tags),
             Some(base) => {
                 let mut new_tags = base.clone();
                 new_tags.extend(tags);
-                self.tags = Some(new_tags);
+                Some(new_tags)
             }
         }
     }
@@ -369,21 +369,18 @@ pub fn function_environment_metadata<P: AsRef<Path> + Debug>(
 pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
     manifest_path: P,
     name: &str,
-) -> Result<Option<DeployConfig>, MetadataError> {
+    tags: &Option<Vec<String>>,
+    s3_bucket: &Option<String>,
+    default: DeployConfig,
+) -> Result<DeployConfig, MetadataError> {
     let metadata = load_metadata(manifest_path)?;
     let ws_metadata: LambdaMetadata =
         serde_json::from_value(metadata.workspace_metadata).unwrap_or_default();
 
-    let mut config = ws_metadata.package.deploy;
+    let mut config = ws_metadata.package.deploy.unwrap_or(default);
 
     if let Some(package_metadata) = ws_metadata.bin.get(name) {
-        match (&config, &package_metadata.deploy) {
-            (None, Some(c)) => config = Some(c.clone()),
-            (Some(base), Some(c)) => {
-                config = Some(merge_deploy_config(base, c));
-            }
-            _ => {}
-        }
+        merge_deploy_config(&mut config, &package_metadata.deploy);
     }
 
     for pkg in &metadata.packages {
@@ -392,29 +389,28 @@ pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
                 && target.kind.iter().any(|kind| kind == "bin")
                 && pkg.metadata.is_object();
 
-            tracing::debug!(
-                name = name,
-                target_matches = target_matches,
-                "searching package metadata"
-            );
+            tracing::debug!(name, target_matches, "searching package metadata");
 
             if target_matches {
                 let package_metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
                     .map_err(MetadataError::InvalidCargoMetadata)?;
-                let package_deploy = package_metadata.lambda.package.deploy;
+                let package_config = package_metadata.lambda.package.deploy;
+                merge_deploy_config(&mut config, &package_config);
 
-                match (&config, &package_deploy) {
-                    (None, Some(c)) => config = Some(c.clone()),
-                    (Some(base), Some(c)) => {
-                        config = Some(merge_deploy_config(base, c));
-                    }
-                    _ => {}
-                }
+                break;
             }
         }
     }
 
-    tracing::debug!(config = ?config, "using deploy configuration from metadata");
+    if let Some(tags) = tags {
+        config.append_tags(extract_tags(tags));
+    }
+
+    if config.s3_bucket.is_none() {
+        config.s3_bucket = s3_bucket.clone();
+    }
+
+    tracing::debug!(?config, "using deploy configuration from metadata");
     Ok(config)
 }
 
@@ -466,45 +462,54 @@ pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String, M
     }
 }
 
-fn merge_deploy_config(base: &DeployConfig, package_deploy: &DeployConfig) -> DeployConfig {
-    let mut new_config = base.clone();
+fn merge_deploy_config(base: &mut DeployConfig, package_deploy: &Option<DeployConfig>) {
+    let Some(package_deploy) = package_deploy else {
+        return;
+    };
+
     if package_deploy.memory.is_some() {
-        new_config.memory = package_deploy.memory.clone();
+        base.memory = package_deploy.memory.clone();
     }
     if let Some(package_timeout) = &package_deploy.timeout {
         if !package_timeout.is_zero() {
-            new_config.timeout = Some(package_timeout.clone());
+            base.timeout = Some(package_timeout.clone());
         }
     }
-    new_config.env.extend(package_deploy.env.clone());
+    base.env.extend(package_deploy.env.clone());
     if package_deploy.env_file.is_some() && base.env_file.is_none() {
-        new_config.env_file = package_deploy.env_file.clone();
+        base.env_file = package_deploy.env_file.clone();
     }
     if package_deploy.tracing != Tracing::default() {
-        new_config.tracing = package_deploy.tracing.clone();
+        base.tracing = package_deploy.tracing.clone();
     }
     if package_deploy.iam_role.is_some() {
-        new_config.iam_role = package_deploy.iam_role.clone();
+        base.iam_role = package_deploy.iam_role.clone();
     }
     if package_deploy.layers.is_some() {
-        new_config.layers = package_deploy.layers.clone();
+        base.layers = package_deploy.layers.clone();
     }
     if package_deploy.subnet_ids.is_some() {
-        new_config.subnet_ids = package_deploy.subnet_ids.clone();
+        base.subnet_ids = package_deploy.subnet_ids.clone();
     }
     if package_deploy.security_group_ids.is_some() {
-        new_config.security_group_ids = package_deploy.security_group_ids.clone();
+        base.security_group_ids = package_deploy.security_group_ids.clone();
     }
-    new_config.runtime = package_deploy.runtime.clone();
-    if package_deploy.include.is_some() {
-        new_config.include = package_deploy.include.clone();
+    base.runtime = package_deploy.runtime.clone();
+    if let Some(package_include) = &package_deploy.include {
+        let mut include = base.include.clone().unwrap_or_default();
+        include.extend(package_include.clone());
+        base.include = Some(include);
     }
     if package_deploy.s3_bucket.is_some() {
-        new_config.s3_bucket = package_deploy.s3_bucket.clone();
+        base.s3_bucket = package_deploy.s3_bucket.clone();
+    }
+    if let Some(package_tags) = &package_deploy.tags {
+        let mut tags = base.tags.clone().unwrap_or_default();
+        tags.extend(package_tags.clone());
+        base.tags = Some(tags);
     }
 
-    tracing::debug!(ws_metadata = ?new_config, package_metadata = ?package_deploy, "finished merging deploy metadata");
-    new_config
+    tracing::debug!(ws_metadata = ?base, package_metadata = ?package_deploy, "finished merging deploy metadata");
 }
 
 fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
@@ -519,6 +524,19 @@ fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
 
 fn is_project_metadata_ok(path: &Path) -> bool {
     path.is_dir() && metadata(path).is_ok()
+}
+
+pub(crate) fn extract_tags(tags: &Vec<String>) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+
+    for var in tags {
+        let mut split = var.splitn(2, '=');
+        if let (Some(k), Some(v)) = (split.next(), split.next()) {
+            map.insert(k.to_string(), v.to_string());
+        }
+    }
+
+    map
 }
 
 #[cfg(test)]
@@ -582,9 +600,14 @@ mod tests {
 
     #[test]
     fn test_deploy_metadata_packages() {
-        let env = function_deploy_metadata(fixture("single-binary-package"), "basic-lambda")
-            .unwrap()
-            .unwrap();
+        let env = function_deploy_metadata(
+            fixture("single-binary-package"),
+            "basic-lambda",
+            &None,
+            &None,
+            DeployConfig::default(),
+        )
+        .unwrap();
 
         let layers = [
             "arn:aws:lambda:us-east-1:xxxxxxxx:layers:layer1".to_string(),
@@ -614,6 +637,40 @@ mod tests {
         assert_eq!(2, s3_tags.split('&').collect::<Vec<_>>().len());
         assert!(s3_tags.contains("organization=aws"), "{s3_tags}");
         assert!(s3_tags.contains("team=lambda"), "{s3_tags}");
+    }
+
+    #[test]
+    fn test_deploy_metadata_packages_with_tags() {
+        let tags = vec!["FOO=bar".into()];
+        let env = function_deploy_metadata(
+            fixture("single-binary-package"),
+            "basic-lambda",
+            &Some(tags),
+            &None,
+            DeployConfig::default(),
+        )
+        .unwrap();
+
+        let mut tags = HashMap::new();
+        tags.insert("organization".to_string(), "aws".to_string());
+        tags.insert("team".to_string(), "lambda".to_string());
+        tags.insert("FOO".to_string(), "bar".to_string());
+
+        assert_eq!(Some(tags), env.tags);
+    }
+
+    #[test]
+    fn test_deploy_metadata_packages_with_s3_bucket() {
+        let env = function_deploy_metadata(
+            fixture("single-binary-package"),
+            "basic-lambda",
+            &None,
+            &Some("deploy-bucket".into()),
+            DeployConfig::default(),
+        )
+        .unwrap();
+
+        assert_eq!(Some("deploy-bucket".to_string()), env.s3_bucket);
     }
 
     #[test]
