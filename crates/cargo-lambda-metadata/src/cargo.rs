@@ -18,7 +18,12 @@ use crate::{
     lambda::{Memory, Timeout, Tracing},
 };
 
-#[derive(Default, Deserialize)]
+const STRIP_CONFIG: &str = "profile.release.strip=\"symbols\"";
+const LTO_CONFIG: &str = "profile.release.lto=\"thin\"";
+const CODEGEN_CONFIG: &str = "profile.release.codegen-units=1";
+const PANIC_CONFIG: &str = "profile.release.panic=\"abort\"";
+
+#[derive(Debug, Default, Deserialize)]
 #[non_exhaustive]
 pub struct Metadata {
     #[serde(default)]
@@ -95,13 +100,15 @@ struct CargoProfile {
     pub release: Option<CargoProfileRelease>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 struct CargoProfileRelease {
     strip: Option<toml::Value>,
     lto: Option<toml::Value>,
     #[serde(rename = "codegen-units")]
     codegen_units: Option<toml::Value>,
     panic: Option<toml::Value>,
+    #[serde(default)]
+    debug: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -236,42 +243,42 @@ pub fn target_dir_from_metadata(metadata: &CargoMetadata) -> Result<PathBuf> {
 /// Attempt to read the releaes profile section in the Cargo manifest.
 /// Cargo metadata doesn't expose profile information, so we try
 /// to read it from the Cargo.toml file directly.
-pub fn cargo_release_profile_config<P: AsRef<Path> + Debug>(
+pub fn cargo_release_profile_config<'a, P: AsRef<Path> + Debug>(
     manifest_path: P,
-) -> Result<Vec<String>, MetadataError> {
+) -> Result<HashSet<&'a str>, MetadataError> {
     let path = manifest_path.as_ref();
     let file = read_to_string(path)
         .map_err(|e| MetadataError::InvalidManifestFile(path.to_path_buf(), e))?;
 
     let metadata: Metadata = toml::from_str(&file).map_err(MetadataError::InvalidTomlManifest)?;
 
-    let mut config = HashMap::new();
-    config.insert("strip", "profile.release.strip=\"symbols\"");
-    config.insert("lto", "profile.release.lto=\"thin\"");
-    config.insert("codegen-units", "profile.release.codegen-units=1");
-    config.insert("panic", "profile.release.panic=\"abort\"");
+    Ok(cargo_release_profile_config_from_metadata(metadata))
+}
 
-    let Some(profile) = metadata.profile else {
-        return Ok(config.values().map(|s| s.to_string()).collect::<Vec<_>>());
+fn cargo_release_profile_config_from_metadata(metadata: Metadata) -> HashSet<&'static str> {
+    let mut config = HashSet::from([STRIP_CONFIG, LTO_CONFIG, CODEGEN_CONFIG, PANIC_CONFIG]);
+
+    let Some(profile) = &metadata.profile else {
+        return config;
     };
-    let Some(release) = profile.release else {
-        return Ok(config.values().map(|s| s.to_string()).collect::<Vec<_>>());
+    let Some(release) = &profile.release else {
+        return config;
     };
 
-    if release.strip.is_some() {
-        config.remove("strip");
+    if release.strip.is_some() || release.debug {
+        config.remove(STRIP_CONFIG);
     }
     if release.lto.is_some() {
-        config.remove("lto");
+        config.remove(LTO_CONFIG);
     }
     if release.codegen_units.is_some() {
-        config.remove("codegen-units");
+        config.remove(CODEGEN_CONFIG);
     }
     if release.panic.is_some() {
-        config.remove("panic");
+        config.remove(PANIC_CONFIG);
     }
 
-    return Ok(config.values().map(|s| s.to_string()).collect::<Vec<_>>());
+    config
 }
 
 /// Create metadata about the root package in the Cargo manifest, without any dependencies.
@@ -847,5 +854,91 @@ mod tests {
         let bins = binary_targets(fixture("examples-package"), true).unwrap();
         assert_eq!(1, bins.len());
         assert!(bins.contains("example-lambda"));
+    }
+
+    #[test]
+    fn test_release_config() {
+        let config = cargo_release_profile_config_from_metadata(Metadata::default());
+        assert!(config.contains(STRIP_CONFIG));
+        assert!(config.contains(LTO_CONFIG));
+        assert!(config.contains(CODEGEN_CONFIG));
+        assert!(config.contains(PANIC_CONFIG));
+    }
+
+    #[test]
+    fn test_release_config_exclude_strip() {
+        let meta = Metadata {
+            profile: Some(CargoProfile {
+                release: Some(CargoProfileRelease {
+                    strip: Some(toml::Value::String("none".into())),
+                    ..Default::default()
+                }),
+            }),
+            ..Default::default()
+        };
+
+        let config = cargo_release_profile_config_from_metadata(meta);
+        assert!(!config.contains(STRIP_CONFIG));
+
+        let meta = Metadata {
+            profile: Some(CargoProfile {
+                release: Some(CargoProfileRelease {
+                    debug: true,
+                    ..Default::default()
+                }),
+            }),
+            ..Default::default()
+        };
+
+        let config = cargo_release_profile_config_from_metadata(meta);
+        assert!(!config.contains(STRIP_CONFIG));
+    }
+
+    #[test]
+    fn test_release_config_exclude_lto() {
+        let meta = Metadata {
+            profile: Some(CargoProfile {
+                release: Some(CargoProfileRelease {
+                    lto: Some(toml::Value::String("none".into())),
+                    ..Default::default()
+                }),
+            }),
+            ..Default::default()
+        };
+
+        let config = cargo_release_profile_config_from_metadata(meta);
+        assert!(!config.contains(LTO_CONFIG));
+    }
+
+    #[test]
+    fn test_release_config_exclude_codegen() {
+        let meta = Metadata {
+            profile: Some(CargoProfile {
+                release: Some(CargoProfileRelease {
+                    codegen_units: Some(toml::Value::Integer(2)),
+                    ..Default::default()
+                }),
+            }),
+            ..Default::default()
+        };
+
+        let config = cargo_release_profile_config_from_metadata(meta);
+        assert!(!config.contains(CODEGEN_CONFIG));
+    }
+
+    #[test]
+    fn test_release_config_exclude_panic() {
+        let meta = Metadata {
+            profile: Some(CargoProfile {
+                release: Some(CargoProfileRelease {
+                    panic: Some(toml::Value::String("none".into())),
+                    ..Default::default()
+                }),
+            }),
+            ..Default::default()
+        };
+
+        let config = cargo_release_profile_config_from_metadata(meta);
+        assert!(!config.contains(PANIC_CONFIG));
     }
 }

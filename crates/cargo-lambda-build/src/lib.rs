@@ -170,7 +170,12 @@ impl Build {
         let rust_flags = if self.build.release && !self.disable_optimizations {
             let release_optimizations =
                 cargo_release_profile_config(manifest_path).map_err(BuildError::MetadataError)?;
-            self.build.config.extend(release_optimizations);
+            self.build.config.extend(
+                release_optimizations
+                    .into_iter()
+                    .map(String::from)
+                    .collect::<Vec<_>>(),
+            );
 
             let mut rust_flags = env::var("RUSTFLAGS").unwrap_or_default();
             if !rust_flags.contains("-C target-cpu=") {
