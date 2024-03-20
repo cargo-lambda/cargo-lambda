@@ -44,6 +44,13 @@ codegen-units = 16
 panic = "unwind"
 ```
 
+Setting `debug = true` in the release profile will also preserve all the debugging symbols in the release binary:
+
+```toml
+[profile.release]
+debug = true
+```
+
 If you want to learn more about the possible values for these options, check out Cargo's reference about [Profile settings](https://doc.rust-lang.org/cargo/reference/profiles.html#profile-settings).
 
 ## Rutime CPU optimizations
