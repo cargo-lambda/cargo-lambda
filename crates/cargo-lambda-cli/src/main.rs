@@ -1,4 +1,5 @@
-#![warn(rust_2018_idioms, unused_lifetimes, clippy::multiple_crate_versions)]
+#![warn(rust_2018_idioms, unused_lifetimes)]
+#![allow(clippy::multiple_crate_versions)]
 use cargo_lambda_build::{Build, Zig};
 use cargo_lambda_deploy::Deploy;
 use cargo_lambda_invoke::Invoke;

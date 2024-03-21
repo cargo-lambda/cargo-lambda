@@ -190,7 +190,7 @@ pub mod paths {
     static GLOBAL_ROOT: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
 
     thread_local! {
-        static TEST_ID: RefCell<Option<usize>> = RefCell::new(None);
+        static TEST_ID: RefCell<Option<usize>> = const { RefCell::new(None) };
     }
 
     pub struct TestIdGuard {

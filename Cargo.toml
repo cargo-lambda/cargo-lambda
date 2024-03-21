@@ -37,13 +37,13 @@ description = "Cargo subcommand to work with AWS Lambda"
 rust-version = "1.64.0"
 
 [workspace.dependencies]
-aws-config = "1.1.5"
-aws-sdk-iam = "1.13.0"
-aws-sdk-lambda = "1.13.0"
-aws-sdk-s3 = "1.13.0"
-aws-sdk-sts = "1.13.0"
-aws-smithy-types = "1.1.5"
-aws-types = "1.1.5"
+aws-config = "1.1.8"
+aws-sdk-iam = "1.17.0"
+aws-sdk-lambda = "1.17.0"
+aws-sdk-s3 = "1.17.0"
+aws-sdk-sts = "1.17.0"
+aws-smithy-types = "1.1.8"
+aws-types = "1.1.8"
 base64 = "0.21.2"
 cargo-lambda-build = { version = "1.1.0", path = "crates/cargo-lambda-build" }
 cargo-lambda-deploy = { version = "1.1.0", path = "crates/cargo-lambda-deploy" }
