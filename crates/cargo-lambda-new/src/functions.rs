@@ -150,8 +150,8 @@ impl Options {
             )),
             Some(s) if !s.is_empty() => {
                 let import = Value::scalar(format!("aws_lambda_events::event::{s}"));
-                match s.splitn(2, "::").collect::<Vec<_>>()[..] {
-                    [ev_mod, ev_type] => Ok((
+                match s.rsplitn(2, "::").collect::<Vec<_>>()[..] {
+                    [ev_type, ev_mod] => Ok((
                         import,
                         Value::scalar(ev_mod.to_string()),
                         Value::scalar(ev_type.to_string()),
@@ -224,5 +224,24 @@ mod test {
         );
         assert_eq!(Value::scalar("sns"), module);
         assert_eq!(Value::scalar("SnsEvent"), kind);
+    }
+
+    #[test]
+    fn test_submodule_event_type() {
+        let opt = Options {
+            http: false,
+            http_feature: None,
+            event_type: Some(
+                "cloudformation::provider::CloudFormationCustomResourceRequest".to_string(),
+            ),
+        };
+
+        let (imp, module, kind) = opt.event_type_triple().unwrap();
+        assert_eq!(
+            Value::scalar("aws_lambda_events::event::cloudformation::provider::CloudFormationCustomResourceRequest"),
+            imp
+        );
+        assert_eq!(Value::scalar("cloudformation::provider"), module);
+        assert_eq!(Value::scalar("CloudFormationCustomResourceRequest"), kind);
     }
 }
