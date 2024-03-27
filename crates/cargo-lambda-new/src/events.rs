@@ -42,11 +42,11 @@ pub(crate) const WELL_KNOWN_EVENTS: [&str; 50] = [
     "s3_batch_job::S3BatchJobEvent",
     "s3::S3Event",
     "secretsmanager::SecretsManagerSecretRotationEvent",
+    "serde_json::Value", // this type is a special case not included in the events crate
     "ses::SimpleEmailEvent",
     "sns::CloudWatchAlarmPayload",
     "sns::SnsEvent",
     "sqs::SqsEvent",
     "sqs::SqsApiEvent",
     "sqs::SqsApiEventObj",
-    "serde_json::Value",
 ];
