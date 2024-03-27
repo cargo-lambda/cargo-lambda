@@ -76,10 +76,10 @@ impl Options {
         }
 
         if !self.http {
-            let event_type = Text::new("AWS Event type that this function receives")
+            let event_type = Text::new("Event type that this function receives")
             .with_autocomplete(suggest_event_type)
             .with_validator(validate_event_type)
-            .with_help_message("↑↓ to move, tab to auto-complete, enter to submit. Leave it blank if you don't want to use any event from the aws_lambda_events crate")
+            .with_help_message("use arrows (↑↓) to move, tab to auto-complete, enter to submit.\nLeave this input empty if you want to use a predefined example")
             .prompt()?;
             self.event_type = Some(event_type);
         }
@@ -143,10 +143,15 @@ impl Options {
 
     fn event_type_triple(&self) -> Result<(Value, Value, Value)> {
         match &self.event_type {
+            Some(s) if s == "serde_json::Value" => Ok((
+                Value::scalar(s.clone()),
+                Value::scalar("serde_json"),
+                Value::scalar("Value"),
+            )),
             Some(s) if !s.is_empty() => {
                 let import = Value::scalar(format!("aws_lambda_events::event::{s}"));
-                match s.splitn(2, "::").collect::<Vec<_>>()[..] {
-                    [ev_mod, ev_type] => Ok((
+                match s.rsplitn(2, "::").collect::<Vec<_>>()[..] {
+                    [ev_type, ev_mod] => Ok((
                         import,
                         Value::scalar(ev_mod.to_string()),
                         Value::scalar(ev_type.to_string()),
@@ -188,5 +193,55 @@ mod test {
     #[test]
     fn test_http_features_to_string() {
         assert_eq!("apigw_http", HttpFeature::ApigwHttp.to_string().as_str());
+    }
+
+    #[test]
+    fn test_json_value_event_type() {
+        let opt = Options {
+            http: false,
+            http_feature: None,
+            event_type: Some("serde_json::Value".to_string()),
+        };
+
+        let (imp, module, kind) = opt.event_type_triple().unwrap();
+        assert_eq!(Value::scalar("serde_json::Value"), imp);
+        assert_eq!(Value::scalar("serde_json"), module);
+        assert_eq!(Value::scalar("Value"), kind);
+    }
+
+    #[test]
+    fn test_sns_event_type() {
+        let opt = Options {
+            http: false,
+            http_feature: None,
+            event_type: Some("sns::SnsEvent".to_string()),
+        };
+
+        let (imp, module, kind) = opt.event_type_triple().unwrap();
+        assert_eq!(
+            Value::scalar("aws_lambda_events::event::sns::SnsEvent"),
+            imp
+        );
+        assert_eq!(Value::scalar("sns"), module);
+        assert_eq!(Value::scalar("SnsEvent"), kind);
+    }
+
+    #[test]
+    fn test_submodule_event_type() {
+        let opt = Options {
+            http: false,
+            http_feature: None,
+            event_type: Some(
+                "cloudformation::provider::CloudFormationCustomResourceRequest".to_string(),
+            ),
+        };
+
+        let (imp, module, kind) = opt.event_type_triple().unwrap();
+        assert_eq!(
+            Value::scalar("aws_lambda_events::event::cloudformation::provider::CloudFormationCustomResourceRequest"),
+            imp
+        );
+        assert_eq!(Value::scalar("cloudformation::provider"), module);
+        assert_eq!(Value::scalar("CloudFormationCustomResourceRequest"), kind);
     }
 }
