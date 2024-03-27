@@ -1,4 +1,4 @@
-pub(crate) const WELL_KNOWN_EVENTS: [&str; 37] = [
+pub(crate) const WELL_KNOWN_EVENTS: [&str; 38] = [
     "activemq::ActiveMqEvent",
     "autoscaling::AutoScalingEvent",
     "chime_bot::ChimeBotEvent",
@@ -36,4 +36,5 @@ pub(crate) const WELL_KNOWN_EVENTS: [&str; 37] = [
     "ses::SimpleEmailEvent",
     "sns::SnsEvent",
     "sqs::SqsEvent",
+    "serde_json::Value",
 ];

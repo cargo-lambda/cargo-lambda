@@ -143,6 +143,11 @@ impl Options {
 
     fn event_type_triple(&self) -> Result<(Value, Value, Value)> {
         match &self.event_type {
+            Some(s) if s == "serde_json::Value" => Ok((
+                Value::scalar(s.clone()),
+                Value::scalar("serde_json"),
+                Value::scalar("Value"),
+            )),
             Some(s) if !s.is_empty() => {
                 let import = Value::scalar(format!("aws_lambda_events::event::{s}"));
                 match s.splitn(2, "::").collect::<Vec<_>>()[..] {
@@ -188,5 +193,36 @@ mod test {
     #[test]
     fn test_http_features_to_string() {
         assert_eq!("apigw_http", HttpFeature::ApigwHttp.to_string().as_str());
+    }
+
+    #[test]
+    fn test_json_value_event_type() {
+        let opt = Options {
+            http: false,
+            http_feature: None,
+            event_type: Some("serde_json::Value".to_string()),
+        };
+
+        let (imp, module, kind) = opt.event_type_triple().unwrap();
+        assert_eq!(Value::scalar("serde_json::Value"), imp);
+        assert_eq!(Value::scalar("serde_json"), module);
+        assert_eq!(Value::scalar("Value"), kind);
+    }
+
+    #[test]
+    fn test_sns_event_type() {
+        let opt = Options {
+            http: false,
+            http_feature: None,
+            event_type: Some("sns::SnsEvent".to_string()),
+        };
+
+        let (imp, module, kind) = opt.event_type_triple().unwrap();
+        assert_eq!(
+            Value::scalar("aws_lambda_events::event::sns::SnsEvent"),
+            imp
+        );
+        assert_eq!(Value::scalar("sns"), module);
+        assert_eq!(Value::scalar("SnsEvent"), kind);
     }
 }
