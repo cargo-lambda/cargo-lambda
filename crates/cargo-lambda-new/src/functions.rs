@@ -76,10 +76,10 @@ impl Options {
         }
 
         if !self.http {
-            let event_type = Text::new("AWS Event type that this function receives")
+            let event_type = Text::new("Event type that this function receives")
             .with_autocomplete(suggest_event_type)
             .with_validator(validate_event_type)
-            .with_help_message("↑↓ to move, tab to auto-complete, enter to submit. Leave it blank if you don't want to use any event from the aws_lambda_events crate")
+            .with_help_message("use arrows (↑↓) to move, tab to auto-complete, enter to submit.\nLeave this input empty if you want to use a predefined example")
             .prompt()?;
             self.event_type = Some(event_type);
         }
