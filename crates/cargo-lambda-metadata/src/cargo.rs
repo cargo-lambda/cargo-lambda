@@ -107,8 +107,34 @@ struct CargoProfileRelease {
     #[serde(rename = "codegen-units")]
     codegen_units: Option<toml::Value>,
     panic: Option<toml::Value>,
-    #[serde(default)]
-    debug: bool,
+    #[serde(default = "default_cargo_bool")]
+    debug: CargoBool,
+}
+
+impl CargoProfileRelease {
+    fn debug_enabled(&self) -> bool {
+        !(self.debug == CargoBool::Str("none".to_string())
+            || self.debug == CargoBool::Num(0)
+            || self.debug == CargoBool::Bool(false))
+    }
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq)]
+#[serde(untagged)]
+enum CargoBool {
+    Bool(bool),
+    Num(u8),
+    Str(String),
+}
+
+impl Default for CargoBool {
+    fn default() -> Self {
+        default_cargo_bool()
+    }
+}
+
+fn default_cargo_bool() -> CargoBool {
+    CargoBool::Bool(false)
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -265,7 +291,7 @@ fn cargo_release_profile_config_from_metadata(metadata: Metadata) -> HashSet<&'s
         return config;
     };
 
-    if release.strip.is_some() || release.debug {
+    if release.strip.is_some() || release.debug_enabled() {
         config.remove(STRIP_CONFIG);
     }
     if release.lto.is_some() {
@@ -883,7 +909,7 @@ mod tests {
         let meta = Metadata {
             profile: Some(CargoProfile {
                 release: Some(CargoProfileRelease {
-                    debug: true,
+                    debug: CargoBool::Bool(true),
                     ..Default::default()
                 }),
             }),
@@ -940,5 +966,20 @@ mod tests {
 
         let config = cargo_release_profile_config_from_metadata(meta);
         assert!(!config.contains(PANIC_CONFIG));
+    }
+
+    #[test]
+    fn test_release_debug_info() {
+        let data = r#"
+        [profile.release]
+        overflow-checks = true
+        debug = 1
+        debug-assertions = false
+        panic = "abort"
+        lto = true
+        "#;
+        let metadata: Metadata = toml::from_str(&data).unwrap();
+        let profile = metadata.profile.unwrap().release.unwrap();
+        assert!(profile.debug_enabled());
     }
 }
