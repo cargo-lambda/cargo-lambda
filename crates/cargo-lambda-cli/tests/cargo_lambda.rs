@@ -64,6 +64,39 @@ fn test_build_basic_zip_function() {
 }
 
 #[test]
+fn test_build_basic_zip_function_with_include() {
+    let _guard = init_root();
+    let lp = cargo_lambda_new("test-basic-function");
+
+    lp.new_cmd()
+        .arg("--no-interactive")
+        .arg(&lp.name)
+        .assert()
+        .success();
+
+    let project = lp.test_project();
+    cargo_lambda_build(project.root())
+        .args(["--output-format", "zip", "--include", "Cargo.toml"])
+        .assert()
+        .success();
+
+    let bin = project.lambda_dir().join(&lp.name).join("bootstrap.zip");
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    let file = File::open(bin).expect("failed to open zip file");
+    let mut zip = ZipArchive::new(file).expect("failed to initialize the zip archive");
+    assert!(
+        zip.by_name("bootstrap").is_ok(),
+        "bootstrap is not in the zip archive. Files in zip: {:?}",
+        zip.file_names().collect::<Vec<&str>>().join(", ")
+    );
+    assert!(
+        zip.by_name("Cargo.toml").is_ok(),
+        "Cargo.toml is not in the zip archive. Files in zip: {:?}",
+        zip.file_names().collect::<Vec<&str>>().join(", ")
+    );
+}
+
+#[test]
 fn test_build_http_function() {
     let _guard = init_root();
     let lp = cargo_lambda_new("test-http-function");

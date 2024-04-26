@@ -117,3 +117,20 @@ type = "cargo"
 ### Additional compilers
 
 The concept of compilers on Cargo Lambda is an abstraction on top of different shell commands. If you want to add an additional compiler, you need to implement [Compiler](https://github.com/cargo-lambda/cargo-lambda/blob/main/crates/cargo-lambda-build/src/compiler/mod.rs#L14) trait. The command to execute needs to follow Rust compilations' convenctions, for example, if the user wants to build an Arm64 binary with the `release` profile, Cargo Lambda will expect that the resulting binary is in `target/aarch64-unknown-linux-gnu/release/`.
+
+## Build configuration in Cargo's Metadata
+
+You can keep some build configuration options in your project's `Cargo.toml` file. This give you a more "configuration as code" approach since you can store that configuration alongside your project. The following example shows the options that you can specify in the metadata, all of them are optional:
+
+```toml
+[package.metadata.lambda.build]
+include = [ "README.md" ]      # Extra list of files to add to the zip bundle
+```
+
+## Adding extra files to the zip file
+
+In some situations, you might want to add extra files inside the zip file built. You can use the option `--include` to add extra files or directories to the zip file. For example, if you have a directory with configuration files, you can add it to the zip file using the command below:
+
+```
+cargo lambda build --output-format zip --include config
+```

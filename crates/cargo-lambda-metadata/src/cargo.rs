@@ -56,6 +56,8 @@ pub struct PackageMetadata {
 pub struct BuildConfig {
     pub compiler: Option<CompilerOptions>,
     pub target: Option<String>,
+    #[serde(default)]
+    pub include: Option<Vec<PathBuf>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
@@ -552,6 +554,9 @@ fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
     if package_build.target != base.target {
         base.target = package_build.target.clone();
     }
+    if package_build.include != base.include {
+        base.include = package_build.include.clone();
+    }
     tracing::debug!(ws_metadata = ?base, package_metadata = ?package_build, "finished merging build metadata");
 }
 
@@ -800,6 +805,15 @@ mod tests {
 
         let subcommand = opts.subcommand.unwrap();
         assert_eq!(vec!["brazil".to_string(), "build".to_string()], subcommand);
+    }
+
+    #[test]
+    fn test_build_config_metadata_include() {
+        let manifest_path = fixture("single-binary-package-build-include");
+        let metadata = load_metadata(manifest_path).unwrap();
+
+        let env = function_build_metadata(&metadata).unwrap();
+        assert_eq!(Some(vec![PathBuf::from("Cargo.toml")]), env.include);
     }
 
     #[test]

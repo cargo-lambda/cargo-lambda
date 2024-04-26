@@ -1,0 +1,12 @@
+[package]
+name = "basic-lambda"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lambda_runtime = "0.5.1"
+serde = "1.0.136"
+tokio = { version = "1", features = ["macros"] }
+
+[package.metadata.lambda.build]
+include = ["Cargo.toml"]

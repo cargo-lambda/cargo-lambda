@@ -221,6 +221,9 @@ mod tests {
     async fn default_profile() {
         setup();
 
+        // make sure the default region from environment variable does not override the default from the profile
+        std::env::remove_var("AWS_DEFAULT_REGION");
+
         let args = RemoteConfig {
             profile: None,
             region: None,

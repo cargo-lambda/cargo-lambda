@@ -176,7 +176,7 @@ cargo lambda deploy --extension --internal
 
 ## Deploy configuration in Cargo's Metadata
 
-You can keep some deploy configuration options in your project's `Cargo.toml` file. This give you a more "configuration as code" approach since you can store that configuration along side your project. The following example shows the options that you can specify in the metadata, all of them are optional:
+You can keep some deploy configuration options in your project's `Cargo.toml` file. This give you a more "configuration as code" approach since you can store that configuration alongside your project. The following example shows the options that you can specify in the metadata, all of them are optional:
 
 ```toml
 [package.metadata.lambda.deploy]
@@ -202,7 +202,7 @@ cargo lambda deploy --s3-bucket bucket-name
 
 ## Adding extra files to the zip file
 
-In some sitiations, you might want to add extra files inside the zip file uploaded to AWS. You can use the option `--include` to add extra files or directories to the zip file. For example, if you have a directory with configuration files, you can add it to the zip file using the command below:
+In some situations, you might want to add extra files inside the zip file uploaded to AWS. You can use the option `--include` to add extra files or directories to the zip file. For example, if you have a directory with configuration files, you can add it to the zip file using the command below:
 
 ```
 cargo lambda deploy --include config
