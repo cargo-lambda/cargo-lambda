@@ -282,7 +282,10 @@ impl Build {
                         } else {
                             None
                         };
-                        let extra_files = self.include.clone().or_else(|| build_config.include.clone());
+                        let extra_files = self
+                            .include
+                            .clone()
+                            .or_else(|| build_config.include.clone());
                         zip_binary(bin_name, binary, bootstrap_dir, parent, extra_files)?;
                     }
                 }
