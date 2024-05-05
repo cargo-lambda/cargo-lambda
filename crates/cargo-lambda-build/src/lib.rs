@@ -88,6 +88,10 @@ pub struct Build {
     #[arg(long)]
     disable_optimizations: bool,
 
+    /// Option to add one or more files and directories to include in the output ZIP file (only works with --output-format=zip).
+    #[arg(short, long)]
+    include: Option<Vec<PathBuf>>,
+
     #[command(flatten)]
     build: CargoBuild,
 }
@@ -278,7 +282,11 @@ impl Build {
                         } else {
                             None
                         };
-                        zip_binary(bin_name, binary, bootstrap_dir, parent, None)?;
+                        let extra_files = self
+                            .include
+                            .clone()
+                            .or_else(|| build_config.include.clone());
+                        zip_binary(bin_name, binary, bootstrap_dir, parent, extra_files)?;
                     }
                 }
             }
