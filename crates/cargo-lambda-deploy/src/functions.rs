@@ -491,25 +491,25 @@ fn merge_configuration(
 
     if function_config.role.is_some() {
         deploy_metadata.use_for_update = true;
-        deploy_metadata.iam_role = function_config.role.clone();
+        deploy_metadata.iam_role.clone_from(&function_config.role);
     }
 
     if function_config.layer.is_some() {
         deploy_metadata.use_for_update = true;
-        deploy_metadata.layers = function_config.layer.clone();
+        deploy_metadata.layers.clone_from(&function_config.layer);
     }
 
     if function_config.memory.is_some() {
         deploy_metadata.use_for_update = true;
-        deploy_metadata.memory = function_config.memory.clone();
+        deploy_metadata.memory.clone_from(&function_config.memory);
     }
 
     if function_config.subnet_ids.is_some() {
-        deploy_metadata.subnet_ids = function_config.subnet_ids.clone();
+        deploy_metadata.subnet_ids.clone_from(&function_config.subnet_ids);
     }
 
     if function_config.security_group_ids.is_some() {
-        deploy_metadata.security_group_ids = function_config.security_group_ids.clone();
+        deploy_metadata.security_group_ids.clone_from(&function_config.security_group_ids);
     }
 
     if let Some(timeout) = &function_config.timeout {
@@ -525,7 +525,7 @@ fn merge_configuration(
             deploy_metadata.use_for_update = true;
 
             if config.env_file.is_some() {
-                deploy_metadata.env_file = config.env_file.clone();
+                deploy_metadata.env_file.clone_from(&config.env_file);
             }
 
             let flag_env = config.lambda_environment().into_diagnostic()?;
@@ -541,7 +541,7 @@ fn merge_configuration(
         }
     }
 
-    deploy_metadata.runtime = function_config.runtime.clone();
+    deploy_metadata.runtime.clone_from(&function_config.runtime);
 
     Ok((environment, deploy_metadata))
 }
