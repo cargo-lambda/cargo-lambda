@@ -505,11 +505,15 @@ fn merge_configuration(
     }
 
     if function_config.subnet_ids.is_some() {
-        deploy_metadata.subnet_ids.clone_from(&function_config.subnet_ids);
+        deploy_metadata
+            .subnet_ids
+            .clone_from(&function_config.subnet_ids);
     }
 
     if function_config.security_group_ids.is_some() {
-        deploy_metadata.security_group_ids.clone_from(&function_config.security_group_ids);
+        deploy_metadata
+            .security_group_ids
+            .clone_from(&function_config.security_group_ids);
     }
 
     if let Some(timeout) = &function_config.timeout {

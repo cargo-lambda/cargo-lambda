@@ -527,7 +527,8 @@ fn merge_deploy_config(base: &mut DeployConfig, package_deploy: &Option<DeployCo
         base.subnet_ids.clone_from(&package_deploy.subnet_ids);
     }
     if package_deploy.security_group_ids.is_some() {
-        base.security_group_ids.clone_from(&package_deploy.security_group_ids);
+        base.security_group_ids
+            .clone_from(&package_deploy.security_group_ids);
     }
     base.runtime.clone_from(&package_deploy.runtime);
     if let Some(package_include) = &package_deploy.include {
