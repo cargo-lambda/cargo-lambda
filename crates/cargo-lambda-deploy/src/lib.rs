@@ -191,7 +191,7 @@ impl Deploy {
 
         let mut tags = self.tags.clone();
         if tags.is_none() {
-            tags = self.tag.clone();
+            tags.clone_from(&self.tag);
         }
 
         let result = if self.dry {

@@ -88,7 +88,7 @@ async fn start_function(
     } else {
         None
     };
-    watcher_config.name = name.clone();
+    watcher_config.name.clone_from(&name);
     watcher_config.runtime_api = runtime_api;
 
     let wx = crate::watcher::new(cmd, watcher_config, ext_cache.clone()).await?;

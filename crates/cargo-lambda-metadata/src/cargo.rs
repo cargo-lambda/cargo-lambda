@@ -442,7 +442,7 @@ pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
     }
 
     if config.s3_bucket.is_none() {
-        config.s3_bucket = s3_bucket.clone();
+        config.s3_bucket.clone_from(s3_bucket);
     }
 
     tracing::debug!(?config, "using deploy configuration from metadata");
@@ -503,7 +503,7 @@ fn merge_deploy_config(base: &mut DeployConfig, package_deploy: &Option<DeployCo
     };
 
     if package_deploy.memory.is_some() {
-        base.memory = package_deploy.memory.clone();
+        base.memory.clone_from(&package_deploy.memory);
     }
     if let Some(package_timeout) = &package_deploy.timeout {
         if !package_timeout.is_zero() {
@@ -512,31 +512,32 @@ fn merge_deploy_config(base: &mut DeployConfig, package_deploy: &Option<DeployCo
     }
     base.env.extend(package_deploy.env.clone());
     if package_deploy.env_file.is_some() && base.env_file.is_none() {
-        base.env_file = package_deploy.env_file.clone();
+        base.env_file.clone_from(&package_deploy.env_file);
     }
     if package_deploy.tracing != Tracing::default() {
         base.tracing = package_deploy.tracing.clone();
     }
     if package_deploy.iam_role.is_some() {
-        base.iam_role = package_deploy.iam_role.clone();
+        base.iam_role.clone_from(&package_deploy.iam_role);
     }
     if package_deploy.layers.is_some() {
-        base.layers = package_deploy.layers.clone();
+        base.layers.clone_from(&package_deploy.layers);
     }
     if package_deploy.subnet_ids.is_some() {
-        base.subnet_ids = package_deploy.subnet_ids.clone();
+        base.subnet_ids.clone_from(&package_deploy.subnet_ids);
     }
     if package_deploy.security_group_ids.is_some() {
-        base.security_group_ids = package_deploy.security_group_ids.clone();
+        base.security_group_ids
+            .clone_from(&package_deploy.security_group_ids);
     }
-    base.runtime = package_deploy.runtime.clone();
+    base.runtime.clone_from(&package_deploy.runtime);
     if let Some(package_include) = &package_deploy.include {
         let mut include = base.include.clone().unwrap_or_default();
         include.extend(package_include.clone());
         base.include = Some(include);
     }
     if package_deploy.s3_bucket.is_some() {
-        base.s3_bucket = package_deploy.s3_bucket.clone();
+        base.s3_bucket.clone_from(&package_deploy.s3_bucket);
     }
     if let Some(package_tags) = &package_deploy.tags {
         let mut tags = base.tags.clone().unwrap_or_default();
@@ -549,13 +550,13 @@ fn merge_deploy_config(base: &mut DeployConfig, package_deploy: &Option<DeployCo
 
 fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
     if package_build.compiler != base.compiler {
-        base.compiler = package_build.compiler.clone();
+        base.compiler.clone_from(&package_build.compiler);
     }
     if package_build.target != base.target {
-        base.target = package_build.target.clone();
+        base.target.clone_from(&package_build.target);
     }
     if package_build.include != base.include {
-        base.include = package_build.include.clone();
+        base.include.clone_from(&package_build.include);
     }
     tracing::debug!(ws_metadata = ?base, package_metadata = ?package_build, "finished merging build metadata");
 }
@@ -992,7 +993,7 @@ mod tests {
         panic = "abort"
         lto = true
         "#;
-        let metadata: Metadata = toml::from_str(&data).unwrap();
+        let metadata: Metadata = toml::from_str(data).unwrap();
         let profile = metadata.profile.unwrap().release.unwrap();
         assert!(profile.debug_enabled());
     }
