@@ -13,7 +13,7 @@ use object::{read::File as ObjectFile, Architecture, Object};
 use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
-    env, fmt,
+    fmt,
     fs::{create_dir_all, read, File},
     io::{self, Read, Write},
     path::{Path, PathBuf},
@@ -171,7 +171,7 @@ impl Build {
             }
         }
 
-        let rust_flags = if self.build.release && !self.disable_optimizations {
+        if self.build.release && !self.disable_optimizations {
             let release_optimizations =
                 cargo_release_profile_config(manifest_path).map_err(BuildError::MetadataError)?;
             self.build.config.extend(
@@ -181,20 +181,14 @@ impl Build {
                     .collect::<Vec<_>>(),
             );
 
-            let mut rust_flags = env::var("RUSTFLAGS").unwrap_or_default();
-            if !rust_flags.contains("-C target-cpu=") {
-                if !rust_flags.is_empty() {
-                    rust_flags += " ";
-                }
-                rust_flags += "-C target-cpu=";
-                rust_flags += target_arch.target_cpu();
-            }
+            let build_flags = format!(
+                "build.rustflags=[\"-C\", \"target-cpu={}\"]",
+                target_arch.target_cpu()
+            );
+            self.build.config.push(build_flags);
 
-            debug!(?rust_flags, config = ?self.build.config, "release optimizations");
-            Some(rust_flags)
-        } else {
-            None
-        };
+            debug!(config = ?self.build.config, "release optimizations");
+        }
 
         let profile = build_profile(&self.build, &compiler_option);
         let cmd = build_command(
@@ -211,10 +205,6 @@ impl Build {
             Err(err) if downcasted_user_cancellation(&err) => return Ok(()),
             Err(err) => return Err(err),
         };
-
-        if let Some(rust_flags) = rust_flags {
-            cmd.env("RUSTFLAGS", rust_flags);
-        }
 
         let mut child = cmd.spawn().map_err(BuildError::FailedBuildCommand)?;
         let status = child.wait().map_err(BuildError::FailedBuildCommand)?;

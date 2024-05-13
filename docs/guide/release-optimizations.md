@@ -26,13 +26,7 @@ When a program panics, Rust tries to read all the information in the memory stac
 
 Cargo Lambda uses `panic=abort` to compile your functions. This option removes the unwinding behavior from your binary, making it smaller.
 
-## Changing and disabling compile time optimizations
-
-If you want to disable all compile time optimizations, you cause use the flag `--disable-optimizations` in the build command:
-
-```shell
-cargo lambda build --release --disable-optimizations
-```
+## Changing compile time optimizations
 
 If you want to change any of the options that Cargo Lambda sets by default, you can set them in your `Cargo.toml` under the `[profile.release]` section. This is an example of profile with all the options modified:
 
@@ -57,6 +51,28 @@ If you want to learn more about the possible values for these options, check out
 
 Cargo Lambda also optimizes the resulting binaries for specific CPU instruction sets.
 
-AWS Lambda uses the Neoverse N1 core for ARM architectures, and the Haswell code for X86-64 architectures. When you compile your code with Cargo Lambda, the right core is added to the `target-cpu` flag in `RUSTFLAGS`.
+AWS Lambda uses the Neoverse N1 core for ARM architectures, and the Haswell code for X86-64 architectures. When you compile your code with Cargo Lambda, the right core is added to the `target-cpu` flag using Cargo's `build.rustflags` configuration option.
 
-You can change this behavior by setting your own `RUSTFLAGS` option.
+If you want to provide other rustflags options in the `.cargo/config.toml` file in your project you need to ensure the value is an array of options. That will ensure that both options, your flags and the `target-cpu` flag, are merged correctly.
+
+This is an example of a valid `rustflags` option in the `.cargo/config.toml` file:
+
+```toml
+[build]
+rustflags = ["--cfg", "tracing_unstable"]
+```
+
+This is an example of an _invalid_ `rustflags` option in the `.cargo/config.toml` file:
+
+```toml
+[build]
+rustflags = "--cfg tracing_unstable"
+```
+
+## Disable all release optimizations
+
+If you want to disable all of these optimizations and provide your own, you can pass the flag `--disable-optimizations` to the `cargo lambda build` command:
+
+```shell
+cargo lambda build --release --disable-optimizations
+```
