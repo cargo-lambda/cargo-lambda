@@ -1,4 +1,4 @@
-ARG RUST_VERSION=1.70.0
+ARG RUST_VERSION=1.78.0
 FROM rust:${RUST_VERSION}
 
 RUN set -eux; \
@@ -7,7 +7,7 @@ RUN set -eux; \
 
 CMD [ "cargo", "lambda" ]
 
-ARG ZIG_VERSION=0.10.1
+ARG ZIG_VERSION=0.12.0
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
     case "${dpkgArch##*-}" in \
@@ -25,7 +25,7 @@ RUN set -eux; \
 
 ENV PATH=$PATH:/zig
 
-ARG CARGO_LAMBDA_VERSION=v0.19.2
+ARG CARGO_LAMBDA_VERSION=v1.2.2
 RUN set -eux; \
     mkdir cargo-lambda; \
     cd cargo-lambda; \
