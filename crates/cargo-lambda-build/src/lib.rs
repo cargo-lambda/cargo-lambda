@@ -7,6 +7,7 @@ use cargo_lambda_metadata::{
     fs::copy_and_replace,
 };
 use cargo_options::Build as CargoBuild;
+use chrono::{DateTime, Utc};
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Report, Result, WrapErr};
 use object::{read::File as ObjectFile, Architecture, Object};
@@ -14,7 +15,7 @@ use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
     fmt,
-    fs::{create_dir_all, read, File},
+    fs::{create_dir_all, read, File, Metadata},
     io::{self, Read, Write},
     path::{Path, PathBuf},
     str::FromStr,
@@ -24,7 +25,7 @@ use target_arch::TargetArch;
 use toolchain::rustup_cmd;
 use tracing::{debug, trace, warn};
 use walkdir::WalkDir;
-use zip::{write::FileOptions, ZipWriter};
+use zip::{write::SimpleFileOptions, ZipWriter};
 
 pub use cargo_zigbuild::Zig;
 
@@ -333,7 +334,6 @@ impl BinaryArchive {
             .wrap_err_with(|| format!("failed to finish zip file `{}`", self.path.display()))?;
 
         drop(archive);
-        drop(new_archive);
         copy_and_replace(&tmp_path, &self.path).into_diagnostic()?;
         Ok(())
     }
@@ -402,10 +402,16 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     let zipped_binary = File::create(&zipped)
         .into_diagnostic()
         .wrap_err_with(|| format!("failed to create zip file `{zipped:?}`"))?;
-    let binary_data = read(path)
+
+    let mut file = File::open(path)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to open binary file `{path:?}`"))?;
+
+    let mut binary_data = Vec::new();
+    file.read_to_end(&mut binary_data)
         .into_diagnostic()
         .wrap_err_with(|| format!("failed to read binary file `{path:?}`"))?;
-    let binary_perm = binary_permissions(path)?;
+
     let binary_data = &*binary_data;
     let object = ObjectFile::parse(binary_data)
         .into_diagnostic()
@@ -427,7 +433,8 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     }
 
     let file_name = if let Some(parent) = parent {
-        zip.add_directory(parent, FileOptions::default())
+        let options = SimpleFileOptions::default();
+        zip.add_directory(parent, options)
             .into_diagnostic()
             .wrap_err_with(|| {
                 format!("failed to add directory `{parent}` to zip file `{zipped:?}`")
@@ -439,12 +446,12 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
 
     let zip_file_name = convert_to_unix_path(&file_name)
         .ok_or_else(|| BuildError::InvalidUnixFileName(file_name.clone()))?;
-    zip.start_file(
-        zip_file_name.to_string(),
-        FileOptions::default().unix_permissions(binary_perm),
-    )
-    .into_diagnostic()
-    .wrap_err_with(|| format!("failed to start zip file `{zip_file_name:?}`"))?;
+
+    let options = zip_file_options(&file, path)?;
+
+    zip.start_file(zip_file_name.to_string(), options)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to start zip file `{zip_file_name:?}`"))?;
     zip.write_all(binary_data)
         .into_diagnostic()
         .wrap_err_with(|| format!("failed to write data into zip file `{zip_file_name:?}`"))?;
@@ -459,18 +466,40 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     })
 }
 
-#[cfg(unix)]
-fn binary_permissions(path: &Path) -> Result<u32> {
-    use std::os::unix::prelude::PermissionsExt;
-    let meta = std::fs::metadata(path)
+fn zip_file_options(file: &File, path: &Path) -> Result<SimpleFileOptions> {
+    let meta = file
+        .metadata()
         .into_diagnostic()
-        .wrap_err_with(|| format!("failed to get binary permissions from file `{path:?}`"))?;
-    Ok(meta.permissions().mode())
+        .wrap_err_with(|| format!("failed to get metadata from file `{path:?}`"))?;
+    let perm = binary_permissions(&meta);
+    let mtime = binary_mtime(&meta)?;
+
+    Ok(SimpleFileOptions::default()
+        .unix_permissions(perm)
+        .last_modified_time(mtime))
+}
+
+fn binary_mtime(meta: &Metadata) -> Result<zip::DateTime> {
+    let modified = meta
+        .modified()
+        .into_diagnostic()
+        .wrap_err("failed to get modified time")?;
+
+    let dt: DateTime<Utc> = modified.into();
+    zip::DateTime::try_from(dt.naive_utc())
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to convert `{modified:?}` to zip time"))
+}
+
+#[cfg(unix)]
+fn binary_permissions(meta: &Metadata) -> u32 {
+    use std::os::unix::fs::PermissionsExt;
+    meta.permissions().mode()
 }
 
 #[cfg(not(unix))]
-fn binary_permissions(_path: &Path) -> Result<u32> {
-    Ok(0o755)
+fn binary_permissions(meta: &Metadata) -> u32 {
+    0o755
 }
 
 #[cfg(target_os = "windows")]
@@ -512,7 +541,7 @@ where
             if path.is_dir() {
                 trace!(?entry_name, "creating directory in zip file");
 
-                zip.add_directory(entry_name.to_string(), FileOptions::default())
+                zip.add_directory(entry_name.to_string(), SimpleFileOptions::default())
                     .into_diagnostic()
                     .wrap_err_with(|| {
                         format!("failed to add directory `{entry_name}` to zip file")
@@ -528,7 +557,9 @@ where
 
                 trace!(?entry_name, "including file in zip file");
 
-                zip.start_file(entry_name.to_string(), FileOptions::default())
+                let options = zip_file_options(&file, path)?;
+
+                zip.start_file(entry_name.to_string(), options)
                     .into_diagnostic()
                     .wrap_err_with(|| format!("failed to start zip file `{entry_name:?}`"))?;
 
