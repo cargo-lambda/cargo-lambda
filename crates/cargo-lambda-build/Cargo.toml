@@ -33,6 +33,7 @@ tracing.workspace = true
 which.workspace = true
 zip.workspace = true
 walkdir = "2.4.0"
+chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }
