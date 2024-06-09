@@ -36,4 +36,5 @@ walkdir = "2.4.0"
 chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
+rstest = "0.21.0"
 tokio = { workspace = true, features = ["macros", "rt"] }
