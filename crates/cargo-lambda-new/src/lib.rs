@@ -51,7 +51,7 @@ struct Config {
     bin_name: Option<String>,
 
     /// Apply the default template values without any prompt
-    #[arg(long, alias = "default")]
+    #[arg(short = 'y', long, alias = "default")]
     no_interactive: bool,
 
     /// List of additional files to render with the template engine
