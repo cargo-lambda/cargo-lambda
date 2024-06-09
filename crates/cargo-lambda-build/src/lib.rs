@@ -21,7 +21,7 @@ use tracing::{debug, warn};
 pub use cargo_zigbuild::Zig;
 
 mod archive;
-pub use archive::{find_binary_archive, zip_binary, BinaryArchive};
+pub use archive::{create_binary_archive, zip_binary, BinaryArchive, BinaryData};
 
 mod compiler;
 use compiler::{build_command, build_profile};
@@ -247,15 +247,11 @@ impl Build {
                         format!("error creating lambda directory {bootstrap_dir:?}")
                     })?;
 
-                let bin_name = if self.extension {
-                    name.as_str()
-                } else {
-                    "bootstrap"
-                };
+                let data = BinaryData::new(name.as_str(), self.extension, self.internal);
 
                 match self.output_format {
                     OutputFormat::Binary => {
-                        let output_location = bootstrap_dir.join(bin_name);
+                        let output_location = bootstrap_dir.join(data.binary_name());
                         copy_and_replace(&binary, &output_location)
                             .into_diagnostic()
                             .wrap_err_with(|| {
@@ -263,16 +259,11 @@ impl Build {
                             })?;
                     }
                     OutputFormat::Zip => {
-                        let parent = if self.extension && !self.internal {
-                            Some("extensions")
-                        } else {
-                            None
-                        };
                         let extra_files = self
                             .include
                             .clone()
                             .or_else(|| build_config.include.clone());
-                        zip_binary(bin_name, binary, bootstrap_dir, parent, extra_files)?;
+                        zip_binary(binary, bootstrap_dir, &data, extra_files)?;
                     }
                 }
             }

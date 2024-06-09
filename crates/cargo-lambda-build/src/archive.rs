@@ -17,6 +17,68 @@ use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
 
 use crate::error::BuildError;
 
+#[derive(Debug)]
+pub enum BinaryData<'a> {
+    Function(&'a str),
+    ExternalExtension(&'a str),
+    InternalExtension(&'a str),
+}
+
+impl<'a> BinaryData<'a> {
+    /// Create a BinaryData given the arguments of the CLI
+    pub fn new(name: &'a str, extension: bool, internal: bool) -> Self {
+        if extension {
+            if internal {
+                BinaryData::InternalExtension(name)
+            } else {
+                BinaryData::ExternalExtension(name)
+            }
+        } else {
+            BinaryData::Function(name)
+        }
+    }
+
+    /// Name of the binary to copy inside the zip archive
+    pub fn binary_name(&self) -> &str {
+        match self {
+            BinaryData::Function(_) => "bootstrap",
+            BinaryData::ExternalExtension(name) => name,
+            BinaryData::InternalExtension(name) => name,
+        }
+    }
+
+    /// Name of the zip archive
+    pub fn zip_name(&self) -> String {
+        format!("{}.zip", self.binary_name())
+    }
+
+    /// Location of the binary after building it
+    pub fn binary_location(&self) -> &str {
+        match self {
+            BinaryData::Function(name) => name,
+            BinaryData::ExternalExtension(_) => "extensions",
+            BinaryData::InternalExtension(_) => "extensions",
+        }
+    }
+
+    /// Name of the parent directory to copy the binary into
+    pub fn parent_dir(&self) -> Option<&str> {
+        match self {
+            BinaryData::ExternalExtension(_) => Some("extensions"),
+            _ => None,
+        }
+    }
+
+    /// Command to use to build each kind of binary
+    pub fn build_help(&self) -> &str {
+        match self {
+            BinaryData::Function(_) => "build",
+            BinaryData::ExternalExtension(_) => "build --extension",
+            BinaryData::InternalExtension(_) => "build --extension --internal",
+        }
+    }
+}
+
 pub struct BinaryArchive {
     pub architecture: String,
     pub path: PathBuf,
@@ -74,46 +136,31 @@ impl BinaryArchive {
 
 /// Search for the bootstrap file for a function inside the target directory.
 /// If the binary file exists, it creates the zip archive and extracts its architecture by reading the binary.
-pub fn find_binary_archive<M, P>(
-    name: &str,
+pub fn create_binary_archive<M, P>(
     manifest_path: M,
     base_dir: &Option<P>,
-    is_extension: bool,
-    is_internal: bool,
+    data: &BinaryData,
     include: Option<Vec<PathBuf>>,
 ) -> Result<BinaryArchive>
 where
     M: AsRef<Path> + Debug,
     P: AsRef<Path>,
 {
-    let target_dir = target_dir(manifest_path).unwrap_or_else(|_| PathBuf::from("target"));
-    let (dir_name, binary_name, parent) = if is_extension && is_internal {
-        ("extensions", name, None)
-    } else if is_extension && !is_internal {
-        ("extensions", name, Some("extensions"))
-    } else {
-        (name, "bootstrap", None)
-    };
-
     let bootstrap_dir = if let Some(dir) = base_dir {
-        dir.as_ref().join(dir_name)
+        dir.as_ref().join(data.binary_location())
     } else {
-        target_dir.join("lambda").join(dir_name)
+        let target_dir = target_dir(manifest_path).unwrap_or_else(|_| PathBuf::from("target"));
+        target_dir.join("lambda").join(data.binary_location())
     };
 
-    let binary_path = bootstrap_dir.join(binary_name);
+    let binary_path = bootstrap_dir.join(data.binary_name());
     if !binary_path.exists() {
-        let build_cmd = if is_extension && is_internal {
-            "build --extension --internal"
-        } else if is_extension && !is_internal {
-            "build --extension"
-        } else {
-            "build"
-        };
-        return Err(BuildError::BinaryMissing(name.into(), build_cmd.into()).into());
+        return Err(
+            BuildError::BinaryMissing(data.binary_name().into(), data.build_help().into()).into(),
+        );
     }
 
-    zip_binary(binary_name, binary_path, bootstrap_dir, parent, include)
+    zip_binary(binary_path, bootstrap_dir, data, include)
 }
 
 /// Create a zip file from a function binary.
@@ -121,16 +168,16 @@ where
 /// The binary inside the zip file is called by its name, and put inside the `extensions`
 /// directory, for extension binaries.
 pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
-    name: &str,
     binary_path: BP,
     destination_directory: DD,
-    parent: Option<&str>,
+    data: &BinaryData,
     include: Option<Vec<PathBuf>>,
 ) -> Result<BinaryArchive> {
     let path = binary_path.as_ref();
     let dir = destination_directory.as_ref();
-    let zipped = dir.join(format!("{name}.zip"));
-    debug!(name, parent, ?path, ?dir, ?zipped, "zipping binary");
+
+    let zipped = dir.join(data.zip_name());
+    debug!(?data, ?path, ?dir, ?zipped, "zipping binary");
 
     let zipped_binary = File::create(&zipped)
         .into_diagnostic()
@@ -161,16 +208,16 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
         include_files_in_zip(&mut zip, &files)?;
     }
 
-    let file_name = if let Some(parent) = parent {
+    let file_name = if let Some(parent) = data.parent_dir() {
         let options = SimpleFileOptions::default();
         zip.add_directory(parent, options)
             .into_diagnostic()
             .wrap_err_with(|| {
                 format!("failed to add directory `{parent}` to zip file `{zipped:?}`")
             })?;
-        Path::new(parent).join(name)
+        Path::new(parent).join(data.binary_name())
     } else {
-        PathBuf::from("bootstrap")
+        PathBuf::from(data.binary_name())
     };
 
     let zip_file_name = convert_to_unix_path(&file_name)
@@ -297,8 +344,13 @@ fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
 
 #[cfg(test)]
 mod test {
-    use std::{thread::sleep, time::Duration};
+    use std::{
+        fs::{create_dir_all, remove_dir_all},
+        thread::sleep,
+        time::Duration,
+    };
 
+    use cargo_lambda_metadata::fs::copy_without_replace;
     use rstest::rstest;
     use tempfile::TempDir;
 
@@ -336,14 +388,15 @@ mod test {
     #[case("binary-x86-64", "x86_64")]
     #[case("binary-arm64", "arm64")]
     fn test_zip_funcion(#[case] name: &str, #[case] arch: &str) {
+        let data = BinaryData::new(name, false, false);
         let bp = &format!("../../tests/binaries/{name}");
         let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
         let archive =
-            zip_binary(name, bp, dd.path(), None, None).expect("failed to create binary archive");
+            zip_binary(bp, dd.path(), &data, None).expect("failed to create binary archive");
 
         assert_eq!(arch, archive.architecture);
 
-        let arch_path = dd.path().join(format!("{name}.zip"));
+        let arch_path = dd.path().join("bootstrap.zip");
         assert_eq!(arch_path, archive.path);
 
         let file = File::open(arch_path).expect("failed to open zip file");
@@ -357,10 +410,12 @@ mod test {
     #[case("binary-x86-64", "x86_64")]
     #[case("binary-arm64", "arm64")]
     fn test_zip_extension(#[case] name: &str, #[case] arch: &str) {
+        let data = BinaryData::new(name, true, false);
+
         let bp = &format!("../../tests/binaries/{name}");
         let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
-        let archive = zip_binary(name, bp, dd.path(), Some("extensions"), None)
-            .expect("failed to create binary archive");
+        let archive =
+            zip_binary(bp, dd.path(), &data, None).expect("failed to create binary archive");
 
         assert_eq!(arch, archive.architecture);
 
@@ -377,16 +432,41 @@ mod test {
     #[rstest]
     #[case("binary-x86-64", "x86_64")]
     #[case("binary-arm64", "arm64")]
-    fn test_zip_funcion_with_files(#[case] name: &str, #[case] arch: &str) {
+    fn test_zip_internal_extension(#[case] name: &str, #[case] arch: &str) {
+        let data = BinaryData::new(name, true, true);
+
         let bp = &format!("../../tests/binaries/{name}");
-        let extra = vec!["Cargo.toml".into()];
         let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
-        let archive = zip_binary(name, bp, dd.path(), None, Some(extra))
-            .expect("failed to create binary archive");
+        let archive =
+            zip_binary(bp, dd.path(), &data, None).expect("failed to create binary archive");
 
         assert_eq!(arch, archive.architecture);
 
         let arch_path = dd.path().join(format!("{name}.zip"));
+        assert_eq!(arch_path, archive.path);
+
+        let file = File::open(arch_path).expect("failed to open zip file");
+        let mut zip = ZipArchive::new(file).expect("failed to open zip archive");
+
+        zip.by_name(name)
+            .expect(&format!("failed to find {name} in zip archive"));
+    }
+
+    #[rstest]
+    #[case("binary-x86-64", "x86_64")]
+    #[case("binary-arm64", "arm64")]
+    fn test_zip_funcion_with_files(#[case] name: &str, #[case] arch: &str) {
+        let data = BinaryData::new(name, false, false);
+
+        let bp = &format!("../../tests/binaries/{name}");
+        let extra = vec!["Cargo.toml".into()];
+        let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
+        let archive =
+            zip_binary(bp, dd.path(), &data, Some(extra)).expect("failed to create binary archive");
+
+        assert_eq!(arch, archive.architecture);
+
+        let arch_path = dd.path().join("bootstrap.zip");
         assert_eq!(arch_path, archive.path);
 
         let file = File::open(arch_path).expect("failed to open zip file");
@@ -401,33 +481,37 @@ mod test {
 
     #[test]
     fn test_consistent_hash() {
+        let data = BinaryData::new("binary-x86-64", false, false);
+
         let bp = &format!("../../tests/binaries/binary-x86-64");
         let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
 
-        let archive1 = zip_binary("binary-x86-64", bp, dd.path(), None, None)
-            .expect("failed to create binary archive");
+        let archive1 =
+            zip_binary(bp, dd.path(), &data, None).expect("failed to create binary archive");
 
         // Sleep to ensure that the mtime is different enough for the hash to change
         sleep(Duration::from_secs(2));
 
-        let archive2 = zip_binary("binary-x86-64", bp, dd.path(), None, None)
-            .expect("failed to create binary archive");
+        let archive2 =
+            zip_binary(bp, dd.path(), &data, None).expect("failed to create binary archive");
 
         assert_eq!(archive1.sha256().unwrap(), archive2.sha256().unwrap());
     }
 
     #[test]
     fn test_add_files() {
+        let data = BinaryData::new("binary-x86-64", false, false);
+
         let bp = &format!("../../tests/binaries/binary-x86-64");
         let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
 
-        let archive = zip_binary("binary-x86-64", bp, dd.path(), None, None)
-            .expect("failed to create binary archive");
+        let archive =
+            zip_binary(bp, dd.path(), &data, None).expect("failed to create binary archive");
 
         let extra = vec!["Cargo.toml".into()];
         archive.add_files(&extra).expect("failed to add files");
 
-        let arch_path = dd.path().join(format!("binary-x86-64.zip"));
+        let arch_path = dd.path().join("bootstrap.zip");
         assert_eq!(arch_path, archive.path);
 
         let file = File::open(arch_path).expect("failed to open zip file");
@@ -438,5 +522,57 @@ mod test {
 
         zip.by_name("Cargo.toml")
             .expect("failed to find Cargo.toml in zip archive");
+    }
+
+    #[test]
+    fn test_create_binary_archive_with_base_path() {
+        let data = BinaryData::new("binary-x86-64", false, false);
+
+        let bp = &format!("../../tests/binaries/binary-x86-64");
+        let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
+        let bsp = dd.path().join("binary-x86-64");
+
+        create_dir_all(&bsp).expect("failed to create dir");
+        copy_without_replace(bp, bsp.join("bootstrap")).expect("failed to copy bootstrap file");
+
+        let archive = create_binary_archive("Cargo.toml", &Some(dd.path()), &data, None)
+            .expect("failed to create binary archive");
+
+        let arch_path = bsp.join("bootstrap.zip");
+        assert_eq!(arch_path, archive.path);
+
+        let file = File::open(arch_path).expect("failed to open zip file");
+        let mut zip = ZipArchive::new(file).expect("failed to open zip archive");
+
+        zip.by_name("bootstrap")
+            .expect("failed to find bootstrap in zip archive");
+    }
+
+    #[test]
+    fn test_create_binary_archive_from_target() {
+        let data = BinaryData::new("binary-x86-64", false, false);
+
+        let bp = &format!("../../tests/binaries/binary-x86-64");
+        let target_dir = target_dir("Cargo.toml").unwrap_or_else(|_| PathBuf::from("target"));
+
+        let bsp = target_dir.join("lambda").join("binary-x86-64");
+
+        create_dir_all(&bsp).expect("failed to create dir");
+        copy_without_replace(bp, bsp.join("bootstrap")).expect("failed to copy bootstrap file");
+
+        let base_dir: Option<&Path> = None;
+        let archive = create_binary_archive("Cargo.toml", &base_dir, &data, None)
+            .expect("failed to create binary archive");
+
+        let arch_path = bsp.join("bootstrap.zip");
+        assert_eq!(arch_path, archive.path);
+
+        let file = File::open(arch_path).expect("failed to open zip file");
+        let mut zip = ZipArchive::new(file).expect("failed to open zip archive");
+
+        zip.by_name("bootstrap")
+            .expect("failed to find bootstrap in zip archive");
+
+        remove_dir_all(&bsp).expect("failed to delete dir");
     }
 }
