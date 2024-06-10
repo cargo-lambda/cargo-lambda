@@ -1,5 +1,5 @@
 use aws_smithy_types::retry::{RetryConfig, RetryMode};
-use cargo_lambda_build::{find_binary_archive, zip_binary, BinaryArchive};
+use cargo_lambda_build::{create_binary_archive, zip_binary, BinaryArchive, BinaryData};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::{function_deploy_metadata, main_binary, DeployConfig};
 use cargo_lambda_remote::{
@@ -244,8 +244,8 @@ impl Deploy {
     }
 
     fn load_archive(&self) -> Result<(String, BinaryArchive)> {
-        let arc = match &self.binary_path {
-            Some(bp) if bp.is_dir() => return Err(miette::miette!("invalid file {:?}", bp)),
+        match &self.binary_path {
+            Some(bp) if bp.is_dir() => Err(miette::miette!("invalid file {:?}", bp)),
             Some(bp) => {
                 let name = match &self.name {
                     Some(name) => name.clone(),
@@ -260,14 +260,9 @@ impl Deploy {
                     .parent()
                     .ok_or_else(|| miette::miette!("invalid binary path {:?}", bp))?;
 
-                let parent = if self.extension && !self.internal {
-                    Some("extensions")
-                } else {
-                    None
-                };
-
-                let arc = zip_binary(&name, bp, destination, parent, self.include.clone())?;
-                (name, arc)
+                let data = BinaryData::new(&name, self.extension, self.internal);
+                let arc = zip_binary(bp, destination, &data, self.include.clone())?;
+                Ok((name, arc))
             }
             None => {
                 let name = match (&self.name, &self.binary_name) {
@@ -276,19 +271,17 @@ impl Deploy {
                     (None, None) => main_binary(&self.manifest_path).into_diagnostic()?,
                 };
                 let binary_name = self.binary_name_or_default(&name);
+                let data = BinaryData::new(&binary_name, self.extension, self.internal);
 
-                let arc = find_binary_archive(
-                    &binary_name,
+                let arc = create_binary_archive(
                     &self.manifest_path,
                     &self.lambda_dir,
-                    self.extension,
-                    self.internal,
+                    &data,
                     self.include.clone(),
                 )?;
-                (name, arc)
+                Ok((name, arc))
             }
-        };
-        Ok(arc)
+        }
     }
 
     fn dry_output(

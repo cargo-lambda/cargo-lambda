@@ -53,12 +53,16 @@ where
 {
     let from = from.as_ref();
     if from.is_dir() {
-        copy_dir(from, to, replace).and(remove_dir_all::remove_dir_all(from))
+        return copy_dir(from, to, replace).and(remove_dir_all::remove_dir_all(from));
     } else if replace || !to.as_ref().exists() {
-        fs::copy(from, to).and(fs::remove_file(from))
-    } else {
-        Ok(())
+        fs::copy(from, to)?;
     }
+
+    if replace {
+        fs::remove_file(from)?;
+    }
+
+    Ok(())
 }
 
 fn copy_dir<P, Q>(from: P, to: Q, replace: bool) -> io::Result<()>

@@ -2,34 +2,29 @@ use cargo_lambda_interactive::{error::InquireError, is_user_cancellation_error};
 use cargo_lambda_metadata::{
     cargo::{
         binary_targets_from_metadata, cargo_release_profile_config, function_build_metadata,
-        load_metadata, target_dir, target_dir_from_metadata, CompilerOptions,
+        load_metadata, target_dir_from_metadata, CompilerOptions,
     },
     fs::copy_and_replace,
 };
 use cargo_options::Build as CargoBuild;
-use chrono::{DateTime, Utc};
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Report, Result, WrapErr};
-use object::{read::File as ObjectFile, Architecture, Object};
-use sha2::{Digest, Sha256};
 use std::{
-    borrow::Cow,
-    fmt,
-    fs::{create_dir_all, read, File, Metadata},
-    io::{self, Read, Write},
+    fs::create_dir_all,
     path::{Path, PathBuf},
     str::FromStr,
 };
 use strum_macros::EnumString;
 use target_arch::TargetArch;
-use toolchain::rustup_cmd;
-use tracing::{debug, trace, warn};
-use walkdir::WalkDir;
-use zip::{write::SimpleFileOptions, ZipWriter};
+use tracing::{debug, warn};
 
 pub use cargo_zigbuild::Zig;
 
+mod archive;
+pub use archive::{create_binary_archive, zip_binary, BinaryArchive, BinaryData};
+
 mod compiler;
+use compiler::{build_command, build_profile};
 
 mod error;
 use error::BuildError;
@@ -37,9 +32,9 @@ use error::BuildError;
 mod target_arch;
 use target_arch::validate_linux_target;
 
-use crate::compiler::{build_command, build_profile};
-
 mod toolchain;
+use toolchain::rustup_cmd;
+
 mod zig;
 
 #[derive(Args, Clone, Debug)]
@@ -252,15 +247,11 @@ impl Build {
                         format!("error creating lambda directory {bootstrap_dir:?}")
                     })?;
 
-                let bin_name = if self.extension {
-                    name.as_str()
-                } else {
-                    "bootstrap"
-                };
+                let data = BinaryData::new(name.as_str(), self.extension, self.internal);
 
                 match self.output_format {
                     OutputFormat::Binary => {
-                        let output_location = bootstrap_dir.join(bin_name);
+                        let output_location = bootstrap_dir.join(data.binary_name());
                         copy_and_replace(&binary, &output_location)
                             .into_diagnostic()
                             .wrap_err_with(|| {
@@ -268,16 +259,11 @@ impl Build {
                             })?;
                     }
                     OutputFormat::Zip => {
-                        let parent = if self.extension && !self.internal {
-                            Some("extensions")
-                        } else {
-                            None
-                        };
                         let extra_files = self
                             .include
                             .clone()
                             .or_else(|| build_config.include.clone());
-                        zip_binary(bin_name, binary, bootstrap_dir, parent, extra_files)?;
+                        zip_binary(binary, bootstrap_dir, &data, extra_files)?;
                     }
                 }
             }
@@ -294,315 +280,9 @@ impl Build {
     }
 }
 
-pub struct BinaryArchive {
-    pub architecture: String,
-    pub sha256: String,
-    pub path: PathBuf,
-}
-
-impl BinaryArchive {
-    pub fn read(&self) -> Result<Vec<u8>> {
-        read(&self.path)
-            .into_diagnostic()
-            .wrap_err("failed to read binary archive")
-    }
-
-    pub fn add_files(&self, files: &Vec<PathBuf>) -> Result<()> {
-        trace!(?self.path, ?files, "adding files to zip file");
-        let zipfile = std::fs::File::open(&self.path).into_diagnostic()?;
-
-        let mut archive = zip::ZipArchive::new(zipfile).into_diagnostic()?;
-
-        // Open a new, empty archive for writing to
-        let tmp_dir = tempfile::tempdir().into_diagnostic()?;
-        let tmp_path = tmp_dir
-            .path()
-            .join(self.path.file_name().expect("missing zip file name"));
-        let tmp = File::create(&tmp_path).into_diagnostic()?;
-        let mut new_archive = zip::ZipWriter::new(tmp);
-
-        for i in 0..archive.len() {
-            let file = archive.by_index_raw(i).into_diagnostic()?;
-            new_archive.raw_copy_file(file).into_diagnostic()?;
-        }
-
-        include_files_in_zip(&mut new_archive, files)?;
-
-        new_archive
-            .finish()
-            .into_diagnostic()
-            .wrap_err_with(|| format!("failed to finish zip file `{}`", self.path.display()))?;
-
-        drop(archive);
-        copy_and_replace(&tmp_path, &self.path).into_diagnostic()?;
-        Ok(())
-    }
-}
-
-/// Search for the bootstrap file for a function inside the target directory.
-/// If the binary file exists, it creates the zip archive and extracts its architecture by reading the binary.
-pub fn find_binary_archive<M, P>(
-    name: &str,
-    manifest_path: M,
-    base_dir: &Option<P>,
-    is_extension: bool,
-    is_internal: bool,
-    include: Option<Vec<PathBuf>>,
-) -> Result<BinaryArchive>
-where
-    M: AsRef<Path> + fmt::Debug,
-    P: AsRef<Path>,
-{
-    let target_dir = target_dir(manifest_path).unwrap_or_else(|_| PathBuf::from("target"));
-    let (dir_name, binary_name, parent) = if is_extension && is_internal {
-        ("extensions", name, None)
-    } else if is_extension && !is_internal {
-        ("extensions", name, Some("extensions"))
-    } else {
-        (name, "bootstrap", None)
-    };
-
-    let bootstrap_dir = if let Some(dir) = base_dir {
-        dir.as_ref().join(dir_name)
-    } else {
-        target_dir.join("lambda").join(dir_name)
-    };
-
-    let binary_path = bootstrap_dir.join(binary_name);
-    if !binary_path.exists() {
-        let build_cmd = if is_extension && is_internal {
-            "build --extension --internal"
-        } else if is_extension && !is_internal {
-            "build --extension"
-        } else {
-            "build"
-        };
-        return Err(BuildError::BinaryMissing(name.into(), build_cmd.into()).into());
-    }
-
-    zip_binary(binary_name, binary_path, bootstrap_dir, parent, include)
-}
-
-/// Create a zip file from a function binary.
-/// The binary inside the zip file is called `bootstrap` for function binaries.
-/// The binary inside the zip file is called by its name, and put inside the `extensions`
-/// directory, for extension binaries.
-pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
-    name: &str,
-    binary_path: BP,
-    destination_directory: DD,
-    parent: Option<&str>,
-    include: Option<Vec<PathBuf>>,
-) -> Result<BinaryArchive> {
-    let path = binary_path.as_ref();
-    let dir = destination_directory.as_ref();
-    let zipped = dir.join(format!("{name}.zip"));
-    debug!(name, parent, ?path, ?dir, ?zipped, "zipping binary");
-
-    let zipped_binary = File::create(&zipped)
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to create zip file `{zipped:?}`"))?;
-
-    let mut file = File::open(path)
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to open binary file `{path:?}`"))?;
-
-    let mut binary_data = Vec::new();
-    file.read_to_end(&mut binary_data)
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to read binary file `{path:?}`"))?;
-
-    let binary_data = &*binary_data;
-    let object = ObjectFile::parse(binary_data)
-        .into_diagnostic()
-        .wrap_err("the provided function file is not a valid Linux binary")?;
-
-    let arch = match object.architecture() {
-        Architecture::Aarch64 => "arm64",
-        Architecture::X86_64 => "x86_64",
-        other => return Err(BuildError::InvalidBinaryArchitecture(other).into()),
-    };
-
-    let mut hasher = Sha256::new();
-    hasher.update(binary_data);
-    let sha256 = format!("{:X}", hasher.finalize());
-
-    let mut zip = ZipWriter::new(zipped_binary);
-    if let Some(files) = include {
-        include_files_in_zip(&mut zip, &files)?;
-    }
-
-    let file_name = if let Some(parent) = parent {
-        let options = SimpleFileOptions::default();
-        zip.add_directory(parent, options)
-            .into_diagnostic()
-            .wrap_err_with(|| {
-                format!("failed to add directory `{parent}` to zip file `{zipped:?}`")
-            })?;
-        Path::new(parent).join(name)
-    } else {
-        PathBuf::from(name)
-    };
-
-    let zip_file_name = convert_to_unix_path(&file_name)
-        .ok_or_else(|| BuildError::InvalidUnixFileName(file_name.clone()))?;
-
-    let options = zip_file_options(&file, path)?;
-
-    zip.start_file(zip_file_name.to_string(), options)
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to start zip file `{zip_file_name:?}`"))?;
-    zip.write_all(binary_data)
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to write data into zip file `{zip_file_name:?}`"))?;
-    zip.finish()
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to finish zip file `{zip_file_name:?}`"))?;
-
-    Ok(BinaryArchive {
-        architecture: arch.into(),
-        path: zipped,
-        sha256,
-    })
-}
-
-fn zip_file_options(file: &File, path: &Path) -> Result<SimpleFileOptions> {
-    let meta = file
-        .metadata()
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to get metadata from file `{path:?}`"))?;
-    let perm = binary_permissions(&meta);
-    let mtime = binary_mtime(&meta)?;
-
-    Ok(SimpleFileOptions::default()
-        .unix_permissions(perm)
-        .last_modified_time(mtime))
-}
-
-fn binary_mtime(meta: &Metadata) -> Result<zip::DateTime> {
-    let modified = meta
-        .modified()
-        .into_diagnostic()
-        .wrap_err("failed to get modified time")?;
-
-    let dt: DateTime<Utc> = modified.into();
-    zip::DateTime::try_from(dt.naive_utc())
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to convert `{modified:?}` to zip time"))
-}
-
-#[cfg(unix)]
-fn binary_permissions(meta: &Metadata) -> u32 {
-    use std::os::unix::fs::PermissionsExt;
-    meta.permissions().mode()
-}
-
-#[cfg(not(unix))]
-fn binary_permissions(meta: &Metadata) -> u32 {
-    0o755
-}
-
-#[cfg(target_os = "windows")]
-fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
-    let mut path_str = String::new();
-    for component in path.components() {
-        if let std::path::Component::Normal(os_str) = component {
-            if !path_str.is_empty() {
-                path_str.push('/');
-            }
-            path_str.push_str(os_str.to_str()?);
-        }
-    }
-    Some(Cow::Owned(path_str))
-}
-
-#[cfg(not(target_os = "windows"))]
-fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
-    path.to_str().map(Cow::Borrowed)
-}
-
 fn downcasted_user_cancellation(err: &Report) -> bool {
     match err.root_cause().downcast_ref::<InquireError>() {
         Some(err) => is_user_cancellation_error(err),
         None => false,
-    }
-}
-
-fn include_files_in_zip<W>(zip: &mut ZipWriter<W>, files: &Vec<PathBuf>) -> Result<()>
-where
-    W: Write + io::Seek,
-{
-    for file in files {
-        for entry in WalkDir::new(file).into_iter().filter_map(|e| e.ok()) {
-            let path = entry.path();
-            let entry_name = convert_to_unix_path(path)
-                .ok_or_else(|| BuildError::InvalidUnixFileName(path.to_path_buf()))?;
-
-            if path.is_dir() {
-                trace!(?entry_name, "creating directory in zip file");
-
-                zip.add_directory(entry_name.to_string(), SimpleFileOptions::default())
-                    .into_diagnostic()
-                    .wrap_err_with(|| {
-                        format!("failed to add directory `{entry_name}` to zip file")
-                    })?;
-            } else {
-                let mut content = Vec::new();
-                let mut file = File::open(path)
-                    .into_diagnostic()
-                    .wrap_err_with(|| format!("failed to open file `{path:?}`"))?;
-                file.read_to_end(&mut content)
-                    .into_diagnostic()
-                    .wrap_err_with(|| format!("failed to read file `{path:?}`"))?;
-
-                trace!(?entry_name, "including file in zip file");
-
-                let options = zip_file_options(&file, path)?;
-
-                zip.start_file(entry_name.to_string(), options)
-                    .into_diagnostic()
-                    .wrap_err_with(|| format!("failed to start zip file `{entry_name:?}`"))?;
-
-                zip.write_all(&content)
-                    .into_diagnostic()
-                    .wrap_err_with(|| {
-                        format!("failed to write data into zip file `{entry_name:?}`")
-                    })?;
-            }
-        }
-    }
-    Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_convert_to_unix_path() {
-        // On Windows, a PathBuff constructed from Path::join will have "\" as separator, while on Unix-like systems it will have "/"
-        let path = Path::new("extensions").join("test").join("filename");
-        assert_eq!(
-            "extensions/test/filename",
-            convert_to_unix_path(&path).expect("failed to convert file path")
-        );
-    }
-
-    #[test]
-    fn test_convert_to_unix_path_keep_original() {
-        let path = Path::new("extensions/test/filename");
-        assert_eq!(
-            "extensions/test/filename",
-            convert_to_unix_path(path).expect("failed to convert file path")
-        );
-    }
-
-    #[test]
-    fn test_convert_to_unix_path_empty_path() {
-        let path = Path::new("");
-        assert_eq!(
-            "",
-            convert_to_unix_path(path).expect("failed to convert file path")
-        );
     }
 }
