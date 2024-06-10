@@ -29,13 +29,6 @@ pub(crate) async fn build_command(
 
 #[allow(unused_variables)]
 pub(crate) fn build_profile<'a>(cargo: &'a Build, compiler: &'a CompilerOptions) -> &'a str {
-    // To understand why we need this,
-    // see https://github.com/cargo-lambda/cargo-lambda/issues/77
-    #[cfg(windows)]
-    if compiler.is_cargo_zigbuild() {
-        return "release";
-    }
-
     match cargo.profile.as_deref() {
         Some("dev" | "test") => "debug",
         Some("release" | "bench") => "release",
