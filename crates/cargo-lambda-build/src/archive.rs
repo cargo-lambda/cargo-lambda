@@ -319,7 +319,7 @@ fn binary_permissions(meta: &Metadata) -> u32 {
 }
 
 #[cfg(not(unix))]
-fn binary_permissions(meta: &Metadata) -> u32 {
+fn binary_permissions(_meta: &Metadata) -> u32 {
     0o755
 }
 
