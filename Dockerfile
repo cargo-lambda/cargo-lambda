@@ -7,13 +7,13 @@ RUN set -eux; \
 
 CMD [ "cargo", "lambda" ]
 
-ARG ZIG_VERSION=0.12.0
+ARG ZIG_VERSION=0.13.0
 RUN set -eux; \
     dpkgArch="$(dpkg --print-architecture)"; \
     case "${dpkgArch##*-}" in \
     amd64) zigArch='x86_64';; \
     arm64) zigArch='aarch64';; \
-    i386) zigArch='i386';; \
+    i386) zigArch='x86';; \
     esac; \
     url="https://ziglang.org/download/${ZIG_VERSION}/zig-linux-${zigArch}-${ZIG_VERSION}.tar.xz"; \
     wget "$url"; \
