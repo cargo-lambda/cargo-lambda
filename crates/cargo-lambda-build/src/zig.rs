@@ -5,25 +5,24 @@ use cargo_lambda_interactive::{
 use cargo_zigbuild::Zig;
 use miette::{IntoDiagnostic, Result};
 
-pub async fn check_installation() -> Result<()> {
-    if Zig::find_zig().is_ok() {
-        return Ok(());
+/// Print information about the Zig installation.
+pub fn print_install_options(options: &[InstallOption]) {
+    println!("Zig is not installed in your system.");
+    if is_stdin_tty() {
+        println!("Run `cargo lambda system --setup` to install Zig.")
     }
 
-    let options = install_options();
-
-    if !is_stdin_tty() || options.is_empty() {
-        println!("Zig is not installed in your system.");
-        if !options.is_empty() {
-            println!("You can use any of the following options to install it:");
-            for option in &options {
-                println!("\t* {}: `{}`", option, option.usage());
-            }
+    if !options.is_empty() {
+        println!("You can use any of the following options to install it:");
+        for option in options {
+            println!("\t* {}: `{}`", option, option.usage());
         }
-        println!("\t* Download Zig 0.9.1 or newer from https://ziglang.org/download/ and add it to your PATH");
-        return Err(BuildError::ZigMissing.into());
     }
+    println!("\t* Download Zig 0.9.1 or newer from https://ziglang.org/download/ and add it to your PATH");
+}
 
+/// Install Zig using a choice prompt.
+pub async fn install_zig(options: Vec<InstallOption>) -> Result<()> {
     let choice = choose_option(
         "Zig is not installed in your system.\nHow do you want to install Zig?",
         options,
@@ -35,7 +34,22 @@ pub async fn check_installation() -> Result<()> {
     }
 }
 
-enum InstallOption {
+pub async fn check_installation() -> Result<()> {
+    if Zig::find_zig().is_ok() {
+        return Ok(());
+    }
+
+    let options = install_options();
+
+    if !is_stdin_tty() || options.is_empty() {
+        print_install_options(&options);
+        return Err(BuildError::ZigMissing.into());
+    }
+
+    install_zig(options).await
+}
+
+pub enum InstallOption {
     #[cfg(not(windows))]
     Brew,
     #[cfg(windows)]
@@ -64,7 +78,7 @@ impl std::fmt::Display for InstallOption {
 }
 
 impl InstallOption {
-    fn usage(&self) -> &'static str {
+    pub fn usage(&self) -> &'static str {
         match self {
             #[cfg(not(windows))]
             InstallOption::Brew => "brew install zig",
@@ -78,7 +92,7 @@ impl InstallOption {
         }
     }
 
-    async fn install(self) -> Result<()> {
+    pub async fn install(self) -> Result<()> {
         let pb = Progress::start("Installing Zig...");
         let usage = self.usage().split(' ').collect::<Vec<_>>();
         let usage = usage.as_slice();
@@ -95,7 +109,7 @@ impl InstallOption {
     }
 }
 
-fn install_options() -> Vec<InstallOption> {
+pub fn install_options() -> Vec<InstallOption> {
     let mut options = Vec::new();
 
     #[cfg(not(windows))]

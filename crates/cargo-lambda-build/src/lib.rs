@@ -36,6 +36,9 @@ mod toolchain;
 use toolchain::rustup_cmd;
 
 mod zig;
+pub use zig::{
+    check_installation, install_options, install_zig, print_install_options, InstallOption,
+};
 
 #[derive(Args, Clone, Debug)]
 #[command(
