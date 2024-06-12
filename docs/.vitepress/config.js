@@ -73,6 +73,7 @@ function sidebar() {
                 { text: 'cargo lambda init', link: '/commands/init' },
                 { text: 'cargo lambda invoke', link: '/commands/invoke' },
                 { text: 'cargo lambda new', link: '/commands/new' },
+                { text: 'cargo lambda system', link: '/commands/system' },
                 { text: 'cargo lambda watch', link: '/commands/watch' },
             ]
         }

@@ -962,6 +962,7 @@ dependencies = [
  "cargo-lambda-deploy",
  "cargo-lambda-invoke",
  "cargo-lambda-new",
+ "cargo-lambda-system",
  "cargo-lambda-watch",
  "clap",
  "clap-cargo",
@@ -1113,6 +1114,17 @@ dependencies = [
  "aws-types",
  "clap",
  "tokio",
+]
+
+[[package]]
+name = "cargo-lambda-system"
+version = "1.3.0"
+dependencies = [
+ "cargo-lambda-build",
+ "cargo-lambda-interactive",
+ "clap",
+ "miette 5.10.0",
+ "tracing",
 ]
 
 [[package]]

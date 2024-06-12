@@ -14,4 +14,6 @@ The [invoke](/commands/invoke) subcommand sends requests to the control plane em
 
 The [deploy](/commands/deploy) subcommand uploads functions to AWS Lambda. You can use the same command to create new functions as well as update existent functions code.
 
+The [system](/commands/system) subcommand shows the status of the system Zig installation and installs Zig if it is not already installed.
+
 Cargo Lambda does not provide a command to delete the lambda once it is deployed. You can use the ```aws lambda delete-function --function-name NAME``` command from the AWS CLI.

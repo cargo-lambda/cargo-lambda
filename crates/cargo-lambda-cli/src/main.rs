@@ -4,6 +4,7 @@ use cargo_lambda_build::{Build, Zig};
 use cargo_lambda_deploy::Deploy;
 use cargo_lambda_invoke::Invoke;
 use cargo_lambda_new::{Init, New};
+use cargo_lambda_system::System;
 use cargo_lambda_watch::Watch;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_cargo::style::CLAP_STYLING;
@@ -85,6 +86,8 @@ enum LambdaSubcommand {
     /// `cargo lambda watch` boots a development server that emulates interactions with the AWS Lambda control plane.
     /// This subcommand also reloads your Rust code as you work on it.
     Watch(Watch),
+    /// `cargo lambda system` shows the status of the system Zig installation.
+    System(System),
 }
 
 impl LambdaSubcommand {
@@ -96,6 +99,7 @@ impl LambdaSubcommand {
             Self::Invoke(i) => i.run().await,
             Self::New(mut n) => n.run().await,
             Self::Watch(w) => w.run(color).await,
+            Self::System(s) => s.run().await,
         }
     }
 }
