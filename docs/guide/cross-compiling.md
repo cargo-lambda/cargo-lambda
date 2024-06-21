@@ -8,6 +8,14 @@ Cargo Lambda compiles your code for Linux targets using several techniques, rega
 
 By default, Cargo Lambda uses the [Zig toolchain](https://crates.io/crates/cargo-zigbuild) to cross compile your code. This is the most convenient cross compilation mechanism because it comes built in, and it works for the majority of use cases. Any pure Rust Lambda function should compile correctly with this toolchain.
 
+### Why is Zig desirable here?
+
+While Rust has really [good cross compiling](https://rust-lang.github.io/rustup/cross-compilation.html) support and [many targets are currently supported](https://doc.rust-lang.org/nightly/rustc/platform-support.html), any crate having C components that need to be compiled by the host can have many practical compiling issues (see "Known cross compilation issues" below for a small selection).
+
+[Zig CC, a subcommand of the Zig's CLI](https://zig.guide/working-with-c/zig-cc/), provides an extremely convenient multi-target, multi-platform and multi-library way to cross compile almost any C project. Please take some time to appreciate the amount of work this user friendlyness takes written in [zig cc: a Powerful Drop-In Replacement for GCC/Lang](https://andrewkelley.me/post/zig-cc-powerful-drop-in-replacement-gcc-clang.html). 
+
+At the time of writing, this effort is unmatched by the Rust community.
+
 ## Cross Compiling with Cross
 
 Cargo Lambda also supports [cross](https://crates.io/crates/cross) as the compiler. Cross compiles your code inside Linux containers. If you want to use it with Cargo Lambda, you'll have to install it manually in your system, as well as installing [Docker](https://www.docker.com/). All builds with Cross happen inside Docker, so they are slower, but it preserves Cargo Lambda's optimizations and conventions.
