@@ -41,6 +41,8 @@ publish-all:
 	sleep 10
 	cargo publish --package cargo-lambda-new
 	sleep 10
+	cargo publish --package cargo-lambda-system
+	sleep 10
 	cargo publish --package cargo-lambda-watch
 	sleep 10
 	cd crates/cargo-lambda-cli && cargo publish

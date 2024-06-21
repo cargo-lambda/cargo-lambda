@@ -449,7 +449,7 @@ mod test {
         let mut zip = ZipArchive::new(file).expect("failed to open zip archive");
 
         zip.by_name(name)
-            .expect(&format!("failed to find {name} in zip archive"));
+            .unwrap_or_else(|_| panic!("failed to find {name} in zip archive"));
     }
 
     #[rstest]
@@ -483,7 +483,7 @@ mod test {
     fn test_consistent_hash() {
         let data = BinaryData::new("binary-x86-64", false, false);
 
-        let bp = &format!("../../tests/binaries/binary-x86-64");
+        let bp = "../../tests/binaries/binary-x86-64";
         let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
 
         let archive1 =
@@ -502,7 +502,7 @@ mod test {
     fn test_add_files() {
         let data = BinaryData::new("binary-x86-64", false, false);
 
-        let bp = &format!("../../tests/binaries/binary-x86-64");
+        let bp = "../../tests/binaries/binary-x86-64";
         let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
 
         let archive =
@@ -528,7 +528,7 @@ mod test {
     fn test_create_binary_archive_with_base_path() {
         let data = BinaryData::new("binary-x86-64", false, false);
 
-        let bp = &format!("../../tests/binaries/binary-x86-64");
+        let bp = "../../tests/binaries/binary-x86-64";
         let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
         let bsp = dd.path().join("binary-x86-64");
 
@@ -552,7 +552,7 @@ mod test {
     fn test_create_binary_archive_from_target() {
         let data = BinaryData::new("binary-x86-64", false, false);
 
-        let bp = &format!("../../tests/binaries/binary-x86-64");
+        let bp = "../../tests/binaries/binary-x86-64";
         let target_dir = target_dir("Cargo.toml").unwrap_or_else(|_| PathBuf::from("target"));
 
         let bsp = target_dir.join("lambda").join("binary-x86-64");

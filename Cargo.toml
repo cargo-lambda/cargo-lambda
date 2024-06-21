@@ -36,7 +36,7 @@ homepage = "https://github.com/cargo-lambda/cargo-lambda"
 repository = "https://github.com/cargo-lambda/cargo-lambda"
 keywords = ["cargo", "subcommand", "aws", "lambda"]
 description = "Cargo subcommand to work with AWS Lambda"
-rust-version = "1.70.0"
+rust-version = "1.74.0"
 
 [workspace.dependencies]
 aws-config = "1.1.8"
