@@ -12,9 +12,9 @@ By default, Cargo Lambda uses the [Zig toolchain](https://crates.io/crates/cargo
 
 While Rust has really [good cross compiling](https://rust-lang.github.io/rustup/cross-compilation.html) support and [many targets are currently supported](https://doc.rust-lang.org/nightly/rustc/platform-support.html), any crate having C components that need to be compiled by the host can have many practical compiling issues (see "Known cross compilation issues" below for a small selection).
 
-[Zig CC, a subcommand of the Zig's CLI](https://zig.guide/working-with-c/zig-cc/), provides an extremely convenient multi-target, multi-platform and multi-library way to cross compile almost any C project. Please take some time to appreciate the amount of work this user friendlyness takes written in [zig cc: a Powerful Drop-In Replacement for GCC/Lang](https://andrewkelley.me/post/zig-cc-powerful-drop-in-replacement-gcc-clang.html). 
+[Zig CC, a subcommand of the Zig's CLI](https://zig.guide/working-with-c/zig-cc/), provides an extremely convenient multi-target, multi-platform and multi-library way to cross compile almost any C project. To appreciate the amount of work this user friendliness takes to attain, please read the following blogpost by Zig's author: [zig cc: a Powerful Drop-In Replacement for GCC/Lang](https://andrewkelley.me/post/zig-cc-powerful-drop-in-replacement-gcc-clang.html).
 
-At the time of writing, this effort is unmatched by the Rust community.
+At the time of writing, [this 'native' effort is unmatched by the Rust community](https://users.rust-lang.org/t/rust-ecosystem-needs-improvement-in-the-area-of-cross-compilation/101378/20)... that is, without the use of [cross](https://github.com/cross-rs/cross), as detailed in the next section.
 
 ## Cross Compiling with Cross
 
