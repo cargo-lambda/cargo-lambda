@@ -125,12 +125,14 @@ jobs:
             - name: Install Zig toolchain
               uses: korandoru/setup-zig@v1
               with:
-                zig-version: 0.10.0
+                # Note: make sure you are using a recent version of zig (the one below isn't kept in sync with new releases)
+                zig-version: 0.13.0
             - name: Install Cargo Lambda
               uses: jaxxstorm/action-install-gh-release@v1.9.0
               with:
                 repo: cargo-lambda/cargo-lambda
-                tag: v0.14.0 # Remove this if you want to grab always the latest version
+                # Note: make sure you are using a recent version of cargo-lambda (the one below isn't kept in sync with new releases)
+                tag: v1.3.0 # Remove this if you want to grab always the latest version
                 platform: linux # Other valid options: 'windows' or 'darwin'
                 arch: x86_64 # Other valid options for linux: 'aarch64'
             # Add your build steps below
