@@ -83,11 +83,11 @@ enum LambdaSubcommand {
     Invoke(Invoke),
     /// `cargo lambda new` creates Rust Lambda packages from a well defined template to help you start writing AWS Lambda functions in Rust.
     New(New),
+    /// `cargo lambda system` shows the status of the system Zig installation.
+    System(System),
     /// `cargo lambda watch` boots a development server that emulates interactions with the AWS Lambda control plane.
     /// This subcommand also reloads your Rust code as you work on it.
     Watch(Watch),
-    /// `cargo lambda system` shows the status of the system Zig installation.
-    System(System),
 }
 
 impl LambdaSubcommand {
@@ -98,8 +98,8 @@ impl LambdaSubcommand {
             Self::Init(mut i) => i.run().await,
             Self::Invoke(i) => i.run().await,
             Self::New(mut n) => n.run().await,
-            Self::Watch(w) => w.run(color).await,
             Self::System(s) => s.run().await,
+            Self::Watch(w) => w.run(color).await,
         }
     }
 }
