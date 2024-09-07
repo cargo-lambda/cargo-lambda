@@ -117,6 +117,10 @@ struct CargoOptions {
     /// Change the color options in the `cargo run` command
     #[arg(skip)]
     color: String,
+
+    /// Ignore all default features
+    #[arg(long)]
+    no_default_features: bool,
 }
 
 impl Watch {
