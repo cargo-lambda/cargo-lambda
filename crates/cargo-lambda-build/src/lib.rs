@@ -10,6 +10,7 @@ use cargo_options::Build as CargoBuild;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Report, Result, WrapErr};
 use std::{
+    collections::HashSet,
     fs::create_dir_all,
     path::{Path, PathBuf},
     str::FromStr,
@@ -153,13 +154,20 @@ impl Build {
         let binaries = binary_targets_from_metadata(&metadata, build_examples);
         debug!(binaries = ?binaries, "found new target binaries to build");
 
-        if !self.build.bin.is_empty() {
+        let binaries = if !self.build.bin.is_empty() {
+            let mut final_binaries = HashSet::with_capacity(binaries.len());
+
             for name in &self.build.bin {
                 if !binaries.contains(name) {
                     return Err(BuildError::FunctionBinaryMissing(name.into()).into());
                 }
+                final_binaries.insert(name.into());
             }
-        }
+
+            final_binaries
+        } else {
+            binaries
+        };
 
         if compiler_option.is_local_cargo() {
             // This check only makes sense when the build host is local.

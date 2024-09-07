@@ -468,3 +468,61 @@ members = ["crates/{}", "crates/{}"]
             .success();
     }
 }
+
+#[test]
+fn test_build_zip_workspace() {
+    let _guard = init_root();
+    let workspace = project().build();
+    let crates = workspace.root().join("crates");
+    crates.mkdir_p();
+
+    let lp_1 = cargo_lambda_new_in_root("p1", &crates);
+    lp_1.new_cmd()
+        .arg("--no-interactive")
+        .arg(&lp_1.name)
+        .assert()
+        .success();
+
+    let lp_2 = cargo_lambda_new_in_root("p2", &crates);
+    lp_2.new_cmd()
+        .arg("--no-interactive")
+        .arg(&lp_2.name)
+        .assert()
+        .success();
+
+    let mut manifest = File::create(workspace.root().join("Cargo.toml"))
+        .expect("failed to create Cargo.toml file");
+    let content = format!(
+        r#"[workspace]
+resolver = "2"
+members = ["crates/{}", "crates/{}"]
+"#,
+        &lp_1.name, &lp_2.name
+    );
+    manifest
+        .write_all(content.as_bytes())
+        .expect("failed to create manifest content");
+    manifest.flush().unwrap();
+
+    // Build all binaries first. The second build should zip only one of them.
+    cargo_lambda_build(workspace.root()).assert().success();
+    let lp_1_bin = workspace
+        .lambda_dir()
+        .join(&lp_1.name)
+        .join("bootstrap.zip");
+    assert!(!lp_1_bin.exists(), "{:?} exist", lp_1_bin);
+    let lp_2_bin = workspace
+        .lambda_dir()
+        .join(&lp_2.name)
+        .join("bootstrap.zip");
+    assert!(!lp_2_bin.exists(), "{:?} exist", lp_2_bin);
+
+    cargo_lambda_build(workspace.root())
+        .args(["--bin", &lp_1.name, "--output-format", "zip"])
+        .assert()
+        .success();
+
+    assert!(lp_1_bin.exists(), "{:?} doesn't exist", lp_1_bin);
+    // The second zip file should not be created because we're using `--bin`.
+    assert!(!lp_2_bin.exists(), "{:?} exist", lp_2_bin);
+}
