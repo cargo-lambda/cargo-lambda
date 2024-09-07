@@ -133,6 +133,10 @@ fn cargo_command(
         cargo_options.color.clone(),
     ];
 
+    if cargo_options.no_default_features {
+        args.push("--no-default-features".into());
+    }
+
     if let Some(features) = cargo_options.features.as_deref() {
         args.push("--features".into());
         args.push(features.into());
