@@ -146,6 +146,11 @@ fn cargo_command(
         args.push("--release".into());
     }
 
+    if let Some(package) = &cargo_options.package {
+        args.push("--package".into());
+        args.push(package.into());
+    }
+
     if is_valid_bin_name(name) {
         args.push("--bin".into());
         args.push(name.into());

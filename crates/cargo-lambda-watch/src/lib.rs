@@ -121,6 +121,10 @@ struct CargoOptions {
     /// Ignore all default features
     #[arg(long)]
     no_default_features: bool,
+
+    /// Package to build
+    #[arg(long, short)]
+    package: Option<String>,
 }
 
 impl Watch {
