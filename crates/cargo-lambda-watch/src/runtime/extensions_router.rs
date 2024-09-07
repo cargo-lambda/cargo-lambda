@@ -1,24 +1,52 @@
 use crate::{error::ServerError, requests::*, RefRuntimeState};
 use axum::{body::Body, extract::State, http::Request, response::Response, Json};
-use serde::de::DeserializeOwned;
+use hyper::HeaderMap;
+use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
 const EXTENSION_ID_HEADER: &str = "Lambda-Extension-Identifier";
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RegisterResponse {
+    function_name: String,
+    function_version: String,
+    handler: String,
+    account_id: Option<String>,
+}
+
 pub(crate) async fn register_extension(
     State(state): State<RefRuntimeState>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
-    let payload: EventsRequest = extract_json(req).await?;
+    let response_body = serde_json::to_vec(&RegisterResponse {
+        function_name: extract_header_with_default(
+            req.headers(),
+            "cargo-lambda-extension-function-name",
+            "function-name",
+        ),
+        function_version: extract_header_with_default(
+            req.headers(),
+            "cargo-lambda-extension-function-version",
+            "function-version",
+        ),
+        handler: "bootstrap".to_string(),
+        account_id: Some(extract_header_with_default(
+            req.headers(),
+            "cargo-lambda-extension-account-id",
+            "account-id",
+        )),
+    })?;
 
+    let payload: EventsRequest = extract_json(req).await?;
     debug!(?payload, "registering extension");
 
     let extension_id = state.ext_cache.register(payload.events).await;
     let resp = Response::builder()
         .status(200)
         .header(EXTENSION_ID_HEADER, extension_id)
-        .body(Body::empty())?;
+        .body(response_body.into())?;
 
     Ok(resp)
 }
@@ -71,4 +99,12 @@ async fn extract_json<T: DeserializeOwned>(req: Request<Body>) -> Result<T, Serv
         .map_err(ServerError::DataDeserialization)?;
 
     serde_json::from_slice(&bytes).map_err(ServerError::SerializationError)
+}
+
+fn extract_header_with_default(headers: &HeaderMap, name: &str, default: &str) -> String {
+    headers
+        .get(name)
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or(default)
+        .to_string()
 }
