@@ -97,6 +97,10 @@ pub struct Watch {
 
     #[command(flatten)]
     env_options: EnvOptions,
+
+    /// How many functions to run in parallel
+    #[arg(long, short, default_value = "5")]
+    concurrency: u16,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -123,7 +127,7 @@ struct CargoOptions {
     no_default_features: bool,
 
     /// Package to build
-    #[arg(long, short)]
+    #[arg(long)]
     package: Option<String>,
 }
 
@@ -160,6 +164,7 @@ impl Watch {
             manifest_path: cargo_options.manifest_path.clone(),
             env: env.variables().cloned().unwrap_or_default(),
             wait: self.wait,
+            concurrency: self.concurrency,
             ..Default::default()
         };
 

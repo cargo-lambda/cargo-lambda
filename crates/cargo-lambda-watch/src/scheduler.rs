@@ -51,12 +51,15 @@ async fn start_scheduler(
 
                 if watcher_config.start_function() {
                     if let Some(name) = start_function_name {
-                        let runtime_api = state.function_addr(&name);
-                        let gc_tx = gc_tx.clone();
-                        let cargo_options = cargo_options.clone();
-                        let watcher_config = watcher_config.clone();
-                        let ext_cache = state.ext_cache.clone();
-                        subsys.start(SubsystemBuilder::new("lambda runtime", move |s| start_function(s, name, runtime_api, cargo_options, watcher_config, gc_tx, ext_cache)));
+                        for _ in 0..watcher_config.concurrency {
+                            let name = name.clone();
+                            let runtime_api = state.function_addr(&name);
+                            let gc_tx = gc_tx.clone();
+                            let cargo_options = cargo_options.clone();
+                            let watcher_config = watcher_config.clone();
+                            let ext_cache = state.ext_cache.clone();
+                            subsys.start(SubsystemBuilder::new("lambda runtime", move |s| start_function(s, name, runtime_api, cargo_options, watcher_config, gc_tx, ext_cache)));
+                        }
                     }
                 }
             }

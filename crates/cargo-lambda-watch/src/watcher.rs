@@ -26,6 +26,7 @@ pub(crate) struct WatcherConfig {
     pub only_lambda_apis: bool,
     pub env: HashMap<String, String>,
     pub wait: bool,
+    pub concurrency: u16,
 }
 
 impl WatcherConfig {

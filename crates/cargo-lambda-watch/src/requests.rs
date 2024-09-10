@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Sender;
 
 pub(crate) const AWS_XRAY_TRACE_HEADER: &str = "x-amzn-trace-id";
+pub(crate) const AWS_INVOCATION_TYPE_HEADER: &str = "x-amz-invocation-type";
 
 /// LambdaResponse is the data that the Lambda function sends
 /// as the response to an invocation. Because Lambda uses a push

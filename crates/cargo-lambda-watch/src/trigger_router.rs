@@ -34,6 +34,7 @@ use opentelemetry::{
 };
 use query_map::QueryMap;
 use std::collections::{HashMap, HashSet};
+use tokio::sync::oneshot::Receiver;
 use tokio::sync::{mpsc::Sender, oneshot};
 
 const LAMBDA_URL_PREFIX: &str = "lambda-url";
@@ -206,38 +207,101 @@ async fn invoke_handler(
         }
     }
 
-    let resp = schedule_invocation(&cmd_tx, function_name, req).await?;
-    let status_code = resp
-        .extensions()
-        .get::<StatusCode>()
-        .cloned()
-        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let invocation_type =
+        req.headers()
+            .get(AWS_INVOCATION_TYPE_HEADER)
+            .map_or("RequestResponse", |v| {
+                v.to_str()
+                    .expect("could not parse x-amz-invocation-type header")
+            });
 
-    let (info, mut body) = resp.into_parts();
+    match invocation_type {
+        "RequestResponse" => {
+            let resp = schedule_invocation(&cmd_tx, function_name, req).await?;
+            let status_code = resp
+                .extensions()
+                .get::<StatusCode>()
+                .cloned()
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
-    let mut builder = Response::builder().status(status_code);
+            let (info, mut body) = resp.into_parts();
 
-    if is_streaming_response(&info.headers) && status_code == StatusCode::OK {
-        let status = create_streaming_response(&mut builder, &mut body).await?;
-        builder = builder.status(status);
+            let mut builder = Response::builder().status(status_code);
+
+            if is_streaming_response(&info.headers) && status_code == StatusCode::OK {
+                let status = create_streaming_response(&mut builder, &mut body).await?;
+                builder = builder.status(status);
+            }
+
+            builder.body(body).map_err(ServerError::ResponseBuild)
+        }
+        "Event" => {
+            schedule_async_invocation(&cmd_tx, function_name, req).await?;
+            let builder = Response::builder().status(202);
+            builder
+                .body(Body::default())
+                .map_err(ServerError::ResponseBuild)
+        }
+        _ => {
+            let body = Body::from(
+                serde_json::json!({
+                    "title": "Invalid x-amz-invocation-type",
+                    "detail": format!("Must be one of: RequestResponse, Event"),
+                })
+                .to_string(),
+            );
+            Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(body)
+                .map_err(ServerError::ResponseBuild)
+        }
     }
-
-    builder.body(body).map_err(ServerError::ResponseBuild)
 }
 
 async fn schedule_invocation(
     cmd_tx: &Sender<Action>,
     function_name: String,
-    mut req: Request<Body>,
+    req: Request<Body>,
 ) -> Result<LambdaResponse, ServerError> {
-    let headers = req.headers_mut();
-
     let span = global::tracer("cargo-lambda/emulator").start("invoke request");
     let cx = Context::current_with_span(span);
 
+    let resp_rx = invoke(&cx, cmd_tx, function_name, req).await?;
+
+    let resp = resp_rx.await.map_err(ServerError::ReceiveFunctionMessage)?;
+
+    if let Some(status_code) = resp.extensions().get::<StatusCode>() {
+        cx.span().add_event(
+            "function call completed",
+            vec![KeyValue::new("status", status_code.to_string())],
+        );
+    }
+
+    Ok(resp)
+}
+
+async fn schedule_async_invocation(
+    cmd_tx: &Sender<Action>,
+    function_name: String,
+    req: Request<Body>,
+) -> Result<(), ServerError> {
+    let span = global::tracer("cargo-lambda/emulator").start("invoke request");
+    let cx = Context::current_with_span(span);
+    invoke(&cx, cmd_tx, function_name, req).await?;
+    Ok(())
+}
+
+async fn invoke(
+    cx: &Context,
+    cmd_tx: &Sender<Action>,
+    function_name: String,
+    mut req: Request<Body>,
+) -> Result<Receiver<Request<Body>>, ServerError> {
+    let headers = req.headers_mut();
+
     let mut injector = HashMap::new();
     global::get_text_map_propagator(|propagator| {
-        propagator.inject_context(&cx, &mut injector);
+        propagator.inject_context(cx, &mut injector);
     });
     let xray_header = injector
         .get(AWS_XRAY_TRACE_HEADER)
@@ -264,16 +328,7 @@ async fn schedule_invocation(
         .await
         .map_err(|e| ServerError::SendActionMessage(Box::new(e)))?;
 
-    let resp = resp_rx.await.map_err(ServerError::ReceiveFunctionMessage)?;
-
-    if let Some(status_code) = resp.extensions().get::<StatusCode>() {
-        cx.span().add_event(
-            "function call completed",
-            vec![KeyValue::new("status", status_code.to_string())],
-        );
-    }
-
-    Ok(resp)
+    Ok(resp_rx)
 }
 
 fn extract_path_parameters(path: &str) -> (String, String) {
