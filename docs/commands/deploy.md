@@ -208,6 +208,30 @@ In some situations, you might want to add extra files inside the zip file upload
 cargo lambda deploy --include config
 ```
 
+### Modifying the included paths in the zip file
+
+If you want to include files from a parent directory, not inside your project structure, you'll find the challenge that `--include` will use the same path inside the zip file. For example, `../config/data.json` will be named exactly like that inside the zip file, and it will be extracted in a relative location. If you want to change the name of the file or directory when it's included in the zip file, you can use the special syntax `FINAL_NAME:PATH`.
+
+For example, the following command will include all files inside the relative path `../../config` in the zip file, but the base directory will be called `config`:
+
+```
+cargo lambda deploy --include config:../../config
+```
+
+If we were to inspect the zip file to deploy with `unzip -l`, we'd see a structure like this one:
+
+```
+Archive:  bootstrap.zip
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+        0  2024-09-14 18:25   config/
+        8  2024-09-14 18:22   config/production.json
+        8  2024-09-14 18:22   config/database.json
+  3037216  2024-09-14 18:24   bootstrap
+---------                     -------
+  3037232                     4 files
+```
+
 ## Other options
 
 Use the `--help` flag to see other options to configure the function's deployment.
