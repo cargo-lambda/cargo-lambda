@@ -57,7 +57,7 @@ pub struct BuildConfig {
     pub compiler: Option<CompilerOptions>,
     pub target: Option<String>,
     #[serde(default)]
-    pub include: Option<Vec<PathBuf>>,
+    pub include: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
@@ -166,7 +166,7 @@ pub struct DeployConfig {
     #[serde(default = "default_runtime")]
     pub runtime: String,
     #[serde(default)]
-    pub include: Option<Vec<PathBuf>>,
+    pub include: Option<Vec<String>>,
     #[serde(default)]
     pub s3_bucket: Option<String>,
 }
@@ -814,7 +814,7 @@ mod tests {
         let metadata = load_metadata(manifest_path).unwrap();
 
         let env = function_build_metadata(&metadata).unwrap();
-        assert_eq!(Some(vec![PathBuf::from("Cargo.toml")]), env.include);
+        assert_eq!(Some(vec!["Cargo.toml".into()]), env.include);
     }
 
     #[test]
