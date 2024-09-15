@@ -15,6 +15,7 @@ use cargo_lambda_remote::{
 };
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
+use tracing::debug;
 
 #[derive(Serialize)]
 pub(crate) struct DeployOutput {
@@ -36,6 +37,7 @@ pub(crate) async fn deploy(
     architecture: Architecture,
     compatible_runtimes: Vec<Runtime>,
     s3_bucket: &Option<String>,
+    s3_key: &Option<String>,
     tags: &Option<Vec<String>>,
     progress: &Progress,
 ) -> Result<DeployResult> {
@@ -46,6 +48,7 @@ pub(crate) async fn deploy(
         name,
         tags,
         s3_bucket,
+        s3_key,
         DeployConfig::default(),
     )
     .into_diagnostic()?;
@@ -61,11 +64,14 @@ pub(crate) async fn deploy(
         Some(bucket) => {
             progress.set_message("uploading binary to S3");
 
+            let key = deploy_metadata.s3_key.as_deref().unwrap_or(name);
+            debug!(bucket, key, "uploading zip to S3");
+
             let s3_client = S3Client::new(sdk_config);
             let mut operation = s3_client
                 .put_object()
                 .bucket(bucket)
-                .key(name)
+                .key(key)
                 .body(ByteStream::from(binary_archive.read()?));
 
             if let Some(tags) = deploy_metadata.s3_tags() {
@@ -80,7 +86,7 @@ pub(crate) async fn deploy(
 
             LayerVersionContentInput::builder()
                 .s3_bucket(bucket)
-                .s3_key(name)
+                .s3_key(key)
                 .build()
         }
     };
