@@ -34,7 +34,7 @@ struct DryOutput {
     runtimes: Vec<String>,
     tags: Option<String>,
     bucket: Option<String>,
-    include: Option<Vec<PathBuf>>,
+    include: Option<Vec<String>>,
 }
 
 impl std::fmt::Display for DryOutput {
@@ -54,7 +54,7 @@ impl std::fmt::Display for DryOutput {
         if let Some(paths) = &self.include {
             writeln!(f, "🗃️ extra files included:")?;
             for file in paths {
-                writeln!(f, "- {}", file.display())?;
+                writeln!(f, "- {}", file)?;
             }
         }
 
@@ -147,7 +147,7 @@ pub struct Deploy {
 
     /// Option to add one or more files and directories to include in the zip file to upload.
     #[arg(short, long)]
-    include: Option<Vec<PathBuf>>,
+    include: Option<Vec<String>>,
 
     /// Perform all the operations to locate and package the binary to deploy, but don't do the final deploy.
     #[arg(long, alias = "dry-run")]

@@ -90,7 +90,7 @@ pub struct Build {
 
     /// Option to add one or more files and directories to include in the output ZIP file (only works with --output-format=zip).
     #[arg(short, long)]
-    include: Option<Vec<PathBuf>>,
+    include: Option<Vec<String>>,
 
     #[command(flatten)]
     build: CargoBuild,

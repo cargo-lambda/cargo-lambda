@@ -1,5 +1,5 @@
 use std::{
-    borrow::Cow,
+    collections::HashMap,
     fmt::Debug,
     fs::{read, File, Metadata},
     io::{Read, Seek, Write},
@@ -102,7 +102,7 @@ impl BinaryArchive {
     }
 
     /// Add files to the zip archive
-    pub fn add_files(&self, files: &Vec<PathBuf>) -> Result<()> {
+    pub fn add_files(&self, files: &Vec<String>) -> Result<()> {
         trace!(?self.path, ?files, "adding files to zip file");
         let zipfile = File::open(&self.path).into_diagnostic()?;
 
@@ -140,7 +140,7 @@ pub fn create_binary_archive<M, P>(
     manifest_path: M,
     base_dir: &Option<P>,
     data: &BinaryData,
-    include: Option<Vec<PathBuf>>,
+    include: Option<Vec<String>>,
 ) -> Result<BinaryArchive>
 where
     M: AsRef<Path> + Debug,
@@ -171,7 +171,7 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     binary_path: BP,
     destination_directory: DD,
     data: &BinaryData,
-    include: Option<Vec<PathBuf>>,
+    include: Option<Vec<String>>,
 ) -> Result<BinaryArchive> {
     let path = binary_path.as_ref();
     let dir = destination_directory.as_ref();
@@ -254,25 +254,45 @@ fn zip_file_options(file: &File, path: &Path) -> Result<SimpleFileOptions> {
         .last_modified_time(mtime))
 }
 
-fn include_files_in_zip<W>(zip: &mut ZipWriter<W>, files: &Vec<PathBuf>) -> Result<()>
+fn include_files_in_zip<W>(zip: &mut ZipWriter<W>, files: &Vec<String>) -> Result<()>
 where
     W: Write + Seek,
 {
+    let mut file_map = HashMap::with_capacity(files.len());
     for file in files {
-        for entry in WalkDir::new(file).into_iter().filter_map(|e| e.ok()) {
+        match file.split_once(':') {
+            None => file_map.insert(file.clone(), file.clone()),
+            Some((name, path)) => file_map.insert(name.into(), path.into()),
+        };
+    }
+
+    for (base, file) in file_map {
+        for entry in WalkDir::new(&file).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
-            let entry_name = convert_to_unix_path(path)
-                .ok_or_else(|| BuildError::InvalidUnixFileName(path.to_path_buf()))?;
+            let base = base.clone();
+            let file = file.clone();
+
+            let unix_base = convert_to_unix_path(Path::new(&base))
+                .ok_or_else(|| BuildError::InvalidUnixFileName(base.into()))?;
+            let unix_file = convert_to_unix_path(Path::new(&file))
+                .ok_or_else(|| BuildError::InvalidUnixFileName(file.into()))?;
+
+            let source_name = convert_to_unix_path(path)
+                .ok_or_else(|| BuildError::InvalidUnixFileName(path.into()))?;
+
+            let destination_name = source_name.replace(&unix_file, &unix_base);
 
             if path.is_dir() {
-                trace!(?entry_name, "creating directory in zip file");
+                trace!(%destination_name, "creating directory in zip file");
 
-                zip.add_directory(entry_name.to_string(), SimpleFileOptions::default())
+                zip.add_directory(&destination_name, SimpleFileOptions::default())
                     .into_diagnostic()
                     .wrap_err_with(|| {
-                        format!("failed to add directory `{entry_name}` to zip file")
+                        format!("failed to add directory `{destination_name}` to zip file")
                     })?;
             } else {
+                trace!(%source_name, %destination_name, "including file in zip file");
+
                 let mut content = Vec::new();
                 let mut file = File::open(path)
                     .into_diagnostic()
@@ -281,18 +301,18 @@ where
                     .into_diagnostic()
                     .wrap_err_with(|| format!("failed to read file `{path:?}`"))?;
 
-                trace!(?entry_name, "including file in zip file");
-
                 let options = zip_file_options(&file, path)?;
 
-                zip.start_file(entry_name.to_string(), options)
+                zip.start_file(destination_name.clone(), options)
                     .into_diagnostic()
-                    .wrap_err_with(|| format!("failed to start zip file `{entry_name:?}`"))?;
+                    .wrap_err_with(|| {
+                        format!("failed to create zip content file `{destination_name:?}`")
+                    })?;
 
                 zip.write_all(&content)
                     .into_diagnostic()
                     .wrap_err_with(|| {
-                        format!("failed to write data into zip file `{entry_name:?}`")
+                        format!("failed to write data into zip content file `{destination_name:?}`")
                     })?;
             }
         }
@@ -324,7 +344,7 @@ fn binary_permissions(_meta: &Metadata) -> u32 {
 }
 
 #[cfg(target_os = "windows")]
-fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
+fn convert_to_unix_path(path: &Path) -> Option<String> {
     let mut path_str = String::new();
     for component in path.components() {
         if let std::path::Component::Normal(os_str) = component {
@@ -334,12 +354,12 @@ fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
             path_str.push_str(os_str.to_str()?);
         }
     }
-    Some(Cow::Owned(path_str))
+    Some(path_str)
 }
 
 #[cfg(not(target_os = "windows"))]
-fn convert_to_unix_path(path: &Path) -> Option<Cow<'_, str>> {
-    path.to_str().map(Cow::Borrowed)
+fn convert_to_unix_path(path: &Path) -> Option<String> {
+    path.to_str().map(String::from)
 }
 
 #[cfg(test)]
@@ -574,5 +594,41 @@ mod test {
             .expect("failed to find bootstrap in zip archive");
 
         remove_dir_all(&bsp).expect("failed to delete dir");
+    }
+
+    #[test]
+    fn test_zip_funcion_with_directories() {
+        let data = BinaryData::new("binary-x86-64", false, false);
+
+        let bp = &format!("../../tests/binaries/binary-x86-64");
+        #[cfg(unix)]
+        let extra = vec!["source:../../tests/fixtures/examples-package".into()];
+        #[cfg(windows)]
+        let extra = vec!["source:..\\..\\tests\\fixtures\\examples-package".into()];
+
+        let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
+        let archive =
+            zip_binary(bp, dd.path(), &data, Some(extra)).expect("failed to create binary archive");
+
+        let arch_path = dd.path().join("bootstrap.zip");
+        assert_eq!(arch_path, archive.path);
+
+        let file = File::open(arch_path).expect("failed to open zip file");
+        let mut zip = ZipArchive::new(file).expect("failed to open zip archive");
+
+        zip.by_name("bootstrap")
+            .expect("failed to find bootstrap in zip archive");
+
+        zip.by_name("source/Cargo.toml")
+            .expect("failed to find Cargo.toml in zip archive");
+
+        zip.by_name("source/Cargo.lock")
+            .expect("failed to find Cargo.lock in zip archive");
+
+        zip.by_name("source/src/main.rs")
+            .expect("failed to find source/src/main.rs in zip archive");
+
+        zip.by_name("source/examples/example-lambda.rs")
+            .expect("failed to find source/examples/example-lambda.rs in zip archive");
     }
 }
