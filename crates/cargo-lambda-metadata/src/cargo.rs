@@ -169,6 +169,8 @@ pub struct DeployConfig {
     pub include: Option<Vec<String>>,
     #[serde(default)]
     pub s3_bucket: Option<String>,
+    #[serde(default)]
+    pub s3_key: Option<String>,
 }
 
 fn default_runtime() -> String {
@@ -406,6 +408,7 @@ pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
     name: &str,
     tags: &Option<Vec<String>>,
     s3_bucket: &Option<String>,
+    s3_key: &Option<String>,
     default: DeployConfig,
 ) -> Result<DeployConfig, MetadataError> {
     let metadata = load_metadata(manifest_path)?;
@@ -443,6 +446,10 @@ pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
 
     if config.s3_bucket.is_none() {
         config.s3_bucket.clone_from(s3_bucket);
+    }
+
+    if config.s3_key.is_none() {
+        config.s3_key.clone_from(s3_key);
     }
 
     tracing::debug!(?config, "using deploy configuration from metadata");
@@ -644,6 +651,7 @@ mod tests {
             "basic-lambda",
             &None,
             &None,
+            &None,
             DeployConfig::default(),
         )
         .unwrap();
@@ -686,6 +694,7 @@ mod tests {
             "basic-lambda",
             &Some(tags),
             &None,
+            &None,
             DeployConfig::default(),
         )
         .unwrap();
@@ -705,11 +714,28 @@ mod tests {
             "basic-lambda",
             &None,
             &Some("deploy-bucket".into()),
+            &None,
             DeployConfig::default(),
         )
         .unwrap();
 
         assert_eq!(Some("deploy-bucket".to_string()), env.s3_bucket);
+    }
+
+    #[test]
+    fn test_deploy_metadata_packages_with_s3_bucket_and_key() {
+        let env = function_deploy_metadata(
+            fixture("single-binary-package"),
+            "basic-lambda",
+            &None,
+            &Some("deploy-bucket".into()),
+            &Some("prefix/name".into()),
+            DeployConfig::default(),
+        )
+        .unwrap();
+
+        assert_eq!(Some("deploy-bucket".to_string()), env.s3_bucket);
+        assert_eq!(Some("prefix/name".to_string()), env.s3_key);
     }
 
     #[test]

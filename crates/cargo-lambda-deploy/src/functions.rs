@@ -126,6 +126,7 @@ pub(crate) async fn deploy(
     remote_config: &RemoteConfig,
     sdk_config: &SdkConfig,
     s3_bucket: &Option<String>,
+    s3_key: &Option<String>,
     tags: &Option<Vec<String>>,
     binary_archive: &BinaryArchive,
     architecture: Architecture,
@@ -142,6 +143,7 @@ pub(crate) async fn deploy(
         remote_config,
         sdk_config,
         s3_bucket,
+        s3_key,
         tags,
         binary_archive,
         architecture,
@@ -185,6 +187,7 @@ async fn upsert_function(
     remote_config: &RemoteConfig,
     sdk_config: &SdkConfig,
     s3_bucket: &Option<String>,
+    s3_key: &Option<String>,
     tags: &Option<Vec<String>>,
     binary_archive: &BinaryArchive,
     architecture: Architecture,
@@ -192,8 +195,14 @@ async fn upsert_function(
 ) -> Result<(String, String)> {
     let current_function = client.get_function().function_name(name).send().await;
 
-    let (environment, deploy_metadata) =
-        load_deploy_environment(manifest_path, binary_name, function_config, tags, s3_bucket)?;
+    let (environment, deploy_metadata) = load_deploy_environment(
+        manifest_path,
+        binary_name,
+        function_config,
+        tags,
+        s3_bucket,
+        s3_key,
+    )?;
 
     let action = match current_function {
         Ok(fun) => FunctionAction::Update(Box::new(fun)),
@@ -234,12 +243,13 @@ async fn upsert_function(
                     FunctionCode::builder().zip_file(blob).build()
                 }
                 Some(bucket) => {
-                    debug!(bucket = bucket, "uploading zip to S3");
+                    let key = deploy_metadata.s3_key.as_deref().unwrap_or(name);
+                    debug!(bucket, key, "uploading zip to S3");
                     let client = S3Client::new(sdk_config);
                     client
                         .put_object()
                         .bucket(bucket)
-                        .key(name)
+                        .key(key)
                         .body(ByteStream::from(binary_archive.read()?))
                         .set_tagging(s3_tags)
                         .send()
@@ -248,7 +258,7 @@ async fn upsert_function(
                         .wrap_err("failed to upload function code to S3")?;
                     FunctionCode::builder()
                         .s3_bucket(bucket)
-                        .s3_key(name)
+                        .s3_key(key)
                         .build()
                 }
             };
@@ -417,13 +427,15 @@ async fn upsert_function(
                     builder = builder.zip_file(blob)
                 }
                 Some(bucket) => {
-                    debug!(bucket = bucket, "uploading zip to S3");
+                    let key = deploy_metadata.s3_key.as_deref().unwrap_or(name);
+
+                    debug!(bucket, key, "uploading zip to S3");
 
                     let client = S3Client::new(sdk_config);
                     let mut operation = client
                         .put_object()
                         .bucket(bucket)
-                        .key(name)
+                        .key(key)
                         .body(ByteStream::from(binary_archive.read()?));
 
                     if s3_tags.is_some() {
@@ -435,7 +447,7 @@ async fn upsert_function(
                         .into_diagnostic()
                         .wrap_err("failed to upload function code to S3")?;
 
-                    builder = builder.s3_bucket(bucket).s3_key(name);
+                    builder = builder.s3_bucket(bucket).s3_key(key);
                 }
             }
 
@@ -462,12 +474,14 @@ pub(crate) fn load_deploy_environment(
     function_config: &FunctionDeployConfig,
     tags: &Option<Vec<String>>,
     s3_bucket: &Option<String>,
+    s3_key: &Option<String>,
 ) -> Result<(Environment, DeployConfig)> {
     let base = function_deploy_metadata(
         manifest_path,
         binary_name,
         tags,
         s3_bucket,
+        s3_key,
         function_config.to_deploy_config(),
     )
     .into_diagnostic()?;
@@ -801,6 +815,7 @@ mod tests {
             &Default::default(),
             &None,
             &None,
+            &None,
         )
         .unwrap();
 
@@ -836,6 +851,7 @@ mod tests {
             &flags,
             &Some(tags),
             &None,
+            &None,
         )
         .unwrap();
 
@@ -866,6 +882,7 @@ mod tests {
             &flags,
             &Some(tags),
             &None,
+            &None,
         )
         .unwrap();
 
@@ -894,6 +911,7 @@ mod tests {
             &flags,
             &None,
             &None,
+            &None,
         )
         .unwrap();
 
@@ -913,6 +931,7 @@ mod tests {
             &fixture("multi-binary-package"),
             "basic-lambda",
             &flags,
+            &None,
             &None,
             &None,
         )

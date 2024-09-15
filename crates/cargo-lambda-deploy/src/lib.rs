@@ -113,6 +113,10 @@ pub struct Deploy {
     #[arg(long)]
     pub s3_bucket: Option<String>,
 
+    /// Name with prefix where the code will be uploaded to in S3
+    #[arg(long)]
+    pub s3_key: Option<String>,
+
     /// Whether the code that you're deploying is a Lambda Extension
     #[arg(long)]
     extension: bool,
@@ -205,6 +209,7 @@ impl Deploy {
                 architecture,
                 compatible_runtimes,
                 &self.s3_bucket,
+                &self.s3_key,
                 &tags,
                 &progress,
             )
@@ -219,6 +224,7 @@ impl Deploy {
                 &self.remote_config,
                 &sdk_config,
                 &self.s3_bucket,
+                &self.s3_key,
                 &tags,
                 &archive,
                 architecture,
@@ -296,6 +302,7 @@ impl Deploy {
                 name,
                 tags,
                 &self.s3_bucket,
+                &self.s3_key,
                 DeployConfig::default(),
             )
             .into_diagnostic()?;
@@ -313,6 +320,7 @@ impl Deploy {
                 &self.function_config,
                 tags,
                 &self.s3_bucket,
+                &self.s3_key,
             )?;
             (
                 "function",

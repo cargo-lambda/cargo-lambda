@@ -180,16 +180,17 @@ You can keep some deploy configuration options in your project's `Cargo.toml` fi
 
 ```toml
 [package.metadata.lambda.deploy]
-memory = 512                   # Function's memory
-timeout = 60                   # Function's execution timeout
-tracing = "active"             # Tracing mode
-role = "role-full-arn"         # Function's execution role
-env_file = ".env.production"   # File to load environment variables from
-env = { "VAR1" = "VAL1" }      # Additional environment variables
-layers = [ "layer-full-arn" ]  # List of layers to deploy with your function
-tags = { "team" = "lambda" }   # List of AWS resource tags for this function
-s3_bucket = "deploy-bucket"    # S3 bucket to upload the Lambda function to
-include = [ "README.md" ]      # Extra list of files to add to the zip bundle
+memory = 512                    # Function's memory
+timeout = 60                    # Function's execution timeout
+tracing = "active"              # Tracing mode
+role = "role-full-arn"          # Function's execution role
+env_file = ".env.production"    # File to load environment variables from
+env = { "VAR1" = "VAL1" }       # Additional environment variables
+layers = [ "layer-full-arn" ]   # List of layers to deploy with your function
+tags = { "team" = "lambda" }    # List of AWS resource tags for this function
+s3_bucket = "deploy-bucket"     # S3 bucket to upload the Lambda function to
+s3_key = "prefix/bootstrap.zip" # S3 object key to upload the Lambda function to
+include = [ "README.md" ]       # Extra list of files to add to the zip bundle
 ```
 
 ## Deploying to S3
@@ -198,6 +199,12 @@ AWS Lambda has a 50MB limit for Zip file direct uploads. If the Zip file that yo
 
 ```
 cargo lambda deploy --s3-bucket bucket-name
+```
+
+If you want to change the location where the S3 object is created, you can use the `--s3-key` flag to set the S3 object key for the zip file that's uploaded to S3:
+
+```
+cargo lambda deploy --s3-bucket bucket-name --s3-key prefix/deploy/my-bootstrap-file.zip
 ```
 
 ## Adding extra files to the zip file
