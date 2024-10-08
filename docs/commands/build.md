@@ -92,6 +92,40 @@ Cargo Lambda also supports building Rust projects without Zig as the target link
 
 Cargo Lambda supports building Rust projects with [cross](https://crates.io/crates/cross) as well. Read the [Cross Compiling reference](/guide/cross-compiling.html#cross-compiling-with-cross) to learn more abour using cross as the Lambda compiler.
 
+### Adding Zig to PATH on Windows/WSL
+
+If you installed Zig using Pip3 and still encounter issues with Cargo Lambda not finding Zig, it might be because the Zig binary is not in your system’s `$PATH`. 
+
+To resolve this, you need to manually add the Zig installation path to your environment variables.
+
+#### Steps:
+1. First, locate where Zig is installed. If you installed it via Pip3, the directory might look like this:
+   ```
+   /c/Users/your-username/appdata/local/continuum/anaconda3/lib/site-packages/ziglang/
+   ```
+   or
+   ```
+   /home/your-username/.local/lib/python3.9/site-packages/ziglang/
+   ```
+
+2. To ensure the path persists across terminal sessions, append the following command to your `~/.bashrc` (or `~/.zshrc` for Zsh users):
+
+   ```bash
+   echo 'export PATH="/path/to/zig:$PATH"' >> ~/.bashrc
+   ```
+
+3. Apply the changes by running:
+   ```bash
+   source ~/.bashrc
+   ```
+
+4. Finally, verify that Zig is in the PATH by running:
+   ```bash
+   which zig
+   ```
+
+After doing this, the `cargo lambda build` command should now be able to find Zig and compile your project correctly.
+
 ### Switching compilers
 
 To switch compilers, you can use the flag `--compiler` with the name of the compiler to use when you run `cargo lambda build`. For example:
