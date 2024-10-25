@@ -67,7 +67,7 @@ impl TryFrom<&str> for TemplateSource {
 }
 
 /// Represents the local filesystem root of the template, downloaded
-/// and unzipped.  We model this as its own thing because we need to
+/// and unzipped. We model this as its own thing because we need to
 /// pass the root directory back to the caller and optionally keep
 /// the tempdir reference alive, dropping it and deleting it when
 /// it goes out of the caller's scope.

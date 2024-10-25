@@ -291,7 +291,7 @@ async fn open_code_editor(path: &str) -> Result<()> {
     if editor.is_empty() {
         Err(CreateError::InvalidEditor(path.into()).into())
     } else {
-        silent_command(editor.trim(), &[path]).await
+        silent_command(editor, &[path]).await
     }
 }
 
