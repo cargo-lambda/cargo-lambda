@@ -150,6 +150,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "assertables"
+version = "9.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4eafcbd49342bf84989f8db445c8ce254f8c674f0016837310fa1e8f8763e703"
+
+[[package]]
 name = "async-priority-channel"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1099,6 +1105,7 @@ dependencies = [
 name = "cargo-lambda-new"
 version = "1.4.0"
 dependencies = [
+ "assertables",
  "cargo-lambda-interactive",
  "cargo-lambda-metadata",
  "clap",
