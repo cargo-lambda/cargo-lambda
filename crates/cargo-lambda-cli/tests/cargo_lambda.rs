@@ -10,7 +10,7 @@ use harness::*;
 #[test]
 fn test_build_basic_function() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-basic-function");
+    let lp = cargo_lambda_new("test-basic-function", "function-template");
 
     lp.new_cmd()
         .arg("--no-interactive")
@@ -38,7 +38,7 @@ fn test_build_basic_function() {
 #[test]
 fn test_build_basic_zip_function() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-basic-function");
+    let lp = cargo_lambda_new("test-basic-function", "function-template");
 
     lp.new_cmd()
         .arg("--no-interactive")
@@ -66,7 +66,7 @@ fn test_build_basic_zip_function() {
 #[test]
 fn test_build_basic_zip_function_with_include() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-basic-function");
+    let lp = cargo_lambda_new("test-basic-function", "function-template");
 
     lp.new_cmd()
         .arg("--no-interactive")
@@ -99,7 +99,7 @@ fn test_build_basic_zip_function_with_include() {
 #[test]
 fn test_build_http_function() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-http-function");
+    let lp = cargo_lambda_new("test-http-function", "function-template");
 
     lp.new_cmd().arg("--http").arg(&lp.name).assert().success();
 
@@ -123,7 +123,7 @@ fn test_build_http_function() {
 #[test]
 fn test_build_http_feature_function() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-http-function");
+    let lp = cargo_lambda_new("test-http-function", "function-template");
 
     lp.new_cmd()
         .arg("--http-feature")
@@ -142,7 +142,7 @@ fn test_build_http_feature_function() {
 #[test]
 fn test_build_event_type_function() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-event-type-function");
+    let lp = cargo_lambda_new("test-event-type-function", "function-template");
 
     lp.new_cmd()
         .arg("--event-type")
@@ -161,7 +161,7 @@ fn test_build_event_type_function() {
 #[test]
 fn test_build_basic_extension() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-basic-extension");
+    let lp = cargo_lambda_new("test-basic-extension", "extension-template");
 
     lp.new_cmd()
         .arg("--extension")
@@ -189,7 +189,7 @@ fn test_build_basic_extension() {
 #[test]
 fn test_build_logs_extension() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-logs-extension");
+    let lp = cargo_lambda_new("test-logs-extension", "extension-template");
 
     lp.new_cmd()
         .arg("--extension")
@@ -211,7 +211,7 @@ fn test_build_logs_extension() {
 #[test]
 fn test_build_telemetry_extension() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-telemetry-extension");
+    let lp = cargo_lambda_new("test-telemetry-extension", "extension-template");
 
     lp.new_cmd()
         .arg("--extension")
@@ -233,7 +233,7 @@ fn test_build_telemetry_extension() {
 #[test]
 fn test_init_subcommand() {
     let _guard = init_root();
-    let lp = cargo_lambda_init("test-basic-function");
+    let lp = cargo_lambda_init("test-basic-function", "function-template");
     let root = lp.root();
 
     lp.init_cmd().arg("--no-interactive").assert().success();
@@ -253,7 +253,7 @@ fn test_init_subcommand() {
 #[test]
 fn test_init_subcommand_without_override() {
     let _guard = init_root();
-    let lp = cargo_lambda_init("test-basic-function");
+    let lp = cargo_lambda_init("test-basic-function", "function-template");
     let root = lp.root();
 
     let src = root.join("src");
@@ -284,7 +284,7 @@ fn test_init_subcommand_without_override() {
 #[test]
 fn test_build_basic_zip_extension() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-basic-extension");
+    let lp = cargo_lambda_new("test-basic-extension", "extension-template");
 
     lp.new_cmd()
         .arg("--extension")
@@ -314,7 +314,7 @@ fn test_build_basic_zip_extension() {
 #[test]
 fn test_build_internal_zip_extension() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-internal-extension");
+    let lp = cargo_lambda_new("test-internal-extension", "extension-template");
 
     lp.new_cmd()
         .arg("--extension")
@@ -345,7 +345,7 @@ fn test_build_internal_zip_extension() {
 #[test]
 fn test_build_example() {
     let _guard = init_root();
-    let lp = cargo_lambda_new("test-example");
+    let lp = cargo_lambda_new("test-example", "function-template");
     lp.new_cmd()
         .arg("--no-interactive")
         .arg(&lp.name)
@@ -421,14 +421,14 @@ fn test_deploy_workspace() {
     let crates = workspace.root().join("crates");
     crates.mkdir_p();
 
-    let lp_1 = cargo_lambda_new_in_root("p1", &crates);
+    let lp_1 = cargo_lambda_new_in_root("p1", "function-template", &crates);
     lp_1.new_cmd()
         .arg("--no-interactive")
         .arg(&lp_1.name)
         .assert()
         .success();
 
-    let lp_2 = cargo_lambda_new_in_root("p2", &crates);
+    let lp_2 = cargo_lambda_new_in_root("p2", "function-template", &crates);
     lp_2.new_cmd()
         .arg("--no-interactive")
         .arg(&lp_2.name)
@@ -476,14 +476,14 @@ fn test_build_zip_workspace() {
     let crates = workspace.root().join("crates");
     crates.mkdir_p();
 
-    let lp_1 = cargo_lambda_new_in_root("p1", &crates);
+    let lp_1 = cargo_lambda_new_in_root("p1", "function-template", &crates);
     lp_1.new_cmd()
         .arg("--no-interactive")
         .arg(&lp_1.name)
         .assert()
         .success();
 
-    let lp_2 = cargo_lambda_new_in_root("p2", &crates);
+    let lp_2 = cargo_lambda_new_in_root("p2", "function-template", &crates);
     lp_2.new_cmd()
         .arg("--no-interactive")
         .arg(&lp_2.name)

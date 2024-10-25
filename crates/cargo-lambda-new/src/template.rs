@@ -12,6 +12,7 @@ use zip::ZipArchive;
 /// Enum describing the various places a template can come from.  Implements the
 /// logic to expand the template onto the local filesystem, downloading and
 /// unzipping where necessary.
+#[derive(Debug, PartialEq)]
 pub(crate) enum TemplateSource {
     /// ZIP stored remotely at the provided URL
     RemoteZip(String),
@@ -54,20 +55,23 @@ impl TryFrom<&str> for TemplateSource {
             return Ok(Self::RemoteZip(url));
         }
 
-        if is_local_zip_file(value) {
-            return Ok(Self::LocalZip(value.into()));
+        if !(value.starts_with("https://")) {
+            if let Some(path) = find_local_zip_file(value) {
+                return Ok(Self::LocalZip(path));
+            }
+
+            let path = find_local_directory(value)?;
+            return Ok(Self::LocalDir(path));
         }
 
-        if is_local_directory(value) {
-            return Ok(Self::LocalDir(value.into()));
-        }
-
-        Err(miette::miette!("invalid template: {value}"))
+        Err(miette::miette!(
+            "the given template option is not a valid GitHub URL or local directory: {value}"
+        ))
     }
 }
 
 /// Represents the local filesystem root of the template, downloaded
-/// and unzipped.  We model this as its own thing because we need to
+/// and unzipped. We model this as its own thing because we need to
 /// pass the root directory back to the caller and optionally keep
 /// the tempdir reference alive, dropping it and deleting it when
 /// it goes out of the caller's scope.
@@ -158,18 +162,32 @@ fn unzip_template(file: &Path, path: &Path) -> Result<PathBuf> {
     Ok(path.into())
 }
 
-fn is_local_directory(path: &str) -> bool {
-    let path = Path::new(path);
-    path.exists() && path.is_dir()
+fn find_local_directory(value: &str) -> Result<PathBuf> {
+    let path = dunce::realpath(value)
+        .map_err(|err| miette::miette!("invalid template option {value}: {err}"))?;
+
+    if path.is_dir() {
+        Ok(path)
+    } else {
+        Err(miette::miette!(
+            "invalid template option {value}: No such directory"
+        ))
+    }
 }
 
 fn is_remote_zip_file(path: &str) -> bool {
     path.starts_with("https://") && path.ends_with(".zip")
 }
 
-fn is_local_zip_file(path: &str) -> bool {
-    let path = Path::new(path);
-    path.exists() && path.is_file() && path.extension().unwrap_or_default() == "zip"
+fn find_local_zip_file(value: &str) -> Option<PathBuf> {
+    // ignore error to fallback to other template options.
+    if let Ok(path) = dunce::realpath(value) {
+        if path.exists() && path.is_file() && path.extension().unwrap_or_default() == "zip" {
+            return Some(path);
+        }
+    }
+
+    None
 }
 
 fn match_github_url(path: &str) -> Option<String> {
@@ -199,6 +217,7 @@ fn match_github_url(path: &str) -> Option<String> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use assertables::*;
 
     #[test]
     fn test_is_github_url() {
@@ -225,5 +244,52 @@ mod test {
             None,
             match_github_url("https://gitlab.com/cargo-lambda/cargo-lambda")
         );
+    }
+
+    #[test]
+    fn test_template_source() {
+        let source = TemplateSource::try_from("https://github.com/cargo-lambda/cargo-lambda")
+            .expect("failed to parse root GitHub URL");
+        assert_eq!(
+            TemplateSource::RemoteZip(
+                "https://github.com/cargo-lambda/cargo-lambda/archive/refs/heads/main.zip".into()
+            ),
+            source
+        );
+
+        let source = TemplateSource::try_from(
+            "https://github.com/cargo-lambda/cargo-lambda/archive/refs/heads/main.zip",
+        )
+        .expect("failed to parse zip file GitHub URL");
+        assert_eq!(
+            TemplateSource::RemoteZip(
+                "https://github.com/cargo-lambda/cargo-lambda/archive/refs/heads/main.zip".into()
+            ),
+            source
+        );
+
+        let source = TemplateSource::try_from("../../tests/templates/function-template.zip")
+            .expect("failed to parse relative path to zip file");
+        let destination = dunce::realpath("../../tests/templates/function-template.zip")
+            .expect("failed to parse real path");
+        assert_eq!(TemplateSource::LocalZip(destination), source);
+
+        let source = TemplateSource::try_from("../../tests/templates/function-template")
+            .expect("failed to parse relative directory path");
+        let destination = dunce::realpath("../../tests/templates/function-template")
+            .expect("failed to parse real path");
+        assert_eq!(TemplateSource::LocalDir(destination), source);
+
+        let source = TemplateSource::try_from("../../tests/templates/MISSING-template")
+            .expect_err("failed to return an error looking for a missing directory");
+
+        #[cfg(not(windows))]
+        assert_contains!(source.to_string(), "invalid template option ../../tests/templates/MISSING-template: No such file or directory");
+        #[cfg(windows)]
+        assert_contains!(source.to_string(), "invalid template option ../../tests/templates/MISSING-template: The system cannot find the file specified.");
+
+        let source = TemplateSource::try_from("../../tests/templates/function-template/Cargo.toml")
+            .expect_err("failed to return an error looking for a missing directory");
+        assert_contains!(source.to_string(), "invalid template option ../../tests/templates/function-template/Cargo.toml: No such directory");
     }
 }

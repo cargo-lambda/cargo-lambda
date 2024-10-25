@@ -8,6 +8,7 @@ pub use project::{paths::init_root, project, CargoPathExt};
 
 pub struct LambdaProject {
     pub name: String,
+    template: PathBuf,
     root: PathBuf,
     cwd: PathBuf,
 }
@@ -25,6 +26,8 @@ impl LambdaProject {
         Command::cargo_lambda()
             .arg("lambda")
             .arg("new")
+            .arg("--template")
+            .arg(self.template_path().as_os_str())
             .current_dir(&self.cwd)
     }
 
@@ -32,6 +35,8 @@ impl LambdaProject {
         Command::cargo_lambda()
             .arg("lambda")
             .arg("init")
+            .arg("--template")
+            .arg(self.template_path().as_os_str())
             .arg("--name")
             .arg(&self.name)
             .current_dir(&self.cwd)
@@ -44,6 +49,16 @@ impl LambdaProject {
     pub fn test_project(&self) -> Project {
         test_project(&self.root)
     }
+
+    fn template_path(&self) -> PathBuf {
+        let path = Path::new("..")
+            .join("..")
+            .join("tests")
+            .join("templates")
+            .join(&self.template);
+
+        dunce::realpath(path).expect("failed to create real template path")
+    }
 }
 
 pub fn test_project<P: AsRef<Path>>(path: P) -> Project {
@@ -55,20 +70,31 @@ pub fn test_project<P: AsRef<Path>>(path: P) -> Project {
     project
 }
 
-pub fn cargo_lambda_new(project_name: &str) -> LambdaProject {
+pub fn cargo_lambda_new<P: AsRef<Path>>(project_name: &str, template: P) -> LambdaProject {
     let project = project::project().build();
-    cargo_lambda_new_in_root(project_name, &project.root())
+    cargo_lambda_new_in_root(project_name, template, &project.root())
 }
 
-pub fn cargo_lambda_new_in_root(project_name: &str, root: &Path) -> LambdaProject {
+pub fn cargo_lambda_new_in_root<P: AsRef<Path>, R: AsRef<Path>>(
+    project_name: &str,
+    template: P,
+    root: R,
+) -> LambdaProject {
+    let root = root.as_ref();
+
     let cwd = dunce::canonicalize(root).expect("failed to create canonical path");
     let name = format!("{}-{}", project_name, uuid::Uuid::new_v4());
     let root = root.join(&name);
 
-    LambdaProject { name, root, cwd }
+    LambdaProject {
+        name,
+        template: template.as_ref().to_path_buf(),
+        root: root.to_path_buf(),
+        cwd,
+    }
 }
 
-pub fn cargo_lambda_init(project_name: &str) -> LambdaProject {
+pub fn cargo_lambda_init<P: AsRef<Path>>(project_name: &str, template: P) -> LambdaProject {
     let project = project::project().build();
 
     let cwd = dunce::canonicalize(project.root()).expect("failed to create canonical path");
@@ -78,6 +104,7 @@ pub fn cargo_lambda_init(project_name: &str) -> LambdaProject {
 
     LambdaProject {
         name,
+        template: template.as_ref().to_path_buf(),
         root: project.root(),
         cwd,
     }
