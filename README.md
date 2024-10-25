@@ -11,6 +11,12 @@ Get started by looking at **[the documentation](https://www.cargo-lambda.info/gu
 
 This project is released under the [MIT License](/LICENSE).
 
+## Sponsors
+
+This project is maintained thanks to the sponsorship of the individuals below. If you want to sponsor my work on Cargo Lambda, check out the [GitHub Sponsors page](https://github.com/sponsors/calavera/).
+
+<a href="/arthurmf"><img src="https://avatars.githubusercontent.com/u/15284868?s=100&amp;v=4" width="50" height="50" alt="@arthurmf"></a> <a href="/lmammino"><img src="https://avatars.githubusercontent.com/u/205629?s=100&amp;v=4" width="50" height="50" alt="@lmammino"></a>
+
 [//]: # 'badges'
 [crate-image]: https://img.shields.io/crates/v/cargo-lambda.svg
 [crate-link]: https://crates.io/crates/cargo-lambda
