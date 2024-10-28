@@ -28,7 +28,7 @@ cargo lambda new --extension --logs logs-project
 
 Cargo Lambda uses template repositories as scaffolding for new projects. You can see the [default template for functions](https://github.com/cargo-lambda/default-template) and the [default template for extensions](https://github.com/cargo-lambda/default-extension-template) in GitHub.
 
-Cargo Lambda can also download custom templates from other GitHub repositories by using the `--template` with the repository url, for example:
+Cargo Lambda can also download custom templates from other public GitHub repositories by using the `--template` with the repository url, for example:
 
 ```sh
 cargo lambda new \
@@ -47,6 +47,18 @@ cargo lambda new \
 ```sh
 cargo lambda new \
     --template https://github.com/calavera/custom-template/tag/v0.1.0 \
+    new-project
+```
+
+### Private template repositories
+
+If you want to use a template that's in a private repository, Cargo Lambda uses the same method as `git clone` to download the repository. This means that you need to have access to the repository and that you need to have the credentials to access it configured in your machine.
+
+To download a private repository with SSH, you need to have the SSH key configured in your machine. You can use the same SSH URLs as you use with `git clone`.
+
+```sh
+cargo lambda new \
+    --template git@github.com:cargo-lambda/custom-template.git \
     new-project
 ```
 

@@ -226,7 +226,7 @@ pub mod paths {
         });
 
         let mut root = global_root();
-        root.push(&format!("t{}", id));
+        root.push(format!("t{}", id));
         root
     }
 
