@@ -1229,9 +1229,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.19.0"
+version = "0.19.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7999492d24c21b6e181541d865e2691c21fb9f717e67ee5b0b766f94b55a9657"
+checksum = "20de66555d3ebec780021a7cd51aafe92b9e8f4fa648ef1f12e9c723b76c9764"
 dependencies = [
  "anyhow",
  "cargo-config2",
@@ -5444,9 +5444,9 @@ dependencies = [
 
 [[package]]
 name = "target-lexicon"
-version = "0.12.12"
+version = "0.12.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14c39fd04924ca3a864207c66fc2cd7d22d7c016007f9ce846cbb9326331930a"
+checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 
 [[package]]
 name = "tempfile"
