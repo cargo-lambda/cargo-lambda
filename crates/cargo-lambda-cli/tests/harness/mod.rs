@@ -72,7 +72,7 @@ pub fn test_project<P: AsRef<Path>>(path: P) -> Project {
 
 pub fn cargo_lambda_new<P: AsRef<Path>>(project_name: &str, template: P) -> LambdaProject {
     let project = project::project().build();
-    cargo_lambda_new_in_root(project_name, template, &project.root())
+    cargo_lambda_new_in_root(project_name, template, project.root())
 }
 
 pub fn cargo_lambda_new_in_root<P: AsRef<Path>, R: AsRef<Path>>(

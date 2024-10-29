@@ -600,7 +600,7 @@ mod test {
     fn test_zip_funcion_with_directories() {
         let data = BinaryData::new("binary-x86-64", false, false);
 
-        let bp = &format!("../../tests/binaries/binary-x86-64");
+        let bp = "../../tests/binaries/binary-x86-64".to_string();
         #[cfg(unix)]
         let extra = vec!["source:../../tests/fixtures/examples-package".into()];
         #[cfg(windows)]

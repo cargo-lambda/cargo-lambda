@@ -128,6 +128,7 @@ impl New {
     }
 }
 
+#[tracing::instrument(target = "cargo_lambda")]
 async fn new_project<T: AsRef<Path> + Debug>(
     name: &str,
     path: T,
@@ -168,6 +169,7 @@ async fn new_project<T: AsRef<Path> + Debug>(
     }
 }
 
+#[tracing::instrument(target = "cargo_lambda")]
 async fn create_project<T: AsRef<Path> + Debug>(
     name: &str,
     path: T,
