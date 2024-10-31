@@ -1,3 +1,4 @@
+use serde_json;
 use std::{
     fs::{create_dir_all, read_to_string, File},
     io::Write,
@@ -525,4 +526,27 @@ members = ["crates/{}", "crates/{}"]
     assert!(lp_1_bin.exists(), "{:?} doesn't exist", lp_1_bin);
     // The second zip file should not be created because we're using `--bin`.
     assert!(!lp_2_bin.exists(), "{:?} exist", lp_2_bin);
+}
+
+#[test]
+fn test_config_template() {
+    let _guard = init_root();
+    let lp = cargo_lambda_new("test-config-template", "config-template");
+    lp.new_cmd()
+        .arg("--no-interactive")
+        .arg(&lp.name)
+        .assert()
+        .success();
+
+    let project = lp.test_project();
+    cargo_lambda_build(project.root()).assert().success();
+
+    let json_file = read_to_string(project.root().join("render-test.json")).unwrap();
+    let json_data: serde_json::Value = serde_json::from_str(&json_file).unwrap();
+    assert_eq!(json_data["description"], "My Lambda");
+    assert_eq!(json_data["enable_tracing"], "false");
+    assert_eq!(json_data["runtime"], "provided.al2023");
+    assert_eq!(json_data["architecture"], "x86_64");
+    assert_eq!(json_data["memory"], "128");
+    assert_eq!(json_data["timeout"], "3");
 }

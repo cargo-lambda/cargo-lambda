@@ -1,4 +1,6 @@
-use cargo_lambda_interactive::{command::silent_command, is_user_cancellation_error};
+use cargo_lambda_interactive::{
+    command::silent_command, is_user_cancellation_error, progress::Progress,
+};
 use cargo_lambda_metadata::fs::{copy_and_replace, copy_without_replace};
 use clap::Args;
 use liquid::{model::Value, Object, ParserBuilder};
@@ -11,6 +13,7 @@ use std::{
     fs::{copy as copy_file, create_dir_all, File},
     path::{Path, PathBuf},
 };
+use template::{config::TemplateConfig, TemplateRoot};
 use walkdir::WalkDir;
 
 use crate::template::TemplateSource;
@@ -142,12 +145,18 @@ async fn new_project<T: AsRef<Path> + Debug>(
         validate_name(name)?;
     }
 
+    let template = get_template(config).await?;
+    template.cleanup();
+
+    let template_config = template::config::parse_template_config(template.config_path())?;
+    let ignore_default_prompts = template_config.disable_default_prompts || config.no_interactive;
+
     if config.extension {
         config.extension_options.validate_options()?;
     } else {
         match config
             .function_options
-            .validate_options(config.no_interactive)
+            .validate_options(ignore_default_prompts)
         {
             Err(CreateError::UnexpectedInput(err)) if is_user_cancellation_error(&err) => {
                 return Ok(())
@@ -157,7 +166,20 @@ async fn new_project<T: AsRef<Path> + Debug>(
         }
     }
 
-    create_project(name, &path, config, replace).await?;
+    let globals = build_template_variables(config, &template_config, name)?;
+    let render_files = build_render_files(config, &template_config);
+    let ignore_files = build_ignore_files(config, &template_config);
+
+    create_project(
+        &path,
+        &template.final_path(),
+        &template_config,
+        &globals,
+        &render_files,
+        &ignore_files,
+        replace,
+    )
+    .await?;
     if config.open {
         let path_ref = path.as_ref();
         let path_str = path_ref
@@ -169,42 +191,47 @@ async fn new_project<T: AsRef<Path> + Debug>(
     }
 }
 
-#[tracing::instrument(target = "cargo_lambda")]
-async fn create_project<T: AsRef<Path> + Debug>(
-    name: &str,
-    path: T,
-    config: &Config,
-    replace: bool,
-) -> Result<()> {
+async fn get_template(config: &Config) -> Result<TemplateRoot> {
+    let progress = Progress::start("downloading template");
+
     let template_option = match config.template.as_deref() {
         Some(t) => t,
         None if config.extension => extensions::DEFAULT_TEMPLATE_URL,
         None => functions::DEFAULT_TEMPLATE_URL,
     };
 
-    let template_source = TemplateSource::try_from(template_option)?;
-    let template_path = template_source.expand().await?;
+    let template_source = TemplateSource::try_from(template_option);
+    match template_source {
+        Ok(ts) => {
+            let result = ts.expand().await;
+            progress.finish_and_clear();
+            result
+        }
+        Err(e) => {
+            progress.finish_and_clear();
+            Err(e)
+        }
+    }
+}
+
+#[tracing::instrument(target = "cargo_lambda")]
+async fn create_project<T: AsRef<Path> + Debug>(
+    path: T,
+    template_path: &Path,
+    template_config: &TemplateConfig,
+    globals: &Object,
+    render_files: &[PathBuf],
+    ignore_files: &[PathBuf],
+    replace: bool,
+) -> Result<()> {
+    tracing::trace!("rendering new project's template");
 
     let parser = ParserBuilder::with_stdlib().build().into_diagnostic()?;
-
-    let template_vars = if config.extension {
-        config.extension_options.variables()?
-    } else {
-        config.function_options.variables(name, &config.bin_name)?
-    };
-
-    let mut globals = liquid::object!({
-        "project_name": name,
-        "binary_name": config.bin_name,
-    });
-    globals.extend(template_vars);
-    globals.extend(render_variables(config));
-    tracing::debug!(variables = ?globals, "rendering templates");
 
     let render_dir = tempfile::tempdir().into_diagnostic()?;
     let render_path = render_dir.path();
 
-    let walk_dir = WalkDir::new(&template_path).follow_links(false);
+    let walk_dir = WalkDir::new(template_path).follow_links(false);
     for entry in walk_dir {
         let entry = entry.into_diagnostic()?;
         let entry_path = entry.path();
@@ -222,7 +249,7 @@ async fn create_project<T: AsRef<Path> + Debug>(
         } else if entry_name == "cargo-lambda-template.zip" {
             continue;
         } else {
-            let relative = entry_path.strip_prefix(&template_path).into_diagnostic()?;
+            let relative = entry_path.strip_prefix(template_path).into_diagnostic()?;
 
             let new_path = render_path.join(relative);
             let parent_name = if let Some(parent) = new_path.parent() {
@@ -232,7 +259,7 @@ async fn create_project<T: AsRef<Path> + Debug>(
                 None
             };
 
-            if entry_name == "LICENSE" || is_ignore_file(config, relative) {
+            if entry_name == "LICENSE" || ignore_files.contains(&relative.to_path_buf()) {
                 continue;
             }
 
@@ -241,7 +268,8 @@ async fn create_project<T: AsRef<Path> + Debug>(
                 || (entry_name == "main.rs" && parent_name == Some("src"))
                 || (entry_name == "lib.rs" && parent_name == Some("src"))
                 || parent_name == Some("bin")
-                || is_render_file(config, relative)
+                || render_files.contains(&relative.to_path_buf())
+                || template_config.render_all_files
             {
                 let template = parser.parse_file(entry_path).into_diagnostic()?;
 
@@ -250,7 +278,7 @@ async fn create_project<T: AsRef<Path> + Debug>(
                     .wrap_err_with(|| format!("unable to create file: {new_path:?}"))?;
 
                 template
-                    .render_to(&mut file, &globals)
+                    .render_to(&mut file, globals)
                     .into_diagnostic()
                     .wrap_err_with(|| format!("failed to render template file: {:?}", &new_path))?;
             } else {
@@ -297,14 +325,6 @@ async fn open_code_editor(path: &str) -> Result<()> {
     }
 }
 
-fn is_render_file(config: &Config, path: &Path) -> bool {
-    config
-        .render_file
-        .as_ref()
-        .map(|v| v.contains(&path.to_path_buf()))
-        .unwrap_or(false)
-}
-
 fn render_variables(config: &Config) -> Object {
     let vars = config.render_var.clone().unwrap_or_default();
     let mut map = HashMap::new();
@@ -324,10 +344,41 @@ fn render_variables(config: &Config) -> Object {
     object
 }
 
-fn is_ignore_file(config: &Config, path: &Path) -> bool {
-    config
-        .ignore_file
-        .as_ref()
-        .map(|v| v.contains(&path.to_path_buf()))
-        .unwrap_or(false)
+fn build_template_variables(
+    config: &Config,
+    template_config: &TemplateConfig,
+    name: &str,
+) -> Result<Object> {
+    let mut variables = liquid::object!({
+        "project_name": name,
+        "binary_name": config.bin_name,
+    });
+
+    if config.extension {
+        variables.extend(config.extension_options.variables()?);
+    } else {
+        variables.extend(config.function_options.variables(name, &config.bin_name)?);
+    };
+
+    if !template_config.prompts.is_empty() {
+        let template_variables = template_config.ask_template_options(config.no_interactive)?;
+        variables.extend(template_variables);
+    }
+
+    variables.extend(render_variables(config));
+    tracing::debug!(?variables, "collected template variables");
+
+    Ok(variables)
+}
+
+fn build_render_files(config: &Config, template_config: &TemplateConfig) -> Vec<PathBuf> {
+    let mut render_files = template_config.render_files.clone();
+    render_files.extend(config.render_file.clone().unwrap_or_default());
+    render_files
+}
+
+fn build_ignore_files(config: &Config, template_config: &TemplateConfig) -> Vec<PathBuf> {
+    let mut ignore_files = template_config.ignore_files.clone();
+    ignore_files.extend(config.ignore_file.clone().unwrap_or_default());
+    ignore_files
 }
