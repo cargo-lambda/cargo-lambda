@@ -32,6 +32,7 @@ build-data = "0.1"
 
 [dev-dependencies]
 dunce = "1.0.3"
+serde_json.workspace = true
 snapbox = { version = "0.4.3", features = ["cmd", "debug", "path"] }
 url = "2.5.0"
 uuid.workspace = true

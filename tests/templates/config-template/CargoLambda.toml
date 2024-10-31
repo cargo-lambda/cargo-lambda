@@ -1,0 +1,22 @@
+[template]
+disable_default_prompts = true
+render_all_files = true
+
+render_files = [
+    "Cargo.toml",
+    "README.md",
+    "main.rs"
+]
+
+ignore_files = [
+    "README.md"
+]
+
+prompts = [
+    { name = "project_description", message = "What is the description of your project?", default = "My Lambda" },
+    { name = "enable_tracing", message = "Would you like to enable tracing?", default = false },
+    { name = "runtime", message = "Which runtime would you like to use?", choices = ["provided.al2023", "provided.al2"], default = "provided.al2023" },
+    { name = "architecture", message = "Which architecture would you like to target?", choices = ["x86_64", "arm64"], default = "x86_64" },
+    { name = "memory", message = "How much memory (in MB) would you like to allocate?", default = "128" },
+    { name = "timeout", message = "What timeout (in seconds) would you like to set?", default = "3" }
+]

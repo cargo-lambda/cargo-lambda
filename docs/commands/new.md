@@ -136,3 +136,88 @@ cargo lambda new \
     --no-interactive \
     new-project
 ```
+
+## Custom templates
+
+Cargo Lambda allows you to create custom templates with interactive prompts to collect user input during project creation. To create a custom template, add a `CargoLambda.toml` file to your template repository with the following structure. The template files can be placed either in the root directory or in a subdirectory called `template`. Cargo Lambda will automatically detect and use the `template` subdirectory if it exists. The `CargoLambda.toml` file can be located in the root directory or in the `template` directory. If you don't want to add it to the final project directory, it's recommended to place it in the root directory, and put the template files in the `template` directory.
+
+```toml
+[template]
+# Disable the default interactive prompts that cargo-lambda shows
+disable_default_prompts = true
+
+# Specify which files should be processed by the Liquid template engine
+render_files = [
+    "Cargo.toml",
+    "README.md",
+    "src/main.rs"
+]
+
+# Process all files in the template with Liquid (overrides render_files)
+render_all_files = true
+
+# Files to ignore when copying the template
+ignore_files = [
+    "README.md"
+]
+
+# Define custom interactive prompts
+prompts = [
+    { name = "project_description", message = "What is the description of your project?", default = "My Lambda" },
+    { name = "enable_tracing", message = "Would you like to enable tracing?", default = false },
+    { name = "runtime", message = "Which runtime would you like to use?", choices = ["provided.al2023", "provided.al2"], default = "provided.al2023" },
+    { name = "architecture", message = "Which architecture would you like to target?", choices = ["x86_64", "arm64"], default = "x86_64" },
+    { name = "memory", message = "How much memory (in MB) would you like to allocate?", default = "128" },
+    { name = "timeout", message = "What timeout (in seconds) would you like to set?", default = "3" }
+]
+```
+
+## Configuration Options
+
+- `disable_default_prompts`: When set to `true`, disables Cargo Lambda's built-in prompts
+- `render_files`: List of files that should be processed by the Liquid template engine
+- `render_all_files`: When `true`, all files in the template will be processed by Liquid
+- `ignore_files`: List of files that should not be copied to the new project
+- `prompts`: Array of interactive prompts to collect user input
+
+### Prompt Configuration
+
+Each prompt can have the following properties:
+
+- `name`: Variable name to use in templates (required)
+- `message`: Question to display to the user (required)
+- `default`: Default value if user doesn't provide input (optional)
+- `choices`: Array of valid options for the user to choose from (optional)
+
+The values collected from these prompts are available in your template files through Liquid variables. For example:
+
+```toml
+[package]
+name = "{{ project_name }}"
+description = "{{ project_description }}"
+```
+
+```rust
+#[function_name = "{{ project_name }}"]
+#[tracing(enable = {{ enable_tracing }})]
+pub async fn handler() -> Result<()> {
+    // ...
+}
+```
+
+To use your custom template:
+
+```sh
+cargo lambda new \
+    --template https://github.com/your-org/custom-template \
+    new-project
+```
+
+If you want to skip the interactive prompts, use the `--no-interactive` flag:
+
+```sh
+cargo lambda new \
+    --template https://github.com/your-org/custom-template \
+    --no-interactive \
+    new-project
+```

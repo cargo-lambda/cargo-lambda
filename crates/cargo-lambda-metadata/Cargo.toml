@@ -23,6 +23,6 @@ serde_json.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 thiserror.workspace = true
-toml = "0.8.8"
+toml.workspace = true
 tracing.workspace = true
 urlencoding = "2.1.3"

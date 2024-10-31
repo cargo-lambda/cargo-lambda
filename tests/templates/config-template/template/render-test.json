@@ -1,0 +1,8 @@
+{
+    "description": "{{ project_description }}",
+    "enable_tracing": "{{ enable_tracing }}",
+    "runtime": "{{ runtime }}",
+    "architecture": "{{ architecture }}",
+    "memory": "{{ memory }}",
+    "timeout": "{{ timeout }}"
+}

@@ -1,0 +1,41 @@
+[package]
+name = "{{ project_name }}"
+version = "0.1.0"
+edition = "2021"
+
+# Starting in Rust 1.62 you can use `cargo add` to add dependencies 
+# to your project.
+#
+# If you're using an older Rust version,
+# download cargo-edit(https://github.com/killercup/cargo-edit#installation) 
+# to install the `add` subcommand.
+#
+# Running `cargo add DEPENDENCY_NAME` will
+# add the latest version of a dependency to the list,
+# and it will keep the alphabetic ordering for you.
+
+[dependencies]
+{% if event_type_import -%}
+aws_lambda_events = { version = "{{ aws_lambda_events_version | default: "0.8.0" }}", default-features = false, features = ["{{ event_type_feature }}"] }
+{% endif -%}
+{% if http_function -%}
+{%- if http_feature -%}
+lambda_http = { version = "{{ lambda_http_version | default: "0.7" }}", default-features = false, features = ["{{ http_feature }}"] }
+{%- else -%}
+lambda_http = "{{ lambda_http_version | default: "0.7" }}"
+{%- endif -%}
+{%- endif %}
+lambda_runtime = "{{ lambda_runtime_version | default: "0.7" }}"
+{% if basic_example -%}
+serde = "1.0.136"
+{% endif -%}
+tokio = { version = "1", features = ["macros"] }
+tracing = { version = "0.1", features = ["log"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
+
+{% if function_name -%}
+[[bin]]
+name = "{{ function_name }}"
+path = "src/main.rs"
+test = false
+{%- endif -%}
