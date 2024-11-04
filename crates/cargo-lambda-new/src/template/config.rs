@@ -6,6 +6,7 @@ use liquid::{model::Value, Object};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Deserialize;
 use std::{
+    collections::HashMap,
     fmt::Debug,
     fs,
     path::{Path, PathBuf},
@@ -34,8 +35,13 @@ impl From<PromptValue> for Value {
 }
 
 #[derive(Debug, Default, Deserialize)]
+pub(crate) struct RenderCondition {
+    pub var: String,
+    pub value: PromptValue,
+}
+
+#[derive(Debug, Default, Deserialize)]
 pub(crate) struct TemplatePrompt {
-    pub name: String,
     pub message: String,
     #[serde(default)]
     pub choices: Option<Vec<String>>,
@@ -48,13 +54,15 @@ pub(crate) struct TemplateConfig {
     #[serde(default)]
     pub disable_default_prompts: bool,
     #[serde(default)]
-    pub prompts: Vec<TemplatePrompt>,
+    pub prompts: HashMap<String, TemplatePrompt>,
     #[serde(default)]
     pub render_files: Vec<PathBuf>,
     #[serde(default)]
     pub render_all_files: bool,
     #[serde(default)]
     pub ignore_files: Vec<PathBuf>,
+    #[serde(default)]
+    pub render_conditional_files: HashMap<String, RenderCondition>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -83,13 +91,13 @@ pub(crate) fn parse_template_config<P: AsRef<Path> + Debug>(path: P) -> Result<T
 impl TemplateConfig {
     pub(crate) fn ask_template_options(&self, no_interactive: bool) -> Result<Object> {
         let mut variables = Object::new();
-        for prompt in &self.prompts {
+        for (name, prompt) in &self.prompts {
             let value = if no_interactive {
                 prompt.default.clone().unwrap_or_default()
             } else {
                 prompt.ask()?
             };
-            variables.insert(prompt.name.clone().into(), value.into());
+            variables.insert(name.into(), value.into());
         }
         Ok(variables)
     }
@@ -175,38 +183,38 @@ mod tests {
     fn test_parse_template_config_prompts() {
         let config = parse_template_config("../../tests/templates/config-template").unwrap();
         assert_eq!(config.disable_default_prompts, true);
-        assert_eq!(config.prompts.len(), 6);
+        assert_eq!(config.prompts.len(), 8);
 
-        assert_eq!(config.prompts[0].name, "project_description");
         assert_eq!(
-            config.prompts[0].message,
+            config.prompts["project_description"].message,
             "What is the description of your project?"
         );
         assert_eq!(
-            config.prompts[0].default,
+            config.prompts["project_description"].default,
             Some(PromptValue::String("My Lambda".to_string()))
         );
-        assert_eq!(config.prompts[0].choices, None);
+        assert_eq!(config.prompts["project_description"].choices, None);
 
-        assert_eq!(config.prompts[1].name, "enable_tracing");
         assert_eq!(
-            config.prompts[1].message,
+            config.prompts["enable_tracing"].message,
             "Would you like to enable tracing?"
         );
-        assert_eq!(config.prompts[1].default, Some(PromptValue::Boolean(false)));
-        assert_eq!(config.prompts[1].choices, None);
-
-        assert_eq!(config.prompts[2].name, "runtime");
         assert_eq!(
-            config.prompts[2].message,
+            config.prompts["enable_tracing"].default,
+            Some(PromptValue::Boolean(false))
+        );
+        assert_eq!(config.prompts["enable_tracing"].choices, None);
+
+        assert_eq!(
+            config.prompts["runtime"].message,
             "Which runtime would you like to use?"
         );
         assert_eq!(
-            config.prompts[2].default,
+            config.prompts["runtime"].default,
             Some(PromptValue::String("provided.al2023".to_string()))
         );
         assert_eq!(
-            config.prompts[2].choices,
+            config.prompts["runtime"].choices,
             Some(vec![
                 "provided.al2023".to_string(),
                 "provided.al2".to_string()
@@ -267,7 +275,7 @@ mod tests {
     fn test_ask_template_options() {
         let config = parse_template_config("../../tests/templates/config-template").unwrap();
         let variables = config.ask_template_options(true).unwrap();
-        assert_eq!(variables.len(), 6);
+        assert_eq!(variables.len(), 8);
 
         assert_eq!(variables["project_description"], "My Lambda");
         assert_eq!(variables["enable_tracing"], false);
@@ -275,5 +283,21 @@ mod tests {
         assert_eq!(variables["architecture"], "x86_64");
         assert_eq!(variables["memory"], "128");
         assert_eq!(variables["timeout"], "3");
+        assert_eq!(variables["github_actions"], false);
+        assert_eq!(variables["ci_provider"], ".github");
+    }
+
+    #[test]
+    fn test_parse_template_config_render_conditions() {
+        let config = parse_template_config("../../tests/templates/config-template").unwrap();
+        assert_eq!(config.render_conditional_files.len(), 1);
+        assert_eq!(
+            config.render_conditional_files[".github"].var,
+            "github_actions"
+        );
+        assert_eq!(
+            config.render_conditional_files[".github"].value,
+            PromptValue::Boolean(true)
+        );
     }
 }

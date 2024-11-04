@@ -12,11 +12,15 @@ ignore_files = [
     "README.md"
 ]
 
-prompts = [
-    { name = "project_description", message = "What is the description of your project?", default = "My Lambda" },
-    { name = "enable_tracing", message = "Would you like to enable tracing?", default = false },
-    { name = "runtime", message = "Which runtime would you like to use?", choices = ["provided.al2023", "provided.al2"], default = "provided.al2023" },
-    { name = "architecture", message = "Which architecture would you like to target?", choices = ["x86_64", "arm64"], default = "x86_64" },
-    { name = "memory", message = "How much memory (in MB) would you like to allocate?", default = "128" },
-    { name = "timeout", message = "What timeout (in seconds) would you like to set?", default = "3" }
-]
+[template.render_conditional_files]
+".github" = { var = "github_actions", value = true }
+
+[template.prompts]
+project_description = { message = "What is the description of your project?", default = "My Lambda" }
+enable_tracing = { message = "Would you like to enable tracing?", default = false }
+runtime = { message = "Which runtime would you like to use?", choices = ["provided.al2023", "provided.al2"], default = "provided.al2023" }
+architecture = { message = "Which architecture would you like to target?", choices = ["x86_64", "arm64"], default = "x86_64" }
+memory = { message = "How much memory (in MB) would you like to allocate?", default = "128" }
+timeout = { message = "What timeout (in seconds) would you like to set?", default = "3" }
+github_actions = { message = "Would you like to add GitHub Actions CI/CD support?", default = false }
+ci_provider = { message = "Which CI provider would you like to use?", choices = [".github", "circleci"], default = ".github" }

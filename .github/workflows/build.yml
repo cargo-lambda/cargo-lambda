@@ -37,9 +37,9 @@ jobs:
       matrix:
         os:
           - label: MacOS (Intel)
-            runner: macos-12
+            runner: macos-13
           - label: MacOS (ARM)
-            runner: macos-14
+            runner: macos-latest
           - label: Ubuntu Latest
             runner: ubuntu-latest
           - label: Windows Latest

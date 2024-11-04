@@ -549,4 +549,13 @@ fn test_config_template() {
     assert_eq!(json_data["architecture"], "x86_64");
     assert_eq!(json_data["memory"], "128");
     assert_eq!(json_data["timeout"], "3");
+    assert_eq!(json_data["ci_provider"], ".github");
+    assert_eq!(json_data["github_actions"], "false");
+
+    assert!(project
+        .root()
+        .join(".github")
+        .join("actions")
+        .join("build.yml")
+        .exists());
 }

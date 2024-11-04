@@ -19,10 +19,10 @@ jobs:
       matrix:
         platform:
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-latest
             label: MacOs (ARM)
           - target: x86_64-apple-darwin
-            os: macos-12
+            os: macos-13
             label: MacOS (Intel)
     steps:
       - uses: actions/checkout@v3

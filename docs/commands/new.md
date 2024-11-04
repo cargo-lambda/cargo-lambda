@@ -114,6 +114,18 @@ cargo lambda new \
     new-project
 ```
 
+You can also use Liquid variables in file paths themselves. This allows you to dynamically generate file paths based on template variables:
+
+```sh
+cargo lambda new \
+    --template https://github.com/calavera/custom-template \
+    --render-var ci_provider=.github \
+    new-project
+```
+
+For example, a template containing a file path like `{{ci_provider}}/workflows/build.yml` would be rendered as `.github/workflows/build.yml` with the above command.
+
+
 ### Ignore files
 
 By default, Cargo Lambda will ignore the `.git` directory and the `LICENSE` file in the template repository. If you want to ignore additional files in a new project, you can use the flag `--ignore-file`:
@@ -161,15 +173,19 @@ ignore_files = [
     "README.md"
 ]
 
+# Files to conditionally render based on a promptvariable
+[template.render_conditional_files] 
+".github" = { var = "github_actions", value = true }
+
 # Define custom interactive prompts
-prompts = [
-    { name = "project_description", message = "What is the description of your project?", default = "My Lambda" },
-    { name = "enable_tracing", message = "Would you like to enable tracing?", default = false },
-    { name = "runtime", message = "Which runtime would you like to use?", choices = ["provided.al2023", "provided.al2"], default = "provided.al2023" },
-    { name = "architecture", message = "Which architecture would you like to target?", choices = ["x86_64", "arm64"], default = "x86_64" },
-    { name = "memory", message = "How much memory (in MB) would you like to allocate?", default = "128" },
-    { name = "timeout", message = "What timeout (in seconds) would you like to set?", default = "3" }
-]
+[template.prompts]
+project_description = { message = "What is the description of your project?", default = "My Lambda" }
+enable_tracing = { message = "Would you like to enable tracing?", default = false }
+runtime = { message = "Which runtime would you like to use?", choices = ["provided.al2023", "provided.al2"], default = "provided.al2023" }
+architecture = { message = "Which architecture would you like to target?", choices = ["x86_64", "arm64"], default = "x86_64" }
+memory = { message = "How much memory (in MB) would you like to allocate?", default = "128" }
+timeout = { message = "What timeout (in seconds) would you like to set?", default = "3" }
+github_actions = { message = "Would you like to add GitHub Actions CI/CD support?", default = false }
 ```
 
 ## Configuration Options
@@ -177,8 +193,9 @@ prompts = [
 - `disable_default_prompts`: When set to `true`, disables Cargo Lambda's built-in prompts
 - `render_files`: List of files that should be processed by the Liquid template engine
 - `render_all_files`: When `true`, all files in the template will be processed by Liquid
+- `render_conditional_files`: Table of files that should be conditionally rendered based on a prompt variable
 - `ignore_files`: List of files that should not be copied to the new project
-- `prompts`: Array of interactive prompts to collect user input
+- `prompts`: Table of interactive prompts to collect user input
 
 ### Prompt Configuration
 

@@ -3,7 +3,7 @@ use cargo_lambda_interactive::{
 };
 use cargo_lambda_metadata::fs::{copy_and_replace, copy_without_replace};
 use clap::Args;
-use liquid::{model::Value, Object, ParserBuilder};
+use liquid::{model::Value, Object, Parser, ParserBuilder};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use regex::Regex;
 use std::{
@@ -251,7 +251,11 @@ async fn create_project<T: AsRef<Path> + Debug>(
         } else {
             let relative = entry_path.strip_prefix(template_path).into_diagnostic()?;
 
-            let new_path = render_path.join(relative);
+            let mut new_path = render_path.join(relative);
+            if let Some(path) = render_path_with_variables(&new_path, &parser, globals) {
+                new_path = path;
+            }
+
             let parent_name = if let Some(parent) = new_path.parent() {
                 create_dir_all(parent).into_diagnostic()?;
                 parent.file_name().and_then(|p| p.to_str())
@@ -268,8 +272,7 @@ async fn create_project<T: AsRef<Path> + Debug>(
                 || (entry_name == "main.rs" && parent_name == Some("src"))
                 || (entry_name == "lib.rs" && parent_name == Some("src"))
                 || parent_name == Some("bin")
-                || render_files.contains(&relative.to_path_buf())
-                || template_config.render_all_files
+                || should_render_file(relative, render_files, template_config, globals)
             {
                 let template = parser.parse_file(entry_path).into_diagnostic()?;
 
@@ -381,4 +384,181 @@ fn build_ignore_files(config: &Config, template_config: &TemplateConfig) -> Vec<
     let mut ignore_files = template_config.ignore_files.clone();
     ignore_files.extend(config.ignore_file.clone().unwrap_or_default());
     ignore_files
+}
+
+fn should_render_file(
+    relative: &Path,
+    render_files: &[PathBuf],
+    template_config: &TemplateConfig,
+    variables: &Object,
+) -> bool {
+    if template_config.render_all_files {
+        return true;
+    }
+
+    let Some(unix_path) = convert_to_unix_path(relative) else {
+        return false;
+    };
+
+    if render_files.contains(&PathBuf::from(&unix_path)) {
+        return true;
+    }
+
+    if let Some(condition) = template_config.render_conditional_files.get(&unix_path) {
+        let Some(prompt_value) = variables.get::<str>(&condition.var) else {
+            return false;
+        };
+
+        let condition_value: Value = condition.value.clone().into();
+        if condition_value == *prompt_value {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn render_path_with_variables(path: &Path, parser: &Parser, variables: &Object) -> Option<PathBuf> {
+    let re = regex::Regex::new(r"\{\{[^/]*\}\}").ok()?;
+
+    let path_str = path.to_string_lossy();
+    if !re.is_match(&path_str) {
+        return None;
+    }
+
+    let template = parser.parse(&path_str).ok()?;
+    let path_str = template.render(&variables).ok()?;
+
+    Some(PathBuf::from(path_str))
+}
+
+#[cfg(target_os = "windows")]
+fn convert_to_unix_path(path: &Path) -> Option<String> {
+    let mut path_str = String::new();
+    for component in path.components() {
+        if let std::path::Component::Normal(os_str) = component {
+            if !path_str.is_empty() {
+                path_str.push('/');
+            }
+            path_str.push_str(os_str.to_str()?);
+        }
+    }
+    Some(path_str)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn convert_to_unix_path(path: &Path) -> Option<String> {
+    path.to_str().map(String::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use liquid::{model::Value, Object};
+    use template::config::{PromptValue, RenderCondition};
+
+    use super::*;
+
+    #[test]
+    fn test_render_relative_path_with_render_conditional_files() {
+        #[cfg(not(target_os = "windows"))]
+        let path = Path::new("src/main.rs");
+        #[cfg(target_os = "windows")]
+        let path = Path::new("src\\main.rs");
+
+        let render_files = vec![];
+        let mut template_config = TemplateConfig::default();
+        template_config.render_conditional_files.insert(
+            "src/main.rs".into(),
+            RenderCondition {
+                var: "render_main_rs".into(),
+                value: PromptValue::Boolean(true),
+            },
+        );
+        let mut variables = Object::new();
+        variables.insert("render_main_rs".into(), Value::scalar(true));
+
+        assert!(should_render_file(
+            &path,
+            &render_files,
+            &template_config,
+            &variables
+        ));
+    }
+
+    #[test]
+    fn test_render_relative_path_with_render_files() {
+        #[cfg(not(target_os = "windows"))]
+        let path = Path::new("src/main.rs");
+        #[cfg(target_os = "windows")]
+        let path = Path::new("src\\main.rs");
+
+        let render_files = vec![PathBuf::from("src/main.rs")];
+        let template_config = TemplateConfig::default();
+        let variables = Object::new();
+        assert!(should_render_file(
+            &path,
+            &render_files,
+            &template_config,
+            &variables
+        ));
+    }
+
+    #[test]
+    fn test_render_relative_path_with_render_conditional_files_false() {
+        #[cfg(not(target_os = "windows"))]
+        let path = Path::new("src/main.rs");
+        #[cfg(target_os = "windows")]
+        let path = Path::new("src\\main.rs");
+
+        let render_files = vec![];
+        let template_config = TemplateConfig::default();
+        let variables = Object::new();
+        assert!(!should_render_file(
+            &path,
+            &render_files,
+            &template_config,
+            &variables
+        ));
+    }
+
+    #[test]
+    fn test_render_relative_path_with_render_all_files() {
+        #[cfg(not(target_os = "windows"))]
+        let path = Path::new("src/main.rs");
+        #[cfg(target_os = "windows")]
+        let path = Path::new("src\\main.rs");
+
+        let render_files = vec![];
+        let mut template_config = TemplateConfig::default();
+        template_config.render_all_files = true;
+        let variables = Object::new();
+        assert!(should_render_file(
+            &path,
+            &render_files,
+            &template_config,
+            &variables
+        ));
+    }
+
+    #[test]
+    fn test_render_path_with_variables() {
+        #[cfg(not(target_os = "windows"))]
+        let path = Path::new("{{ci_provider}}/actions/build.yml");
+        #[cfg(target_os = "windows")]
+        let path = Path::new("{{ci_provider}}\\actions\\build.yml");
+
+        #[cfg(not(target_os = "windows"))]
+        let expected = PathBuf::from(".github/actions/build.yml");
+        #[cfg(target_os = "windows")]
+        let expected = PathBuf::from(".github\\actions\\build.yml");
+
+        let parser = ParserBuilder::with_stdlib().build().unwrap();
+        let mut variables = Object::new();
+        variables.insert("ci_provider".into(), Value::scalar(".github"));
+
+        assert_eq!(
+            render_path_with_variables(&path, &parser, &variables),
+            Some(expected)
+        );
+    }
 }
