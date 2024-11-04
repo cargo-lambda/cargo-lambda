@@ -4,5 +4,7 @@
     "runtime": "{{ runtime }}",
     "architecture": "{{ architecture }}",
     "memory": "{{ memory }}",
-    "timeout": "{{ timeout }}"
+    "timeout": "{{ timeout }}",
+    "ci_provider": "{{ ci_provider }}",
+    "github_actions": "{{ github_actions }}"
 }
