@@ -251,6 +251,10 @@ async fn create_project<T: AsRef<Path> + Debug>(
         } else {
             let relative = entry_path.strip_prefix(template_path).into_diagnostic()?;
 
+            if should_ignore_file(relative, ignore_files, template_config, globals) {
+                continue;
+            }
+
             let mut new_path = render_path.join(relative);
             if let Some(path) = render_path_with_variables(&new_path, &parser, globals) {
                 new_path = path;
@@ -262,10 +266,6 @@ async fn create_project<T: AsRef<Path> + Debug>(
             } else {
                 None
             };
-
-            if entry_name == "LICENSE" || ignore_files.contains(&relative.to_path_buf()) {
-                continue;
-            }
 
             if entry_name == "Cargo.toml"
                 || entry_name == "README.md"
@@ -396,6 +396,10 @@ fn should_render_file(
         return true;
     }
 
+    if render_files.contains(&relative.to_path_buf()) {
+        return true;
+    }
+
     let Some(unix_path) = convert_to_unix_path(relative) else {
         return false;
     };
@@ -404,14 +408,78 @@ fn should_render_file(
         return true;
     }
 
-    if let Some(condition) = template_config.render_conditional_files.get(&unix_path) {
-        let Some(prompt_value) = variables.get::<str>(&condition.var) else {
+    let condition = template_config
+        .render_conditional_files
+        .get(&unix_path)
+        .or_else(|| {
+            relative
+                .to_str()
+                .and_then(|s| template_config.render_conditional_files.get(s))
+        });
+
+    if let Some(condition) = condition {
+        let Some(variable) = variables.get::<str>(&condition.var) else {
             return false;
         };
 
-        let condition_value: Value = condition.value.clone().into();
-        if condition_value == *prompt_value {
-            return true;
+        if let Some(condition_value) = &condition.r#match {
+            if condition_value.to_value() == *variable {
+                return true;
+            }
+        }
+
+        if let Some(condition_value) = &condition.not_match {
+            if condition_value.to_value() != *variable {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+fn should_ignore_file(
+    relative: &Path,
+    ignore_files: &[PathBuf],
+    template_config: &TemplateConfig,
+    variables: &Object,
+) -> bool {
+    if ignore_files.contains(&relative.to_path_buf()) {
+        return true;
+    }
+
+    let Some(unix_path) = convert_to_unix_path(relative) else {
+        return false;
+    };
+
+    if ignore_files.contains(&PathBuf::from(&unix_path)) {
+        return true;
+    }
+
+    let condition = template_config
+        .ignore_conditional_files
+        .get(&unix_path)
+        .or_else(|| {
+            relative
+                .to_str()
+                .and_then(|s| template_config.ignore_conditional_files.get(s))
+        });
+
+    if let Some(condition) = condition {
+        let Some(variable) = variables.get::<str>(&condition.var) else {
+            return false;
+        };
+
+        if let Some(condition_value) = &condition.r#match {
+            if condition_value.to_value() == *variable {
+                return true;
+            }
+        }
+
+        if let Some(condition_value) = &condition.not_match {
+            if condition_value.to_value() != *variable {
+                return true;
+            }
         }
     }
 
@@ -471,7 +539,8 @@ mod tests {
             "src/main.rs".into(),
             RenderCondition {
                 var: "render_main_rs".into(),
-                value: PromptValue::Boolean(true),
+                r#match: Some(PromptValue::Boolean(true)),
+                not_match: None,
             },
         );
         let mut variables = Object::new();
@@ -560,5 +629,63 @@ mod tests {
             render_path_with_variables(&path, &parser, &variables),
             Some(expected)
         );
+    }
+
+    #[test]
+    fn test_should_ignore_file() {
+        #[cfg(not(target_os = "windows"))]
+        let path = Path::new("src/http.rs");
+        #[cfg(target_os = "windows")]
+        let path = Path::new("src\\http.rs");
+
+        let ignore_files = vec![];
+        let mut template_config = TemplateConfig::default();
+        template_config.ignore_conditional_files.insert(
+            "src/http.rs".into(),
+            RenderCondition {
+                var: "http_function".into(),
+                r#match: None,
+                not_match: Some(PromptValue::Boolean(true)),
+            },
+        );
+
+        let mut variables = Object::new();
+        variables.insert("http_function".into(), Value::scalar(false));
+
+        assert!(should_ignore_file(
+            &path,
+            &ignore_files,
+            &template_config,
+            &variables
+        ));
+    }
+
+    #[test]
+    fn test_should_not_ignore_file() {
+        #[cfg(not(target_os = "windows"))]
+        let path = Path::new("src/http.rs");
+        #[cfg(target_os = "windows")]
+        let path = Path::new("src\\http.rs");
+
+        let ignore_files = vec![];
+        let mut template_config = TemplateConfig::default();
+        template_config.ignore_conditional_files.insert(
+            "src/http.rs".into(),
+            RenderCondition {
+                var: "http_function".into(),
+                r#match: None,
+                not_match: Some(PromptValue::Boolean(true)),
+            },
+        );
+
+        let mut variables = Object::new();
+        variables.insert("http_function".into(), Value::scalar(true));
+
+        assert!(!should_ignore_file(
+            &path,
+            &ignore_files,
+            &template_config,
+            &variables
+        ));
     }
 }

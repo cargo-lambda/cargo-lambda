@@ -13,7 +13,11 @@ ignore_files = [
 ]
 
 [template.render_conditional_files]
-".github" = { var = "github_actions", value = true }
+".github" = { var = "github_actions", match = true }
+
+[template.ignore_conditional_files]
+"Apache.txt" = { var = "license", not_match = "APACHE" }
+"MIT.txt" = { var = "license", not_match = "MIT" }
 
 [template.prompts]
 project_description = { message = "What is the description of your project?", default = "My Lambda" }
@@ -24,3 +28,4 @@ memory = { message = "How much memory (in MB) would you like to allocate?", defa
 timeout = { message = "What timeout (in seconds) would you like to set?", default = "3" }
 github_actions = { message = "Would you like to add GitHub Actions CI/CD support?", default = false }
 ci_provider = { message = "Which CI provider would you like to use?", choices = [".github", "circleci"], default = ".github" }
+license = { message = "Would you like to add a license?", choices = ["Ignore license", "MIT", "APACHE"], default = "Ignore license" }

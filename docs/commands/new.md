@@ -175,7 +175,12 @@ ignore_files = [
 
 # Files to conditionally render based on a promptvariable
 [template.render_conditional_files] 
-".github" = { var = "github_actions", value = true }
+".github" = { var = "github_actions", match = true }
+
+# Files to conditionally ignore based on a prompt variable
+[template.ignore_conditional_files]
+"Apache.txt" = { var = "license", not_match = "APACHE" }
+"MIT.txt" = { var = "license", not_match = "MIT" }
 
 # Define custom interactive prompts
 [template.prompts]
@@ -186,6 +191,7 @@ architecture = { message = "Which architecture would you like to target?", choic
 memory = { message = "How much memory (in MB) would you like to allocate?", default = "128" }
 timeout = { message = "What timeout (in seconds) would you like to set?", default = "3" }
 github_actions = { message = "Would you like to add GitHub Actions CI/CD support?", default = false }
+license = { message = "Would you like to add a license?", choices = ["Ignore license", "MIT", "APACHE"], default = "Ignore license" }
 ```
 
 ## Configuration Options
@@ -194,6 +200,7 @@ github_actions = { message = "Would you like to add GitHub Actions CI/CD support
 - `render_files`: List of files that should be processed by the Liquid template engine
 - `render_all_files`: When `true`, all files in the template will be processed by Liquid
 - `render_conditional_files`: Table of files that should be conditionally rendered based on a prompt variable
+- `ignore_conditional_files`: Table of files that should be conditionally ignored based on a prompt variable
 - `ignore_files`: List of files that should not be copied to the new project
 - `prompts`: Table of interactive prompts to collect user input
 

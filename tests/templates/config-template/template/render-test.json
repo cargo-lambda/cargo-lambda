@@ -6,5 +6,6 @@
     "memory": "{{ memory }}",
     "timeout": "{{ timeout }}",
     "ci_provider": "{{ ci_provider }}",
-    "github_actions": "{{ github_actions }}"
+    "github_actions": "{{ github_actions }}",
+    "license": "{{ license }}"
 }
