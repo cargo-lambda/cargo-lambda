@@ -551,6 +551,7 @@ fn test_config_template() {
     assert_eq!(json_data["timeout"], "3");
     assert_eq!(json_data["ci_provider"], ".github");
     assert_eq!(json_data["github_actions"], "false");
+    assert_eq!(json_data["license"], "Ignore license");
 
     assert!(project
         .root()
@@ -558,4 +559,7 @@ fn test_config_template() {
         .join("actions")
         .join("build.yml")
         .exists());
+
+    assert!(!project.root().join("Apache.txt").exists());
+    assert!(!project.root().join("MIT.txt").exists());
 }

@@ -19,6 +19,15 @@ pub(crate) enum PromptValue {
     String(String),
 }
 
+impl PromptValue {
+    pub fn to_value(&self) -> Value {
+        match self {
+            PromptValue::Boolean(b) => Value::scalar(*b),
+            PromptValue::String(s) => Value::scalar(s.clone()),
+        }
+    }
+}
+
 impl Default for PromptValue {
     fn default() -> Self {
         PromptValue::String(String::default())
@@ -27,17 +36,15 @@ impl Default for PromptValue {
 
 impl From<PromptValue> for Value {
     fn from(value: PromptValue) -> Self {
-        match value {
-            PromptValue::Boolean(b) => Value::scalar(b),
-            PromptValue::String(s) => Value::scalar(s),
-        }
+        value.to_value()
     }
 }
 
 #[derive(Debug, Default, Deserialize)]
 pub(crate) struct RenderCondition {
     pub var: String,
-    pub value: PromptValue,
+    pub r#match: Option<PromptValue>,
+    pub not_match: Option<PromptValue>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -63,6 +70,8 @@ pub(crate) struct TemplateConfig {
     pub ignore_files: Vec<PathBuf>,
     #[serde(default)]
     pub render_conditional_files: HashMap<String, RenderCondition>,
+    #[serde(default)]
+    pub ignore_conditional_files: HashMap<String, RenderCondition>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -183,7 +192,7 @@ mod tests {
     fn test_parse_template_config_prompts() {
         let config = parse_template_config("../../tests/templates/config-template").unwrap();
         assert_eq!(config.disable_default_prompts, true);
-        assert_eq!(config.prompts.len(), 8);
+        assert_eq!(config.prompts.len(), 9);
 
         assert_eq!(
             config.prompts["project_description"].message,
@@ -275,7 +284,7 @@ mod tests {
     fn test_ask_template_options() {
         let config = parse_template_config("../../tests/templates/config-template").unwrap();
         let variables = config.ask_template_options(true).unwrap();
-        assert_eq!(variables.len(), 8);
+        assert_eq!(variables.len(), 9);
 
         assert_eq!(variables["project_description"], "My Lambda");
         assert_eq!(variables["enable_tracing"], false);
@@ -285,6 +294,7 @@ mod tests {
         assert_eq!(variables["timeout"], "3");
         assert_eq!(variables["github_actions"], false);
         assert_eq!(variables["ci_provider"], ".github");
+        assert_eq!(variables["license"], "Ignore license");
     }
 
     #[test]
@@ -296,8 +306,24 @@ mod tests {
             "github_actions"
         );
         assert_eq!(
-            config.render_conditional_files[".github"].value,
-            PromptValue::Boolean(true)
+            config.render_conditional_files[".github"].r#match,
+            Some(PromptValue::Boolean(true))
+        );
+    }
+
+    #[test]
+    fn test_parse_template_config_ignore_conditions() {
+        let config = parse_template_config("../../tests/templates/config-template").unwrap();
+        assert_eq!(config.ignore_conditional_files.len(), 2);
+        assert_eq!(config.ignore_conditional_files["Apache.txt"].var, "license");
+        assert_eq!(
+            config.ignore_conditional_files["Apache.txt"].not_match,
+            Some(PromptValue::String("APACHE".to_string()))
+        );
+        assert_eq!(config.ignore_conditional_files["MIT.txt"].var, "license");
+        assert_eq!(
+            config.ignore_conditional_files["MIT.txt"].not_match,
+            Some(PromptValue::String("MIT".to_string()))
         );
     }
 }
