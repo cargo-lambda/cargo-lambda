@@ -11,7 +11,7 @@ use miette::Result;
 use crate::{error::CreateError, template::PROMPT_WITH_OPTIONS_HELP_MESSAGE};
 
 pub(crate) const DEFAULT_TEMPLATE_URL: &str =
-    "https://github.com/cargo-lambda/default-template/archive/refs/heads/main.zip";
+    "https://github.com/cargo-lambda/new-functions-template/archive/refs/heads/main.zip";
 
 #[derive(Args, Clone, Debug, Default)]
 #[group(multiple = false, conflicts_with_all = ["extension", "extension-opts"], id = "function-opts")]

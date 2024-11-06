@@ -3,7 +3,7 @@ use liquid::{model::Value, Object};
 use miette::Result;
 
 pub(crate) const DEFAULT_TEMPLATE_URL: &str =
-    "https://github.com/cargo-lambda/default-extension-template/archive/refs/heads/main.zip";
+    "https://github.com/cargo-lambda/new-extensions-template/archive/refs/heads/main.zip";
 
 #[derive(Args, Clone, Debug, Default)]
 #[group(requires = "extension", id = "extension-opts")]
