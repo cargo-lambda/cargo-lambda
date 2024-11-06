@@ -10,6 +10,9 @@ use miette::{Context, IntoDiagnostic, Result};
 use tempfile::{tempdir, TempDir};
 use zip::ZipArchive;
 
+pub(crate) const PROMPT_WITH_OPTIONS_HELP_MESSAGE: &str =
+    "use arrows (↑↓) to move, tab to auto-complete, enter to submit";
+
 pub(crate) mod config;
 
 #[derive(Debug, Default, PartialEq)]

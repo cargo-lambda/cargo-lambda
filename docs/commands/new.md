@@ -199,8 +199,8 @@ license = { message = "Would you like to add a license?", choices = ["Ignore lic
 - `disable_default_prompts`: When set to `true`, disables Cargo Lambda's built-in prompts
 - `render_files`: List of files that should be processed by the Liquid template engine
 - `render_all_files`: When `true`, all files in the template will be processed by Liquid
-- `render_conditional_files`: Table of files that should be conditionally rendered based on a prompt variable
-- `ignore_conditional_files`: Table of files that should be conditionally ignored based on a prompt variable
+- `render_conditional_files`: Table of files that should be conditionally rendered based on variable values
+- `ignore_conditional_files`: Table of files that should be conditionally ignored based on variable values
 - `ignore_files`: List of files that should not be copied to the new project
 - `prompts`: Table of interactive prompts to collect user input
 
@@ -212,6 +212,17 @@ Each prompt can have the following properties:
 - `message`: Question to display to the user (required)
 - `default`: Default value if user doesn't provide input (optional)
 - `choices`: Array of valid options for the user to choose from (optional)
+- `help`: Help message to display to the user (optional)
+
+### Conditional Rendering
+
+Each conditional render or ignore can have the following properties:
+
+- `var`: Variable name to use in templates (required)
+- `match`: Value that the variable should match to render or ignore the file
+- `not_match`: Value that the variable should not match to render or ignore the file
+
+### Using prompt values in templates
 
 The values collected from these prompts are available in your template files through Liquid variables. For example:
 

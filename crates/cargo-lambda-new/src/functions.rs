@@ -8,7 +8,7 @@ use clap::Args;
 use liquid::{model::Value, Object};
 use miette::Result;
 
-use crate::error::CreateError;
+use crate::{error::CreateError, template::PROMPT_WITH_OPTIONS_HELP_MESSAGE};
 
 pub(crate) const DEFAULT_TEMPLATE_URL: &str =
     "https://github.com/cargo-lambda/default-template/archive/refs/heads/main.zip";
@@ -76,11 +76,12 @@ impl Options {
         }
 
         if !self.http {
+            let help = format!("{PROMPT_WITH_OPTIONS_HELP_MESSAGE}.\nLeave this input empty if you want to use a predefined example");
             let event_type = Text::new("Event type that this function receives")
-            .with_autocomplete(suggest_event_type)
-            .with_validator(validate_event_type)
-            .with_help_message("use arrows (↑↓) to move, tab to auto-complete, enter to submit.\nLeave this input empty if you want to use a predefined example")
-            .prompt()?;
+                .with_autocomplete(suggest_event_type)
+                .with_validator(validate_event_type)
+                .with_help_message(&help)
+                .prompt()?;
             self.event_type = Some(event_type);
         }
 
