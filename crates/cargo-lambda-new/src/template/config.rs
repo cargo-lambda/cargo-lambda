@@ -13,6 +13,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::template::PROMPT_WITH_OPTIONS_HELP_MESSAGE;
+
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub(crate) enum PromptValue {
@@ -55,6 +57,8 @@ pub(crate) struct TemplatePrompt {
     pub choices: Option<Vec<String>>,
     #[serde(default)]
     pub default: Option<PromptValue>,
+    #[serde(default)]
+    pub help: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -115,25 +119,35 @@ impl TemplateConfig {
 
 impl TemplatePrompt {
     pub(crate) fn ask(&self) -> Result<PromptValue> {
+        let help_message = self.help_message();
+
         match &self.default {
             Some(PromptValue::Boolean(b)) => {
-                let value = Confirm::new(&self.message)
-                    .with_default(*b)
-                    .prompt()
-                    .into_diagnostic()?;
-                Ok(PromptValue::Boolean(value))
+                let prompt = Confirm::new(&self.message).with_default(*b);
+                let value = if let Some(help_message) = help_message {
+                    prompt.with_help_message(&help_message).prompt()
+                } else {
+                    prompt.prompt()
+                };
+                Ok(PromptValue::Boolean(value.into_diagnostic()?))
             }
             Some(PromptValue::String(s)) => {
-                let value = self
-                    .text_prompt()
-                    .with_default(s)
-                    .prompt()
-                    .into_diagnostic()?;
-                Ok(PromptValue::String(value))
+                let prompt = self.text_prompt().with_default(s);
+                let value = if let Some(help_message) = help_message {
+                    prompt.with_help_message(&help_message).prompt()
+                } else {
+                    prompt.prompt()
+                };
+                Ok(PromptValue::String(value.into_diagnostic()?))
             }
             None => {
-                let value = self.text_prompt().prompt().into_diagnostic()?;
-                Ok(PromptValue::String(value))
+                let prompt = self.text_prompt();
+                let value = if let Some(help_message) = help_message {
+                    prompt.with_help_message(&help_message).prompt()
+                } else {
+                    prompt.prompt()
+                };
+                Ok(PromptValue::String(value.into_diagnostic()?))
             }
         }
     }
@@ -148,11 +162,24 @@ impl TemplatePrompt {
             let autocomplete = move |input: &str| suggest_choice(input, &choices_for_suggest);
             let validator = move |input: &str| validate_choice(input, &choices_for_validator);
 
-            prompt = prompt.with_autocomplete(autocomplete);
-            prompt = prompt.with_validator(validator);
+            prompt = prompt
+                .with_autocomplete(autocomplete)
+                .with_validator(validator);
         }
 
         prompt
+    }
+
+    fn help_message(&self) -> Option<String> {
+        match (self.choices.is_some(), &self.help) {
+            (true, Some(user_help)) => Some(format!(
+                "{PROMPT_WITH_OPTIONS_HELP_MESSAGE}.\n{}",
+                user_help
+            )),
+            (true, None) => Some(PROMPT_WITH_OPTIONS_HELP_MESSAGE.to_string()),
+            (false, Some(user_help)) => Some(user_help.clone()),
+            (false, None) => None,
+        }
     }
 }
 
