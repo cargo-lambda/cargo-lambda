@@ -1137,6 +1137,7 @@ dependencies = [
  "dunce",
  "gix",
  "gix-attributes",
+ "indexmap 2.6.0",
  "liquid",
  "miette 5.10.0",
  "regex",
@@ -3435,6 +3436,7 @@ checksum = "707907fe3c25f5424cce2cb7e1cbcafee6bdbe735ca90ef77c29e84591e5b9da"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.0",
+ "serde",
 ]
 
 [[package]]
