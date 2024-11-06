@@ -2,6 +2,7 @@ use cargo_lambda_interactive::{
     validator::{ErrorMessage, Validation},
     Confirm, CustomUserError, Text,
 };
+use indexmap::IndexMap;
 use liquid::{model::Value, Object};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Deserialize;
@@ -61,7 +62,7 @@ pub(crate) struct TemplateConfig {
     #[serde(default)]
     pub disable_default_prompts: bool,
     #[serde(default)]
-    pub prompts: HashMap<String, TemplatePrompt>,
+    pub prompts: IndexMap<String, TemplatePrompt>,
     #[serde(default)]
     pub render_files: Vec<PathBuf>,
     #[serde(default)]
