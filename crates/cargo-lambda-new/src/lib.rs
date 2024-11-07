@@ -1,5 +1,5 @@
 use cargo_lambda_interactive::{
-    command::silent_command, is_user_cancellation_error, progress::Progress,
+    command::new_command, is_user_cancellation_error, progress::Progress,
 };
 use cargo_lambda_metadata::fs::{copy_and_replace, copy_without_replace};
 use clap::Args;
@@ -322,10 +322,21 @@ async fn open_code_editor(path: &str) -> Result<()> {
     let editor = env::var("EDITOR").unwrap_or_default();
     let editor = editor.trim();
     if editor.is_empty() {
-        Err(CreateError::InvalidEditor(path.into()).into())
-    } else {
-        silent_command(editor, &[path]).await
+        return Err(CreateError::InvalidEditor(path.into()).into());
     }
+
+    let mut child = new_command(editor)
+        .args([path])
+        .spawn()
+        .into_diagnostic()
+        .wrap_err_with(|| format!("Failed to run `{editor} {path}`"))?;
+
+    child
+        .wait()
+        .await
+        .into_diagnostic()
+        .wrap_err_with(|| format!("Failed to wait on {editor} process"))
+        .map(|_| ())
 }
 
 fn render_variables(config: &Config) -> Object {
