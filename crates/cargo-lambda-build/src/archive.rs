@@ -247,11 +247,12 @@ fn zip_file_options(file: &File, path: &Path) -> Result<SimpleFileOptions> {
         .into_diagnostic()
         .wrap_err_with(|| format!("failed to get metadata from file `{path:?}`"))?;
     let perm = binary_permissions(&meta);
-    let mtime = binary_mtime(&meta)?;
+    let mut options = SimpleFileOptions::default().unix_permissions(perm);
+    if let Some(mtime) = binary_mtime(&meta) {
+        options = options.last_modified_time(mtime);
+    }
 
-    Ok(SimpleFileOptions::default()
-        .unix_permissions(perm)
-        .last_modified_time(mtime))
+    Ok(options)
 }
 
 fn include_files_in_zip<W>(zip: &mut ZipWriter<W>, files: &Vec<String>) -> Result<()>
@@ -320,16 +321,22 @@ where
     Ok(())
 }
 
-fn binary_mtime(meta: &Metadata) -> Result<zip::DateTime> {
-    let modified = meta
-        .modified()
-        .into_diagnostic()
-        .wrap_err("failed to get modified time")?;
+fn binary_mtime(meta: &Metadata) -> Option<zip::DateTime> {
+    let Ok(modified) = meta.modified() else {
+        return None;
+    };
 
     let dt: DateTime<Utc> = modified.into();
-    zip::DateTime::try_from(dt.naive_utc())
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to convert `{modified:?}` to zip time"))
+    if let Ok(dt) = zip::DateTime::try_from(dt.naive_utc()) {
+        return Some(dt);
+    }
+
+    let Ok(created) = meta.created() else {
+        return None;
+    };
+
+    let dt: DateTime<Utc> = created.into();
+    zip::DateTime::try_from(dt.naive_utc()).ok()
 }
 
 #[cfg(unix)]
