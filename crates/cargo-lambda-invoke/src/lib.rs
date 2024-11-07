@@ -134,7 +134,7 @@ impl Invoke {
         } else if let Some(data) = &self.data_ascii {
             data.clone()
         } else if let Some(example) = &self.data_example {
-            let name = format!("example-{example}.json");
+            let name = example_name(example);
 
             let cache = dirs::cache_dir()
                 .map(|p| p.join("cargo-lambda").join("invoke-fixtures").join(&name));
@@ -278,6 +278,18 @@ impl Invoke {
     }
 }
 
+fn example_name(example: &str) -> String {
+    let mut name = if example.starts_with("example-") {
+        example.to_string()
+    } else {
+        format!("example-{example}")
+    };
+    if !name.ends_with(".json") {
+        name.push_str(".json");
+    }
+    name
+}
+
 async fn download_example(name: &str, cache: Option<PathBuf>) -> Result<String> {
     let target = format!("{EXAMPLES_URL}/{name}");
 
@@ -327,5 +339,22 @@ mod test {
             .await
             .expect("failed to download json");
         assert!(data.contains("\"path\": \"/hello/world\""));
+    }
+
+    #[test]
+    fn test_example_name() {
+        assert_eq!(example_name("apigw-request"), "example-apigw-request.json");
+        assert_eq!(
+            example_name("apigw-request.json"),
+            "example-apigw-request.json"
+        );
+        assert_eq!(
+            example_name("example-apigw-request"),
+            "example-apigw-request.json"
+        );
+        assert_eq!(
+            example_name("example-apigw-request.json"),
+            "example-apigw-request.json"
+        );
     }
 }
