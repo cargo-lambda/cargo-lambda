@@ -27,7 +27,7 @@ pub(crate) async fn create(config: &SdkConfig, progress: &Progress) -> Result<St
         "Statement": [
             {
                 "Effect": "Allow",
-                "Action": "sts:AssumeRole",
+                "Action": ["sts:AssumeRole","sts:SetSourceIdentity"],
                 "Principal": {
                     "AWS": identity.arn().expect("missing account arn"),
                     "Service": "lambda.amazonaws.com"
@@ -64,6 +64,7 @@ pub(crate) async fn create(config: &SdkConfig, progress: &Progress) -> Result<St
 
     try_assume_role(&sts_client, role_arn).await?;
 
+    policy["Statement"][0]["Action"] = serde_json::json!("sts:AssumeRole");
     policy["Statement"][0]["Principal"] = serde_json::json!({"Service": "lambda.amazonaws.com"});
     tracing::trace!(policy = ?policy, "updating assume policy");
 
