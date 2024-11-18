@@ -123,7 +123,7 @@ async fn try_assume_role(client: &StsClient, role_arn: &str) -> Result<()> {
     }
 
     Err(miette::miette!(
-        "failed to assume new lambda role. Try deploying using the flag `--iam-role {}`",
+        "failed to assume new lambda role.\nTry deploying using the flag `--iam-role {}`",
         role_arn
     ))
 }
