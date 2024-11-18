@@ -27,10 +27,16 @@ pub(crate) async fn create(config: &SdkConfig, progress: &Progress) -> Result<St
         "Statement": [
             {
                 "Effect": "Allow",
-                "Action": "sts:AssumeRole",
+                "Action": ["sts:AssumeRole"],
+                "Principal": {
+                    "Service": "lambda.amazonaws.com"
+                }
+            },
+            {
+                "Effect": "Allow",
+                "Action": ["sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession"],
                 "Principal": {
                     "AWS": identity.arn().expect("missing account arn"),
-                    "Service": "lambda.amazonaws.com"
                 }
             }
         ]
@@ -64,7 +70,12 @@ pub(crate) async fn create(config: &SdkConfig, progress: &Progress) -> Result<St
 
     try_assume_role(&sts_client, role_arn).await?;
 
-    policy["Statement"][0]["Principal"] = serde_json::json!({"Service": "lambda.amazonaws.com"});
+    // remove the current identity from the trust policy
+    policy["Statement"]
+        .as_array_mut()
+        .expect("missing statement array")
+        .pop();
+
     tracing::trace!(policy = ?policy, "updating assume policy");
 
     client
@@ -122,7 +133,7 @@ async fn try_assume_role(client: &StsClient, role_arn: &str) -> Result<()> {
     }
 
     Err(miette::miette!(
-        "failed to assume new lambda role. Try deploying using the flag `--iam-role {}`",
+        "failed to assume new lambda role.\nTry deploying using the flag `--iam-role {}`",
         role_arn
     ))
 }
