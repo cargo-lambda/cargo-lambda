@@ -1,10 +1,7 @@
-use crate::error::ServerError;
 use axum::{
     body::Body,
     http::{Request, StatusCode},
-    response::{IntoResponse, Response},
 };
-use http_api_problem::ApiError;
 use hyper::HeaderMap;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Sender;
@@ -37,20 +34,6 @@ pub struct StreamingPrelude {
     #[serde(deserialize_with = "http_serde::header_map::deserialize", default)]
     pub headers: HeaderMap,
     pub cookies: Vec<String>,
-}
-
-impl IntoResponse for ServerError {
-    fn into_response(self) -> Response {
-        let api_error = ApiError::builder(StatusCode::INTERNAL_SERVER_ERROR)
-            .message(self.to_string())
-            .finish();
-
-        (
-            api_error.status(),
-            api_error.into_http_api_problem().json_string(),
-        )
-            .into_response()
-    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

@@ -1,4 +1,5 @@
 use base64::{engine::general_purpose as b64, Engine as _};
+use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
 use cargo_lambda_remote::{
     aws_sdk_lambda::{primitives::Blob, Client as LambdaClient},
     RemoteConfig,
@@ -22,12 +23,6 @@ use tracing::debug;
 mod error;
 use error::*;
 
-/// Name for the function when no name is provided.
-/// This will make the watch command to compile
-/// the binary without the `--bin` option, and will
-/// assume that the package only has one function,
-/// which is the main binary for that package.
-pub const DEFAULT_PACKAGE_FUNCTION: &str = "_";
 const EXAMPLES_URL: &str = "https://event-examples.cargo-lambda.info";
 
 const LAMBDA_RUNTIME_CLIENT_CONTEXT: &str = "lambda-runtime-client-context";

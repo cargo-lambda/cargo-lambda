@@ -12,30 +12,30 @@ keywords.workspace = true
 description.workspace = true
 
 [dependencies]
-aws_lambda_events = { version = "0.6.3", features = ["apigw"] }
-axum = "0.6"
+aws_lambda_events = { version = "0.15", features = ["apigw"] }
+axum = "0.7"
+axum-server = "0.7.1"
 base64.workspace = true
-cargo-lambda-invoke.workspace = true
 cargo-lambda-metadata.workspace = true
 chrono = "0.4.19"
 clap.workspace = true
 dunce.workspace = true
-http-api-problem = { version = "0.51.0", features = ["api-error", "hyper"] }
-http-serde = "1.1.3"
-hyper = "0.14.18"
+http = "1.0"
+http-body-util = "0.1"
+http-serde = "2"
+hyper = "1"
 ignore-files = "=1.2.0"
 miette.workspace = true
 opentelemetry = "0.17.0"
 opentelemetry-aws = "0.5.0"
-query_map = { version = "^0.5", features = ["url-query"] }
-reqwest.workspace = true
+query_map = { version = "0.7", features = ["url-query"] }
 serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }
-tokio-graceful-shutdown = "0.14.2"
-tower-http = { version = "0.3.3", features = [
+tokio-graceful-shutdown = "0.15"
+tower-http = { version = "0.6", features = [
     "catch-panic",
     "cors",
     "request-id",

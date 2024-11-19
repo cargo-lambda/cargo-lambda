@@ -36,7 +36,7 @@ homepage = "https://github.com/cargo-lambda/cargo-lambda"
 repository = "https://github.com/cargo-lambda/cargo-lambda"
 keywords = ["cargo", "subcommand", "aws", "lambda"]
 description = "Cargo subcommand to work with AWS Lambda"
-rust-version = "1.74.0"
+rust-version = "1.80.0"
 
 [workspace.dependencies]
 aws-config = "1.1.8"
@@ -60,7 +60,7 @@ clap = { version = "4.4.2", features = ["derive"] }
 dunce = "1.0.3"
 home = "0.5.3"
 miette = { version = "5.10.0" }
-reqwest = { version = "0.11.10", default-features = false, features = [
+reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-native-roots",
 ] }
 serde = { version = "1.0.137", features = ["derive"] }

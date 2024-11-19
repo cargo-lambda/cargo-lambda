@@ -7,12 +7,13 @@ use crate::{
 };
 use axum::{
     body::Body,
-    extract::{Path, State},
-    http::{Request, StatusCode},
+    extract::{Path, Request, State},
+    http::StatusCode,
     response::Response,
 };
 use base64::{engine::general_purpose as b64, Engine as _};
-use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
+use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
+use http::request::Parts;
 use tracing::debug;
 
 use super::LAMBDA_RUNTIME_AWS_REQUEST_ID;
@@ -25,22 +26,22 @@ pub(crate) const LAMBDA_RUNTIME_FUNCTION_ARN: &str = "lambda-runtime-invoked-fun
 pub(crate) async fn next_request(
     State(state): State<RefRuntimeState>,
     Path(function_name): Path<String>,
-    req: Request<Body>,
+    parts: Parts,
 ) -> Result<Response<Body>, ServerError> {
-    process_next_request(&state, &function_name, &req).await
+    process_next_request(&state, &function_name, parts).await
 }
 
 pub(crate) async fn bare_next_request(
     State(state): State<RefRuntimeState>,
-    req: Request<Body>,
+    parts: Parts,
 ) -> Result<Response<Body>, ServerError> {
-    process_next_request(&state, DEFAULT_PACKAGE_FUNCTION, &req).await
+    process_next_request(&state, DEFAULT_PACKAGE_FUNCTION, parts).await
 }
 
 pub(crate) async fn process_next_request(
     state: &RefRuntimeState,
     function_name: &str,
-    req: &Request<Body>,
+    parts: Parts,
 ) -> Result<Response<Body>, ServerError> {
     let function_name = if function_name.is_empty() {
         DEFAULT_PACKAGE_FUNCTION
@@ -48,8 +49,8 @@ pub(crate) async fn process_next_request(
         function_name
     };
 
-    let req_id = req
-        .headers()
+    let req_id = parts
+        .headers
         .get(LAMBDA_RUNTIME_AWS_REQUEST_ID)
         .expect("missing request id");
 

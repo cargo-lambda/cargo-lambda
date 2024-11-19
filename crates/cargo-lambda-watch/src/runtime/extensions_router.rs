@@ -1,5 +1,6 @@
 use crate::{error::ServerError, requests::*, RefRuntimeState};
 use axum::{body::Body, extract::State, http::Request, response::Response, Json};
+use http_body_util::BodyExt;
 use hyper::HeaderMap;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::mpsc;
@@ -94,9 +95,11 @@ pub(crate) async fn subcribe_extension_events(
 /// because the extensions runtime doesn't send a Content-Type
 async fn extract_json<T: DeserializeOwned>(req: Request<Body>) -> Result<T, ServerError> {
     let body = req.into_body();
-    let bytes = hyper::body::to_bytes(body)
+    let bytes = body
+        .collect()
         .await
-        .map_err(ServerError::DataDeserialization)?;
+        .map_err(ServerError::DataDeserialization)?
+        .to_bytes();
 
     serde_json::from_slice(&bytes).map_err(ServerError::SerializationError)
 }

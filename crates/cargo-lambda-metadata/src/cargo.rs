@@ -1,4 +1,3 @@
-use aws_sdk_lambda::types::Environment;
 pub use cargo_metadata::Metadata as CargoMetadata;
 use cargo_metadata::Target;
 use miette::Result;
@@ -13,7 +12,7 @@ use tracing::{debug, enabled, trace, Level};
 use urlencoding::encode;
 
 use crate::{
-    env::lambda_environment,
+    env::{lambda_environment, Environment},
     error::MetadataError,
     lambda::{Memory, Timeout, Tracing},
 };
@@ -209,17 +208,18 @@ impl DeployConfig {
         } else {
             Some(&self.env)
         };
-        lambda_environment(base, &self.env_file, None).map(|e| e.build())
+        lambda_environment(base, &self.env_file, None)
     }
 
-    pub fn extend_environment(&mut self, extra: Environment) -> Result<Environment, MetadataError> {
+    pub fn extend_environment(
+        &mut self,
+        extra: &HashMap<String, String>,
+    ) -> Result<Environment, MetadataError> {
         let mut env = lambda_environment(Some(&self.env), &self.env_file, None)?;
-        if let Some(vars) = extra.variables() {
-            for (key, value) in vars {
-                env = env.variables(key, value);
-            }
+        for (key, value) in extra {
+            env.insert(key.clone(), value.clone());
         }
-        Ok(env.build())
+        Ok(env)
     }
 }
 
@@ -847,11 +847,12 @@ mod tests {
     fn test_deploy_lambda_env() {
         let mut d = DeployConfig::default();
         let env = d.lambda_environment().unwrap();
-        assert_eq!(None, env.variables());
+        assert!(env.is_empty());
 
-        let extra = Environment::builder().variables("FOO", "BAR").build();
-        let env = d.extend_environment(extra.clone()).unwrap();
-        let vars = env.variables().unwrap();
+        let mut extra = HashMap::new();
+        extra.insert("FOO".to_string(), "BAR".to_string());
+
+        let vars = d.extend_environment(&extra).unwrap();
         assert_eq!(1, vars.len());
         assert_eq!("BAR", vars["FOO"]);
 
@@ -859,11 +860,10 @@ mod tests {
         base.insert("BAZ".to_string(), "QUX".to_string());
         d.env = base;
 
-        let env = d.extend_environment(extra).unwrap();
-        let vars = env.variables().unwrap();
-        assert_eq!(2, vars.len());
-        assert_eq!("BAR", vars["FOO"]);
-        assert_eq!("QUX", vars["BAZ"]);
+        let env = d.extend_environment(&extra).unwrap();
+        assert_eq!(2, env.len());
+        assert_eq!("BAR", env["FOO"]);
+        assert_eq!("QUX", env["BAZ"]);
     }
 
     #[test]

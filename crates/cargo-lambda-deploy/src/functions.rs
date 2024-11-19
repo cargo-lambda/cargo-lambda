@@ -548,20 +548,21 @@ fn merge_configuration(
 
             let flag_env = config.lambda_environment().into_diagnostic()?;
             deploy_metadata
-                .extend_environment(flag_env)
+                .extend_environment(&flag_env)
                 .into_diagnostic()?
         }
     };
 
-    if let Some(env) = &environment.variables() {
-        if !env.is_empty() {
-            deploy_metadata.use_for_update = true;
-        }
+    if !environment.is_empty() {
+        deploy_metadata.use_for_update = true;
     }
 
     deploy_metadata.runtime.clone_from(&function_config.runtime);
+    let env = Environment::builder()
+        .set_variables(Some(environment))
+        .build();
 
-    Ok((environment, deploy_metadata))
+    Ok((env, deploy_metadata))
 }
 
 async fn wait_for_ready_state(
