@@ -1,8 +1,9 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
-use axum_server::Handle;
+use axum_server::{tls_rustls::RustlsConfig, Handle};
 use cargo_lambda_metadata::{
     cargo::binary_targets, env::EnvOptions, lambda::Timeout, DEFAULT_PACKAGE_FUNCTION,
 };
+use cargo_lambda_remote::tls::TlsOptions;
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
@@ -99,6 +100,9 @@ pub struct Watch {
 
     #[command(flatten)]
     env_options: EnvOptions,
+
+    #[command(flatten)]
+    tls_options: TlsOptions,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -165,11 +169,16 @@ impl Watch {
             ..Default::default()
         };
 
-        let runtime_state =
-            RuntimeState::new(addr, cargo_options.manifest_path.clone(), binary_packages);
+        let runtime_state = RuntimeState::new(
+            addr,
+            cargo_options.manifest_path.clone(),
+            binary_packages,
+            self.tls_options.is_secure(),
+        );
 
         let disable_cors = self.disable_cors;
         let timeout = self.timeout.clone();
+        let tls_options = self.tls_options.clone();
 
         Toplevel::new(move |s| async move {
             s.start(SubsystemBuilder::new("Lambda server", move |s| {
@@ -178,6 +187,7 @@ impl Watch {
                     runtime_state,
                     cargo_options,
                     watcher_config,
+                    tls_options,
                     disable_cors,
                     timeout,
                 )
@@ -252,6 +262,7 @@ async fn start_server(
     runtime_state: RuntimeState,
     cargo_options: CargoOptions,
     watcher_config: WatcherConfig,
+    tls_options: TlsOptions,
     disable_cors: bool,
     timeout: Option<Timeout>,
 ) -> Result<()> {
@@ -293,7 +304,6 @@ async fn start_server(
     }
     let app = app.with_state(state_ref);
 
-    info!(?socket_addr, "invoke server waiting for requests");
     if only_lambda_apis {
         info!("");
         info!("the flag --only_lambda_apis is active, the lambda function will not be started by Cargo Lambda");
@@ -325,10 +335,23 @@ async fn start_server(
     let handle = Handle::new();
     tokio::spawn(graceful_shutdown(subsys, handle.clone()));
 
-    let out = axum_server::bind(socket_addr)
-        .handle(handle)
-        .serve(app.into_make_service())
-        .await;
+    let tls_config = tls_options.server_config().await?;
+
+    info!(?socket_addr, "invoke server waiting for requests");
+
+    let out = if let Some(tls_config) = tls_config {
+        let tls_config = RustlsConfig::from_config(Arc::new(tls_config));
+
+        axum_server::bind_rustls(socket_addr, tls_config)
+            .handle(handle)
+            .serve(app.into_make_service())
+            .await
+    } else {
+        axum_server::bind(socket_addr)
+            .handle(handle)
+            .serve(app.into_make_service())
+            .await
+    };
 
     if let Err(e) = out {
         match e.downcast::<hyper::Error>() {

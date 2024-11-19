@@ -8,6 +8,8 @@ use aws_config::{
 use aws_types::{region::Region, SdkConfig};
 use clap::Args;
 
+pub mod tls;
+
 const DEFAULT_REGION: &str = "us-east-1";
 
 #[derive(Args, Clone, Debug)]

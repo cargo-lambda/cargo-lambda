@@ -16,6 +16,10 @@ aws-config.workspace = true
 aws-sdk-lambda.workspace = true
 aws-types.workspace = true
 clap.workspace = true
+miette.workspace = true
+rustls = "0.23.17"
+rustls-pki-types = "1.10.0"
+thiserror.workspace = true
 
 [dev-dependencies]
 aws-credential-types = "0.57.1"

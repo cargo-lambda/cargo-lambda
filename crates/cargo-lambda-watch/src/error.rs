@@ -2,6 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use axum::response::{IntoResponse, Response};
 use cargo_lambda_metadata::error::MetadataError;
+use cargo_lambda_remote::tls::TlsError;
 use http::StatusCode;
 use miette::Diagnostic;
 use serde::Serialize;
@@ -102,6 +103,10 @@ pub enum ServerError {
     #[error("invalid manifest path {0}")]
     #[diagnostic()]
     InvalidManifest(PathBuf),
+
+    #[error(transparent)]
+    #[diagnostic()]
+    TlsError(#[from] TlsError),
 }
 
 // Explicitly implement Send + Sync

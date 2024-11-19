@@ -14,9 +14,10 @@ description.workspace = true
 [dependencies]
 aws_lambda_events = { version = "0.15", features = ["apigw"] }
 axum = "0.7"
-axum-server = "0.7.1"
+axum-server = { version = "0.7.1", features = ["tls-rustls"] }
 base64.workspace = true
 cargo-lambda-metadata.workspace = true
+cargo-lambda-remote.workspace = true
 chrono = "0.4.19"
 clap.workspace = true
 dunce.workspace = true

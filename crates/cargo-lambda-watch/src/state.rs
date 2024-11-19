@@ -34,12 +34,15 @@ impl RuntimeState {
         addr: SocketAddr,
         manifest_path: PathBuf,
         initial_functions: HashSet<String>,
+        is_secure: bool,
     ) -> RuntimeState {
+        let protocol = if is_secure { "https" } else { "http" };
+
         RuntimeState {
             addr,
             manifest_path,
             initial_functions,
-            runtime_addr: format!("http://{addr}{RUNTIME_EMULATOR_PATH}"),
+            runtime_addr: format!("{protocol}://{addr}{RUNTIME_EMULATOR_PATH}"),
             req_cache: RequestCache::new(),
             res_cache: ResponseCache::new(),
             ext_cache: ExtensionCache::default(),
