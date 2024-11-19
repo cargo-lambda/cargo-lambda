@@ -13,6 +13,7 @@ description.workspace = true
 
 [dependencies]
 base64.workspace = true
+cargo-lambda-metadata.workspace = true
 cargo-lambda-remote.workspace = true
 clap.workspace = true
 dirs = "4.0.0"

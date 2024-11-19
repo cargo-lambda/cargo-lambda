@@ -1,6 +1,8 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
-use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
-use cargo_lambda_metadata::{cargo::binary_targets, env::EnvOptions, lambda::Timeout};
+use axum_server::Handle;
+use cargo_lambda_metadata::{
+    cargo::binary_targets, env::EnvOptions, lambda::Timeout, DEFAULT_PACKAGE_FUNCTION,
+};
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
@@ -155,10 +157,10 @@ impl Watch {
         let watcher_config = WatcherConfig {
             base,
             ignore_files,
+            env,
             ignore_changes: self.ignore_changes,
             only_lambda_apis: self.only_lambda_apis,
             manifest_path: cargo_options.manifest_path.clone(),
-            env: env.variables().cloned().unwrap_or_default(),
             wait: self.wait,
             ..Default::default()
         };
@@ -252,7 +254,7 @@ async fn start_server(
     watcher_config: WatcherConfig,
     disable_cors: bool,
     timeout: Option<Timeout>,
-) -> Result<(), axum::Error> {
+) -> Result<()> {
     let only_lambda_apis = watcher_config.only_lambda_apis;
     let init_default_function =
         runtime_state.is_default_function_enabled() && watcher_config.send_function_init();
@@ -320,15 +322,26 @@ async fn start_server(
         }
     }
 
-    if let Err(error) = axum::Server::bind(&socket_addr)
+    let handle = Handle::new();
+    tokio::spawn(graceful_shutdown(subsys, handle.clone()));
+
+    let out = axum_server::bind(socket_addr)
+        .handle(handle)
         .serve(app.into_make_service())
-        .with_graceful_shutdown(subsys.on_shutdown_requested())
-        .await
-    {
-        if !error.is_incomplete_message() {
-            return Err(axum::Error::new(error));
+        .await;
+
+    if let Err(e) = out {
+        match e.downcast::<hyper::Error>() {
+            Ok(hyper_err) if hyper_err.is_incomplete_message() => return Ok(()),
+            Ok(hyper_err) => return Err(hyper_err).into_diagnostic(),
+            Err(e) => return Err(e).into_diagnostic(),
         }
     }
 
     Ok(())
+}
+
+async fn graceful_shutdown(subsys: SubsystemHandle, handle: Handle) {
+    subsys.on_shutdown_requested().await;
+    handle.graceful_shutdown(Some(Duration::from_secs(1)));
 }

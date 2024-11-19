@@ -12,7 +12,6 @@ keywords.workspace = true
 description.workspace = true
 
 [dependencies]
-aws-sdk-lambda.workspace = true
 cargo_metadata = "0.15.3"
 clap.workspace = true
 env-file-reader = "0.3.0"

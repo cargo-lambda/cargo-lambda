@@ -5,7 +5,7 @@ use crate::{
     watcher::WatcherConfig,
     CargoOptions,
 };
-use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
+use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle};
 use tracing::{error, info};

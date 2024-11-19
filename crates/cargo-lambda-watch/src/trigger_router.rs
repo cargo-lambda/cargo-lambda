@@ -20,12 +20,10 @@ use axum::{
     Router,
 };
 use base64::{engine::general_purpose as b64, Engine as _};
-use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
+use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
 use chrono::Utc;
-use hyper::{
-    body::{to_bytes, HttpBody},
-    header, HeaderMap, StatusCode,
-};
+use http_body_util::BodyExt;
+use hyper::{header, HeaderMap, StatusCode};
 use miette::Result;
 use opentelemetry::{
     global,
@@ -73,9 +71,11 @@ async fn furls_handler(
 
     let headers = &parts.headers;
 
-    let body = to_bytes(body)
+    let body = body
+        .collect()
         .await
-        .map_err(ServerError::DataDeserialization)?;
+        .map_err(ServerError::DataDeserialization)?
+        .to_bytes();
     let text_content_type = match headers.get("content-type") {
         None => true,
         Some(c) => {
@@ -147,14 +147,13 @@ async fn furls_handler(
         route_key: Some("$default".into()),
         raw_path: Some(path),
         raw_query_string: uri.query().map(String::from),
-        path_parameters: HashMap::new(),
-        stage_variables: HashMap::new(),
         headers: headers.clone(),
         body,
         request_context,
         cookies,
         query_string_parameters,
         is_base64_encoded,
+        ..Default::default()
     };
     let event = serde_json::to_string(&event).map_err(ServerError::SerializationError)?;
 
@@ -303,17 +302,19 @@ async fn create_streaming_response(
     builder: &mut Builder,
     body: &mut Body,
 ) -> Result<StatusCode, ServerError> {
-    let prelude: StreamingPrelude = body
-        .data()
+    let prelude = body
+        .frame()
         .await
         .ok_or(ServerError::MissingStreamingPrelude)?
-        .map_err(ServerError::DataDeserialization)
-        .and_then(|prelude| {
-            serde_json::from_slice(&prelude).map_err(ServerError::SerializationError)
-        })?;
+        .map_err(ServerError::DataDeserialization)?
+        .into_data()
+        .map_err(|_| ServerError::StreamingPreludeDeserialization)?;
+
+    let prelude: StreamingPrelude =
+        serde_json::from_slice(&prelude).map_err(ServerError::SerializationError)?;
 
     let _separator = body
-        .data()
+        .frame()
         .await
         .ok_or(ServerError::MissingStreamingPrelude)?
         .map_err(ServerError::DataDeserialization)?;
@@ -356,13 +357,15 @@ async fn create_buffered_response(
     builder: &mut Builder,
     body: &mut Body,
 ) -> Result<(StatusCode, Body), ServerError> {
-    let body = to_bytes(body)
+    let body = body
+        .collect()
         .await
-        .map_err(ServerError::DataDeserialization)?;
+        .map_err(ServerError::DataDeserialization)?
+        .to_bytes();
     let resp_event: ApiGatewayV2httpResponse =
         serde_json::from_slice(&body).map_err(ServerError::SerializationError)?;
 
-    let is_base64_encoded = resp_event.is_base64_encoded.unwrap_or(false);
+    let is_base64_encoded = resp_event.is_base64_encoded;
     let resp_body = match resp_event.body.unwrap_or(LambdaBody::Empty) {
         LambdaBody::Empty => Body::empty(),
         b if is_base64_encoded => Body::from(
@@ -437,7 +440,7 @@ fn respond_with_missing_function(
 #[cfg(test)]
 mod test {
     use super::extract_path_parameters;
-    use cargo_lambda_invoke::DEFAULT_PACKAGE_FUNCTION;
+    use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
 
     #[test]
     fn test_extract_path_parameters() {

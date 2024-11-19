@@ -1,10 +1,11 @@
-use aws_sdk_lambda::types::{builders::EnvironmentBuilder, Environment};
 use clap::{Args, ValueHint};
 use env_file_reader::read_file;
 use miette::Result;
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::error::MetadataError;
+
+pub type Environment = HashMap<String, String>;
 
 #[derive(Args, Clone, Debug, Default)]
 pub struct EnvOptions {
@@ -39,7 +40,7 @@ impl EnvOptions {
     }
 
     pub fn lambda_environment(&self) -> Result<Environment, MetadataError> {
-        lambda_environment(None, &self.env_file, self.flag_vars()).map(|e| e.build())
+        lambda_environment(None, &self.env_file, self.flag_vars())
     }
 }
 
@@ -47,15 +48,19 @@ pub(crate) fn lambda_environment(
     base: Option<&HashMap<String, String>>,
     env_file: &Option<PathBuf>,
     vars: Option<Vec<String>>,
-) -> Result<EnvironmentBuilder, MetadataError> {
-    let mut env = Environment::builder().set_variables(base.cloned());
+) -> Result<Environment, MetadataError> {
+    let mut env = HashMap::new();
+
+    if let Some(base) = base.cloned() {
+        env.extend(base);
+    }
 
     if let Some(path) = env_file {
         if path.is_file() {
             let env_variables =
                 read_file(path).map_err(|e| MetadataError::InvalidEnvFile(path.into(), e))?;
             for (key, value) in env_variables {
-                env = env.variables(key, value);
+                env.insert(key, value);
             }
         }
     }
@@ -63,7 +68,7 @@ pub(crate) fn lambda_environment(
     if let Some(vars) = vars {
         for var in vars {
             let (key, value) = extract_var(&var)?;
-            env = env.variables(key, value);
+            env.insert(key.to_string(), value.to_string());
         }
     }
 
@@ -115,19 +120,17 @@ mod test {
 
     #[test]
     fn test_empty_environment() {
-        let env = lambda_environment(None, &None, None).unwrap().build();
-        assert_eq!(None, env.variables());
+        let env = lambda_environment(None, &None, None).unwrap();
+        assert!(env.is_empty());
     }
 
     #[test]
     fn test_base_environment() {
         let mut base = HashMap::new();
         base.insert("FOO".into(), "BAR".into());
-        let env = lambda_environment(Some(&base), &None, None)
-            .unwrap()
-            .build();
+        let env = lambda_environment(Some(&base), &None, None).unwrap();
 
-        assert_eq!("BAR".to_string(), env.variables().unwrap()["FOO"]);
+        assert_eq!("BAR".to_string(), env["FOO"]);
     }
 
     #[test]
@@ -136,12 +139,10 @@ mod test {
         base.insert("FOO".into(), "BAR".into());
 
         let flags = vec!["FOO=QUX".to_string(), "BAZ=QUUX".to_string()];
-        let env = lambda_environment(Some(&base), &None, Some(flags))
-            .unwrap()
-            .build();
+        let env = lambda_environment(Some(&base), &None, Some(flags)).unwrap();
 
-        assert_eq!("QUX".to_string(), env.variables().unwrap()["FOO"]);
-        assert_eq!("QUUX".to_string(), env.variables().unwrap()["BAZ"]);
+        assert_eq!("QUX".to_string(), env["FOO"]);
+        assert_eq!("QUUX".to_string(), env["BAZ"]);
     }
 
     #[test]
@@ -153,11 +154,7 @@ mod test {
         base.insert("FOO".into(), "BAR".into());
 
         let flags = vec!["FOO=QUX".to_string(), "BAZ=QUUX".to_string()];
-        let env = lambda_environment(Some(&base), &Some(file), Some(flags))
-            .unwrap()
-            .build();
-
-        let vars = env.variables().unwrap();
+        let vars = lambda_environment(Some(&base), &Some(file), Some(flags)).unwrap();
 
         assert_eq!("QUX".to_string(), vars["FOO"]);
         assert_eq!("QUUX".to_string(), vars["BAZ"]);
