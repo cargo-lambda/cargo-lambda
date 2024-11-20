@@ -2,6 +2,7 @@ use base64::{engine::general_purpose as b64, Engine as _};
 use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
 use cargo_lambda_remote::{
     aws_sdk_lambda::{primitives::Blob, Client as LambdaClient},
+    tls::TlsOptions,
     RemoteConfig,
 };
 use clap::{Args, ValueHint};
@@ -90,6 +91,9 @@ pub struct Invoke {
     /// Name of the function to invoke
     #[arg(default_value = DEFAULT_PACKAGE_FUNCTION)]
     function_name: String,
+
+    #[command(flatten)]
+    tls_options: TlsOptions,
 }
 
 #[derive(Clone, Debug, Display, EnumString)]
@@ -213,12 +217,23 @@ impl Invoke {
     async fn invoke_local(&self, data: &str) -> Result<String> {
         let host = parse_invoke_ip_address(&self.invoke_address)?;
 
+        let (protocol, client) = if self.tls_options.is_secure() {
+            let tls = self.tls_options.client_config().await?;
+            let client = Client::builder()
+                .use_preconfigured_tls(tls)
+                .build()
+                .into_diagnostic()?;
+
+            ("https", client)
+        } else {
+            ("http", Client::new())
+        };
+
         let url = format!(
-            "http://{}:{}/2015-03-31/functions/{}/invocations",
-            &host, self.invoke_port, &self.function_name
+            "{}://{}:{}/2015-03-31/functions/{}/invocations",
+            protocol, &host, self.invoke_port, &self.function_name
         );
 
-        let client = Client::new();
         let mut req = client.post(url).body(data.to_string());
         if let Some(identity) = &self.cognito {
             if identity.is_valid() {

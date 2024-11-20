@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 use miette::{Diagnostic, Result};
-use rustls::ServerConfig;
+use rustls::{ClientConfig, RootCertStore, ServerConfig};
 use rustls_pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
 use thiserror::Error;
 
@@ -24,21 +24,21 @@ pub enum TlsError {
     #[diagnostic()]
     FailedToParseTlsKey(String),
 
-    #[error("failed to parse server config: {0}")]
+    #[error("failed to parse config: {0}")]
     #[diagnostic()]
-    FailedToParseServerConfig(#[from] rustls::Error),
+    FailedToParseConfig(#[from] rustls::Error),
 }
 
 #[derive(Args, Clone, Debug, Default)]
 pub struct TlsOptions {
     /// Path to a TLS certificate file
-    #[arg(long)]
+    #[arg(long, conflicts_with = "remote")]
     pub tls_cert: Option<PathBuf>,
     /// Path to a TLS key file
-    #[arg(long)]
+    #[arg(long, conflicts_with = "remote")]
     pub tls_key: Option<PathBuf>,
     /// Path to a TLS CA file
-    #[arg(long)]
+    #[arg(long, conflicts_with = "remote")]
     pub tls_ca: Option<PathBuf>,
 }
 
@@ -52,16 +52,8 @@ impl TlsOptions {
             return Ok(None);
         }
 
-        let mut cert_chain = match &self.tls_cert {
-            Some(path) => parse_certificates(path)?,
-            None => return Err(TlsError::MissingTlsCert.into()),
-        };
-
-        let key = match &self.tls_key {
-            Some(path) => PrivateKeyDer::from_pem_file(path)
-                .map_err(|e| TlsError::FailedToParseTlsKey(e.to_string()))?,
-            None => return Err(TlsError::MissingTlsKey.into()),
-        };
+        let (mut cert_chain, key) =
+            parse_cert_and_key(self.tls_cert.as_ref(), self.tls_key.as_ref())?;
 
         if let Some(path) = &self.tls_ca {
             let certs = parse_certificates(path)?;
@@ -73,11 +65,30 @@ impl TlsOptions {
         let mut config = ServerConfig::builder()
             .with_no_client_auth()
             .with_single_cert(cert_chain, key)
-            .map_err(TlsError::FailedToParseServerConfig)?;
+            .map_err(TlsError::FailedToParseConfig)?;
 
         config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
 
         Ok(Some(config))
+    }
+
+    pub async fn client_config(&self) -> Result<ClientConfig> {
+        let builder = if let Some(path) = &self.tls_ca {
+            let mut root_store = RootCertStore::empty();
+            root_store.add_parsable_certificates(parse_certificates(path)?);
+            ClientConfig::builder().with_root_certificates(root_store)
+        } else {
+            use rustls_platform_verifier::BuilderVerifierExt;
+            ClientConfig::builder().with_platform_verifier()
+        };
+
+        let (cert, key) = parse_cert_and_key(self.tls_cert.as_ref(), self.tls_key.as_ref())?;
+
+        let config = builder
+            .with_client_auth_cert(cert, key)
+            .map_err(TlsError::FailedToParseConfig)?;
+
+        Ok(config)
     }
 }
 
@@ -93,4 +104,18 @@ fn parse_certificates<P: AsRef<Path>>(path: P) -> Result<Vec<CertificateDer<'sta
     }
 
     Ok(certs)
+}
+
+fn parse_cert_and_key(
+    cert: Option<&PathBuf>,
+    key: Option<&PathBuf>,
+) -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)> {
+    let path = cert.ok_or(TlsError::MissingTlsCert)?;
+    let cert = parse_certificates(path)?;
+
+    let path = key.ok_or(TlsError::MissingTlsKey)?;
+    let key = PrivateKeyDer::from_pem_file(path)
+        .map_err(|e| TlsError::FailedToParseTlsKey(e.to_string()))?;
+
+    Ok((cert, key))
 }
