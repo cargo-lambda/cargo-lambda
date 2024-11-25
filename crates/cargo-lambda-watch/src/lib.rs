@@ -6,11 +6,11 @@ use cargo_lambda_metadata::{
 use cargo_lambda_remote::tls::TlsOptions;
 use clap::{Args, ValueHint};
 use http_body_util::{combinators::BoxBody, BodyExt};
-use hyper::body::Incoming;
-use hyper::{client::conn::http1, service::service_fn};
-use hyper::{Request, Response};
-use hyper_util::rt::{TokioExecutor, TokioIo};
-use hyper_util::server::conn::auto::Builder;
+use hyper::{body::Incoming, client::conn::http1, service::service_fn, Request, Response};
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::conn::auto::Builder,
+};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
     global,
