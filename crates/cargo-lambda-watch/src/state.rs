@@ -18,8 +18,9 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub(crate) struct RuntimeState {
-    addr: SocketAddr,
-    runtime_addr: String,
+    runtime_addr: SocketAddr,
+    proxy_addr: Option<SocketAddr>,
+    runtime_url: String,
     manifest_path: PathBuf,
     pub initial_functions: HashSet<String>,
     pub req_cache: RequestCache,
@@ -31,30 +32,29 @@ pub(crate) type RefRuntimeState = Arc<RuntimeState>;
 
 impl RuntimeState {
     pub(crate) fn new(
-        addr: SocketAddr,
+        runtime_addr: SocketAddr,
+        proxy_addr: Option<SocketAddr>,
         manifest_path: PathBuf,
         initial_functions: HashSet<String>,
-        is_secure: bool,
     ) -> RuntimeState {
-        let protocol = if is_secure { "https" } else { "http" };
-
         RuntimeState {
-            addr,
+            runtime_addr,
+            proxy_addr,
             manifest_path,
             initial_functions,
-            runtime_addr: format!("{protocol}://{addr}{RUNTIME_EMULATOR_PATH}"),
+            runtime_url: format!("http://{runtime_addr}{RUNTIME_EMULATOR_PATH}"),
             req_cache: RequestCache::new(),
             res_cache: ResponseCache::new(),
             ext_cache: ExtensionCache::default(),
         }
     }
 
-    pub(crate) fn addresses(&self) -> (SocketAddr, String) {
-        (self.addr, self.runtime_addr.clone())
+    pub(crate) fn addresses(&self) -> (SocketAddr, Option<SocketAddr>, String) {
+        (self.runtime_addr, self.proxy_addr, self.runtime_url.clone())
     }
 
     pub(crate) fn function_addr(&self, name: &str) -> String {
-        format!("{}/{}", &self.runtime_addr, name)
+        format!("{}/{}", &self.runtime_url, name)
     }
 
     pub(crate) fn is_default_function_enabled(&self) -> bool {

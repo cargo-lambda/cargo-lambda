@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 use miette::{Diagnostic, Result};
-use rustls::{ClientConfig, RootCertStore, ServerConfig};
+use rustls::{crypto::aws_lc_rs, ClientConfig, RootCertStore, ServerConfig};
 use rustls_pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
 use thiserror::Error;
 
@@ -52,6 +52,10 @@ impl TlsOptions {
             return Ok(None);
         }
 
+        aws_lc_rs::default_provider()
+            .install_default()
+            .expect("failed to install the default TLS provider");
+
         let (mut cert_chain, key) =
             parse_cert_and_key(self.tls_cert.as_ref(), self.tls_key.as_ref())?;
 
@@ -73,6 +77,10 @@ impl TlsOptions {
     }
 
     pub async fn client_config(&self) -> Result<ClientConfig> {
+        aws_lc_rs::default_provider()
+            .install_default()
+            .expect("failed to install the default TLS provider");
+
         let builder = if let Some(path) = &self.tls_ca {
             let mut root_store = RootCertStore::empty();
             root_store.add_parsable_certificates(parse_certificates(path)?);
