@@ -263,3 +263,21 @@ At the moment Log and Telemetry extensions don't receive any data from the local
 The following video shows you how to use the watch subcommand with Lambda extensions:
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/z2sv41ukHTE" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
+## TLS support
+
+The watch subcommand supports TLS connections to the runtime if you want to send requests to the runtime securely.
+
+To enable TLS, you need to provide a TLS certificate and key. You can use the `--tls-cert` and `--tls-key` flags to specify the path to the certificate and key files. The certificate and key files must be in PEM format.
+
+```
+cargo lambda watch --tls-cert cert.pem --tls-key key.pem
+```
+
+If the root CA file is not specified, the local CA certificates on your system will be used to verify the TLS connection. You can use the `--tls-ca` flag to specify a custom root CA file.
+
+```
+cargo lambda watch --tls-cert cert.pem --tls-key key.pem --tls-ca ca.pem
+```
+
+We recommend using [mkcert](https://github.com/FiloSottile/mkcert) to generate the TLS certificate and key files for development purposes.

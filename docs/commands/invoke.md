@@ -82,3 +82,25 @@ The `--output-format` flag allows you to change the output formatting between pl
 ```
 cargo lambda invoke --remote --data-example apigw-request --output-format json http-lambda
 ```
+
+## TLS support
+
+The invoke subcommand supports TLS connections to the runtime if you want to send requests to the runtime securely. The TLS server started by the [watch subcommand](/commands/watch) must be running with the same TLS certificate and key in order to use this feature.
+
+To enable TLS, you need to provide the path to the TLS certificate and key files using the `--tls-cert` and `--tls-key` flags. The certificate and key files must be in PEM format.
+
+```
+cargo lambda invoke --data-example apigw-request --tls-cert cert.pem --tls-key key.pem http-lambda
+```
+
+If the root CA file is not specified, the local CA certificates on your system will be used to verify the TLS connection. You can use the `--tls-ca` flag to specify a custom root CA file.
+
+```
+cargo lambda invoke --data-example apigw-request --tls-cert cert.pem --tls-key key.pem --tls-ca ca.pem http-lambda
+```
+
+If you want to use cURL to send requests to the runtime, you can use the following command:
+
+```
+curl https://<runtime-address> --cert cert.pem --key key.pem --cacert ca.pem
+```
