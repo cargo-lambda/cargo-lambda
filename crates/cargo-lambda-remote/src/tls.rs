@@ -1,10 +1,15 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
 use clap::Args;
 use miette::{Diagnostic, Result};
 use rustls::{ClientConfig, RootCertStore, ServerConfig};
 use rustls_pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
 use thiserror::Error;
+
+static CELL: OnceLock<bool> = OnceLock::new();
 
 #[derive(Debug, Diagnostic, Error)]
 pub enum TlsError {
@@ -55,7 +60,7 @@ impl TlsOptions {
             return Ok(None);
         }
 
-        install_default_tls_provider();
+        CELL.get_or_init(install_default_tls_provider);
 
         let (mut cert_chain, key) =
             parse_cert_and_key(self.cert_path().as_ref(), self.key_path().as_ref())?;
@@ -78,7 +83,7 @@ impl TlsOptions {
     }
 
     pub async fn client_config(&self) -> Result<ClientConfig> {
-        install_default_tls_provider();
+        CELL.get_or_init(install_default_tls_provider);
 
         let builder = if let Some(path) = self.ca_path() {
             let mut root_store = RootCertStore::empty();
@@ -176,15 +181,12 @@ fn parse_cert_and_key(
     Ok((cert, key))
 }
 
-#[cfg(not(test))]
-fn install_default_tls_provider() {
+fn install_default_tls_provider() -> bool {
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .expect("failed to install the default TLS provider");
+    true
 }
-
-#[cfg(test)]
-fn install_default_tls_provider() {}
 
 #[cfg(test)]
 mod tests {
