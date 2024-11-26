@@ -14,9 +14,10 @@ description.workspace = true
 [dependencies]
 aws_lambda_events = { version = "0.15", features = ["apigw"] }
 axum = "0.7"
-axum-server = "0.7.1"
 base64.workspace = true
+bytes = "1.8.0"
 cargo-lambda-metadata.workspace = true
+cargo-lambda-remote.workspace = true
 chrono = "0.4.19"
 clap.workspace = true
 dunce.workspace = true
@@ -24,17 +25,21 @@ http = "1.0"
 http-body-util = "0.1"
 http-serde = "2"
 hyper = "1"
+hyper-util = { version = "0.1.10", features = ["tokio"] }
 ignore-files = "=1.2.0"
 miette.workspace = true
 opentelemetry = "0.17.0"
 opentelemetry-aws = "0.5.0"
 query_map = { version = "0.7", features = ["url-query"] }
+rustls.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }
 tokio-graceful-shutdown = "0.15"
+tokio-rustls = "0.26.0"
+tokio-util = { version = "0.7.12", default-features = false, features = ["rt"] }
 tower-http = { version = "0.6", features = [
     "catch-panic",
     "cors",

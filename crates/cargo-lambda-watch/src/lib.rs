@@ -1,15 +1,23 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
-use axum_server::Handle;
+use bytes::Bytes;
 use cargo_lambda_metadata::{
     cargo::binary_targets, env::EnvOptions, lambda::Timeout, DEFAULT_PACKAGE_FUNCTION,
 };
+use cargo_lambda_remote::tls::TlsOptions;
 use clap::{Args, ValueHint};
+use http_body_util::{combinators::BoxBody, BodyExt};
+use hyper::{body::Incoming, client::conn::http1, service::service_fn, Request, Response};
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    server::conn::auto::Builder,
+};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use opentelemetry::{
     global,
     sdk::{export::trace::stdout, trace, trace::Tracer},
 };
 use opentelemetry_aws::trace::XrayPropagator;
+use rustls::ServerConfig;
 use std::{
     collections::HashSet,
     net::{IpAddr, SocketAddr},
@@ -17,8 +25,14 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use tokio::time::Duration;
+use tokio::{
+    net::{TcpListener, TcpStream},
+    pin,
+    time::Duration,
+};
 use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle, Toplevel};
+use tokio_rustls::TlsAcceptor;
+use tokio_util::task::TaskTracker;
 use tower_http::{
     catch_panic::CatchPanicLayer,
     cors::CorsLayer,
@@ -26,8 +40,7 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-
-use tracing::{info, trace, Subscriber};
+use tracing::{error, info, trace, Subscriber};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::registry::LookupSpan;
 
@@ -99,6 +112,9 @@ pub struct Watch {
 
     #[command(flatten)]
     env_options: EnvOptions,
+
+    #[command(flatten)]
+    tls_options: TlsOptions,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -134,11 +150,6 @@ impl Watch {
     pub async fn run(&self, color: &str) -> Result<()> {
         tracing::trace!(options = ?self, "watching project");
 
-        let ip = IpAddr::from_str(&self.invoke_address)
-            .into_diagnostic()
-            .wrap_err("invalid invoke address")?;
-        let addr = SocketAddr::from((ip, self.invoke_port));
-
         let mut cargo_options = self.cargo_options.clone();
         cargo_options.color = color.into();
 
@@ -166,27 +177,30 @@ impl Watch {
         };
 
         let runtime_state =
-            RuntimeState::new(addr, cargo_options.manifest_path.clone(), binary_packages);
+            self.build_runtime_state(&cargo_options.manifest_path, binary_packages)?;
 
         let disable_cors = self.disable_cors;
         let timeout = self.timeout.clone();
+        let tls_options = self.tls_options.clone();
 
-        Toplevel::new(move |s| async move {
+        let _ = Toplevel::new(move |s| async move {
             s.start(SubsystemBuilder::new("Lambda server", move |s| {
                 start_server(
                     s,
                     runtime_state,
                     cargo_options,
                     watcher_config,
+                    tls_options,
                     disable_cors,
                     timeout,
                 )
             }));
         })
         .catch_signals()
-        .handle_shutdown_requests(Duration::from_millis(1000))
-        .await
-        .into_diagnostic()
+        .handle_shutdown_requests(Duration::from_secs(1))
+        .await;
+
+        Ok(())
     }
 
     pub fn xray_layer<S>(&self) -> OpenTelemetryLayer<S, Tracer>
@@ -206,6 +220,32 @@ impl Watch {
             builder.with_writer(std::io::sink()).install_simple()
         };
         tracing_opentelemetry::layer().with_tracer(tracer)
+    }
+
+    fn build_runtime_state(
+        &self,
+        manifest_path: &Path,
+        binary_packages: HashSet<String>,
+    ) -> Result<RuntimeState> {
+        let ip = IpAddr::from_str(&self.invoke_address)
+            .into_diagnostic()
+            .wrap_err("invalid invoke address")?;
+        let (runtime_port, proxy_addr) = if self.tls_options.is_secure() {
+            (
+                self.invoke_port + 1,
+                Some(SocketAddr::from((ip, self.invoke_port))),
+            )
+        } else {
+            (self.invoke_port, None)
+        };
+        let runtime_addr = SocketAddr::from((ip, runtime_port));
+
+        Ok(RuntimeState::new(
+            runtime_addr,
+            proxy_addr,
+            manifest_path.to_path_buf(),
+            binary_packages,
+        ))
     }
 }
 
@@ -252,6 +292,7 @@ async fn start_server(
     runtime_state: RuntimeState,
     cargo_options: CargoOptions,
     watcher_config: WatcherConfig,
+    tls_options: TlsOptions,
     disable_cors: bool,
     timeout: Option<Timeout>,
 ) -> Result<()> {
@@ -259,7 +300,7 @@ async fn start_server(
     let init_default_function =
         runtime_state.is_default_function_enabled() && watcher_config.send_function_init();
 
-    let (socket_addr, runtime_addr) = runtime_state.addresses();
+    let (runtime_addr, proxy_addr, runtime_url) = runtime_state.addresses();
 
     let x_request_id = HeaderName::from_static("lambda-runtime-aws-request-id");
     let req_tx = init_scheduler(
@@ -293,7 +334,6 @@ async fn start_server(
     }
     let app = app.with_state(state_ref);
 
-    info!(?socket_addr, "invoke server waiting for requests");
     if only_lambda_apis {
         info!("");
         info!("the flag --only_lambda_apis is active, the lambda function will not be started by Cargo Lambda");
@@ -303,7 +343,7 @@ async fn start_server(
         );
         info!("AWS_LAMBDA_FUNCTION_VERSION=1");
         info!("AWS_LAMBDA_FUNCTION_MEMORY_SIZE=4096");
-        info!("AWS_LAMBDA_RUNTIME_API={}", runtime_addr);
+        info!("AWS_LAMBDA_RUNTIME_API={}", runtime_url);
         info!("AWS_LAMBDA_FUNCTION_NAME={DEFAULT_PACKAGE_FUNCTION}");
     } else {
         let print_start_info = if init_default_function {
@@ -322,26 +362,121 @@ async fn start_server(
         }
     }
 
-    let handle = Handle::new();
-    tokio::spawn(graceful_shutdown(subsys, handle.clone()));
+    let tls_config = tls_options.server_config().await?;
+    let tls_tracker = TaskTracker::new();
 
-    let out = axum_server::bind(socket_addr)
-        .handle(handle)
-        .serve(app.into_make_service())
-        .await;
+    if let (Some(tls_config), Some(proxy_addr)) = (tls_config, proxy_addr) {
+        let tls_tracker = tls_tracker.clone();
 
-    if let Err(e) = out {
-        match e.downcast::<hyper::Error>() {
-            Ok(hyper_err) if hyper_err.is_incomplete_message() => return Ok(()),
-            Ok(hyper_err) => return Err(hyper_err).into_diagnostic(),
-            Err(e) => return Err(e).into_diagnostic(),
-        }
+        subsys.start(SubsystemBuilder::new("TLS proxy", move |s| async move {
+            start_tls_proxy(s, tls_tracker, tls_config, proxy_addr, runtime_addr).await
+        }));
     }
+
+    info!(?runtime_addr, "starting Runtime server");
+    let out = axum::serve(
+        TcpListener::bind(runtime_addr).await.into_diagnostic()?,
+        app.into_make_service(),
+    )
+    .with_graceful_shutdown(async move {
+        subsys.on_shutdown_requested().await;
+    })
+    .await;
+
+    if let Err(error) = out {
+        error!(error = ?error, "failed to serve HTTP requests");
+    }
+
+    tls_tracker.close();
+    tls_tracker.wait().await;
 
     Ok(())
 }
 
-async fn graceful_shutdown(subsys: SubsystemHandle, handle: Handle) {
-    subsys.on_shutdown_requested().await;
-    handle.graceful_shutdown(Some(Duration::from_secs(1)));
+async fn start_tls_proxy(
+    subsys: SubsystemHandle,
+    connection_tracker: TaskTracker,
+    tls_config: ServerConfig,
+    proxy_addr: SocketAddr,
+    runtime_addr: SocketAddr,
+) -> Result<()> {
+    info!(
+        ?proxy_addr,
+        "starting TLS server, use this address to send secure requests to the runtime"
+    );
+
+    let acceptor = TlsAcceptor::from(Arc::new(tls_config));
+
+    let listener = TcpListener::bind(proxy_addr).await.into_diagnostic()?;
+
+    let addr = Arc::new(runtime_addr);
+
+    loop {
+        let (stream, _) = listener.accept().await.into_diagnostic()?;
+        let acceptor = acceptor.clone();
+
+        let addr = addr.clone();
+
+        connection_tracker.spawn({
+            let cancellation_token = subsys.create_cancellation_token();
+            let connection_tracker = connection_tracker.clone();
+
+            async move {
+                let hyper_service = service_fn(move |request: Request<Incoming>| {
+                    proxy(connection_tracker.clone(), request, addr.clone())
+                });
+
+                let tls_stream = match acceptor.accept(stream).await {
+                    Ok(tls_stream) => tls_stream,
+                    Err(e) => {
+                        error!(error = ?e, "Failed to accept TLS connection");
+                        return Err(e).into_diagnostic();
+                    }
+                };
+
+                let builder = Builder::new(TokioExecutor::new());
+                let conn = builder.serve_connection(TokioIo::new(tls_stream), hyper_service);
+
+                pin!(conn);
+
+                let result = tokio::select! {
+                    res = conn.as_mut() => res,
+                    _ = cancellation_token.cancelled() => {
+                        conn.as_mut().graceful_shutdown();
+                        conn.await
+                    }
+                };
+
+                if let Err(e) = result {
+                    error!(error = ?e, "Failed to serve connection");
+                }
+
+                Ok(())
+            }
+        });
+    }
+}
+
+async fn proxy(
+    connection_tracker: TaskTracker,
+    req: Request<hyper::body::Incoming>,
+    addr: Arc<SocketAddr>,
+) -> Result<Response<BoxBody<Bytes, hyper::Error>>, hyper::Error> {
+    let stream = TcpStream::connect(&*addr).await.unwrap();
+    let io = TokioIo::new(stream);
+
+    let (mut sender, conn) = http1::Builder::new()
+        .preserve_header_case(true)
+        .title_case_headers(true)
+        .handshake(io)
+        .await?;
+
+    connection_tracker.spawn(async move {
+        if let Err(err) = conn.await {
+            println!("Connection failed: {:?}", err);
+        }
+    });
+
+    let resp = sender.send_request(req).await?;
+    Ok(resp.map(|b| b.boxed()))
 }

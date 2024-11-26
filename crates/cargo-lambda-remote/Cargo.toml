@@ -16,7 +16,14 @@ aws-config.workspace = true
 aws-sdk-lambda.workspace = true
 aws-types.workspace = true
 clap.workspace = true
+dirs.workspace = true
+miette.workspace = true
+rustls.workspace = true
+rustls-pki-types = "1.10.0"
+rustls-platform-verifier = "0.4.0"
+thiserror.workspace = true
 
 [dev-dependencies]
 aws-credential-types = "0.57.1"
+tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }

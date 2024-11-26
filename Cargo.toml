@@ -57,12 +57,14 @@ cargo-lambda-remote = { version = "1.5.0", path = "crates/cargo-lambda-remote" }
 cargo-lambda-system = { version = "1.5.0", path = "crates/cargo-lambda-system" }
 cargo-lambda-watch = { version = "1.5.0", path = "crates/cargo-lambda-watch" }
 clap = { version = "4.4.2", features = ["derive"] }
+dirs = "4"
 dunce = "1.0.3"
 home = "0.5.3"
 miette = { version = "5.10.0" }
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-native-roots",
 ] }
+rustls = "0.23.17"
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 strum = "0.24.0"
