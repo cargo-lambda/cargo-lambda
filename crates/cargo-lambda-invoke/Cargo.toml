@@ -16,7 +16,7 @@ base64.workspace = true
 cargo-lambda-metadata.workspace = true
 cargo-lambda-remote.workspace = true
 clap.workspace = true
-dirs = "4.0.0"
+dirs.workspace = true
 miette.workspace = true
 reqwest = { workspace = true, features = ["rustls-tls"] }
 serde.workspace = true

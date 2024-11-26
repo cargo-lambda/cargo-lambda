@@ -280,4 +280,17 @@ If the root CA file is not specified, the local CA certificates on your system w
 cargo lambda watch --tls-cert cert.pem --tls-key key.pem --tls-ca ca.pem
 ```
 
+If you always want to use TLS, you can place the certificate and key files in the global configuration directory as defined by XDG_CONFIG_HOME. Cargo Lambda will automatically look for
+those files in a subdirectory called `cargo-lambda`. The file names must be `cert.pem`, `key.pem`, and `ca.pem` respectively.
+
+```
+tree $HOME/.config/cargo-lambda
+/home/david/.config/cargo-lambda
+├── cert.pem
+└── key.pem
+
+1 directory, 2 files
+
+```
+
 We recommend using [mkcert](https://github.com/FiloSottile/mkcert) to generate the TLS certificate and key files for development purposes.

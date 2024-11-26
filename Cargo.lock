@@ -1213,10 +1213,12 @@ dependencies = [
  "aws-sdk-lambda",
  "aws-types",
  "clap",
+ "dirs 4.0.0",
  "miette 5.10.0",
  "rustls 0.23.17",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
 ]
