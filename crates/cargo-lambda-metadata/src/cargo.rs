@@ -1,5 +1,6 @@
-pub use cargo_metadata::Metadata as CargoMetadata;
-use cargo_metadata::Target;
+pub use cargo_metadata::{
+    Metadata as CargoMetadata, Package as CargoPackage, Target as CargoTarget,
+};
 use miette::Result;
 use serde::Deserialize;
 use std::{
@@ -236,22 +237,68 @@ pub fn binary_targets_from_metadata(
     metadata: &CargoMetadata,
     build_examples: bool,
 ) -> HashSet<String> {
-    let condition = |target: &&Target| {
-        if build_examples {
-            // Several targets can have `crate_type` be `bin`, we're only
-            // interested in the ones which `kind` is `bin` or `example`.
-            // See https://doc.rust-lang.org/cargo/commands/cargo-metadata.html?highlight=targets%20metadata#json-format
-            target.kind.iter().any(|k| k == "example")
-                && target.crate_types.iter().any(|t| t == "bin")
-        } else {
-            target.kind.iter().any(|k| k == "bin")
-        }
+    let condition = if build_examples {
+        kind_example_filter
+    } else {
+        kind_bin_filter
     };
 
-    metadata
-        .packages
-        .iter()
-        .flat_map(|p| p.targets.iter().filter(condition))
+    let package_filter: Option<fn(&&CargoPackage) -> bool> = None;
+    filter_binary_targets_from_metadata(metadata, condition, package_filter)
+}
+
+pub fn kind_bin_filter(target: &CargoTarget) -> bool {
+    target.kind.iter().any(|k| k == "bin")
+}
+
+// Several targets can have `crate_type` be `bin`, we're only
+// interested in the ones which `kind` is `bin` or `example`.
+// See https://doc.rust-lang.org/cargo/commands/cargo-metadata.html?highlight=targets%20metadata#json-format
+pub fn kind_example_filter(target: &CargoTarget) -> bool {
+    target.kind.iter().any(|k| k == "example") && target.crate_types.iter().any(|t| t == "bin")
+}
+
+/// Extract all the binary target names from a Cargo.toml file
+pub fn filter_binary_targets<P, F, K>(
+    manifest_path: P,
+    target_filter: F,
+    package_filter: Option<K>,
+) -> Result<HashSet<String>, MetadataError>
+where
+    P: AsRef<Path> + Debug,
+    F: FnMut(&CargoTarget) -> bool,
+    K: FnMut(&&CargoPackage) -> bool,
+{
+    let metadata = load_metadata(manifest_path)?;
+    Ok(filter_binary_targets_from_metadata(
+        &metadata,
+        target_filter,
+        package_filter,
+    ))
+}
+
+pub fn filter_binary_targets_from_metadata<F, P>(
+    metadata: &CargoMetadata,
+    target_filter: F,
+    package_filter: Option<P>,
+) -> HashSet<String>
+where
+    F: FnMut(&CargoTarget) -> bool,
+    P: FnMut(&&CargoPackage) -> bool,
+{
+    let packages = metadata.packages.iter();
+    let targets = if let Some(filter) = package_filter {
+        packages
+            .filter(filter)
+            .flat_map(|p| p.targets.clone())
+            .collect::<Vec<_>>()
+    } else {
+        packages.flat_map(|p| p.targets.clone()).collect::<Vec<_>>()
+    };
+
+    targets
+        .into_iter()
+        .filter(target_filter)
         .map(|target| target.name.clone())
         .collect::<_>()
 }
