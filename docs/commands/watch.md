@@ -106,6 +106,16 @@ Your function MUST have the `apigw_http` feature enabled in the `lambda_http` de
 
 If your project includes several functions under the same package, you can access them using the function's name as the prefix in the request path `http://localhost:9000/lambda-url/FUNCTION_NAME`. You can also add any additional path after the function name, or any query parameters.
 
+### Working with specific packages
+
+You can specify the package that you want to work with by using the `--package` flag. This way, only the function in the specified package will be available through the Function URL.
+
+```
+cargo lambda watch --package my-package
+```
+
+Because only one function is available through the Function URL, you can access it by using the root path `http://localhost:9000`.
+
 ## Lambda response streaming
 
 When you work with function URLs, you can stream responses to the client with [Lambda's support for Streaming Responses](https://aws.amazon.com/blogs/compute/introducing-aws-lambda-response-streaming/).
@@ -293,4 +303,6 @@ tree $HOME/.config/cargo-lambda
 
 ```
 
+::: tip
 We recommend using [mkcert](https://github.com/FiloSottile/mkcert) to generate the TLS certificate and key files for development purposes.
+:::

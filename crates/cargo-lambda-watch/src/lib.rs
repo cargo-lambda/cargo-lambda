@@ -1,7 +1,10 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
 use bytes::Bytes;
 use cargo_lambda_metadata::{
-    cargo::binary_targets, env::EnvOptions, lambda::Timeout, DEFAULT_PACKAGE_FUNCTION,
+    cargo::{filter_binary_targets, kind_bin_filter, CargoPackage},
+    env::EnvOptions,
+    lambda::Timeout,
+    DEFAULT_PACKAGE_FUNCTION,
 };
 use cargo_lambda_remote::tls::TlsOptions;
 use clap::{Args, ValueHint};
@@ -158,8 +161,17 @@ impl Watch {
 
         let env = self.env_options.lambda_environment().into_diagnostic()?;
 
-        let binary_packages = binary_targets(&cargo_options.manifest_path, false)
-            .map_err(ServerError::FailedToReadMetadata)?;
+        let package_filter = cargo_options
+            .package
+            .as_ref()
+            .map(|package| move |p: &&CargoPackage| p.name == *package);
+
+        let binary_packages = filter_binary_targets(
+            &cargo_options.manifest_path,
+            kind_bin_filter,
+            package_filter,
+        )
+        .map_err(ServerError::FailedToReadMetadata)?;
 
         if binary_packages.is_empty() {
             Err(ServerError::NoBinaryPackages)?;
