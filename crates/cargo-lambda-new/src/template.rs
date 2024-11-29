@@ -534,13 +534,13 @@ mod test {
         std::fs::create_dir(&expected).unwrap();
 
         let url = "https://github.com/cargo-lambda/default-template/archive/refs/heads/main.zip";
-        let base = adjust_remote_zip_base(url, &tmp_dir.path());
+        let base = adjust_remote_zip_base(url, tmp_dir.path());
 
         assert_eq!(Some(expected.clone()), base);
 
         let url =
             "https://gitlab.com/calavera/default-template/-/archive/main/default-template-main.zip";
-        let base = adjust_remote_zip_base(url, &tmp_dir.path());
+        let base = adjust_remote_zip_base(url, tmp_dir.path());
         assert_eq!(Some(expected), base);
     }
 

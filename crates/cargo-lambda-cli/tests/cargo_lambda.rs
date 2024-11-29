@@ -1,4 +1,3 @@
-use serde_json;
 use std::{
     fs::{create_dir_all, read_to_string, File},
     io::Write,

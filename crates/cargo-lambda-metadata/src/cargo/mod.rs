@@ -305,7 +305,7 @@ pub fn main_binary_from_metadata(metadata: &CargoMetadata) -> Result<String, Met
         targets
             .into_iter()
             .next()
-            .ok_or_else(|| MetadataError::MissingBinaryInProject)
+            .ok_or(MetadataError::MissingBinaryInProject)
     }
 }
 
