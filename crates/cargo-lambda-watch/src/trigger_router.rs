@@ -22,6 +22,7 @@ use axum::{
 use base64::{engine::general_purpose as b64, Engine as _};
 use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
 use chrono::Utc;
+use http::Method;
 use http_body_util::BodyExt;
 use hyper::{header, HeaderMap, StatusCode};
 use miette::Result;
@@ -56,7 +57,7 @@ async fn furls_handler(
     let (parts, body) = req.into_parts();
     let uri = &parts.uri;
 
-    let (function_name, mut path) = extract_path_parameters(uri.path());
+    let (function_name, mut path) = extract_path_parameters(uri.path(), &parts.method, &state);
     tracing::trace!(%function_name, %path, "received request in furls handler");
 
     if function_name == DEFAULT_PACKAGE_FUNCTION && !state.is_default_function_enabled() {
@@ -275,7 +276,11 @@ async fn schedule_invocation(
     Ok(resp)
 }
 
-fn extract_path_parameters(path: &str) -> (String, String) {
+fn extract_path_parameters(
+    path: &str,
+    method: &Method,
+    state: &RefRuntimeState,
+) -> (String, String) {
     let mut comp = path.split('/');
 
     comp.next();
@@ -286,12 +291,19 @@ fn extract_path_parameters(path: &str) -> (String, String) {
             if !new_path.starts_with('/') {
                 new_path = format!("/{new_path}");
             }
+
             let f = if fun_name.is_empty() {
                 DEFAULT_PACKAGE_FUNCTION.to_string()
             } else {
                 fun_name.to_string()
             };
             return (f, new_path);
+        }
+    }
+
+    if let Some(router) = &state.function_router {
+        if let Ok(route) = router.at(path, method.to_string().as_str()) {
+            return (route.to_string(), path.to_string());
         }
     }
 
@@ -439,41 +451,80 @@ fn respond_with_missing_function(
 
 #[cfg(test)]
 mod test {
+    use std::{
+        collections::HashSet,
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        path::PathBuf,
+        sync::Arc,
+    };
+
+    use crate::RuntimeState;
+
     use super::extract_path_parameters;
-    use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
+    use cargo_lambda_metadata::{
+        cargo::{FunctionRouter, FunctionRoutes},
+        DEFAULT_PACKAGE_FUNCTION,
+    };
+    use http::Method;
 
     #[test]
     fn test_extract_path_parameters() {
-        let (func, path) = extract_path_parameters("");
+        let state = Arc::new(RuntimeState::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
+            None,
+            PathBuf::new(),
+            HashSet::new(),
+            None,
+        ));
+
+        let (func, path) = extract_path_parameters("", &Method::GET, &state);
         assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
         assert_eq!("", path);
 
-        let (func, path) = extract_path_parameters("/");
+        let (func, path) = extract_path_parameters("/", &Method::GET, &state);
         assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
         assert_eq!("/", path);
 
-        let (func, path) = extract_path_parameters("/foo");
+        let (func, path) = extract_path_parameters("/foo", &Method::GET, &state);
         assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
         assert_eq!("/foo", path);
 
-        let (func, path) = extract_path_parameters("/foo/");
+        let (func, path) = extract_path_parameters("/foo/", &Method::GET, &state);
         assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
         assert_eq!("/foo/", path);
 
-        let (func, path) = extract_path_parameters("/lambda-url/func-name");
+        let (func, path) = extract_path_parameters("/lambda-url/func-name", &Method::GET, &state);
         assert_eq!("func-name", func);
         assert_eq!("/", path);
 
-        let (func, path) = extract_path_parameters("/lambda-url/func-name/");
+        let (func, path) = extract_path_parameters("/lambda-url/func-name/", &Method::GET, &state);
         assert_eq!("func-name", func);
         assert_eq!("/", path);
 
-        let (func, path) = extract_path_parameters("/lambda-url/func-name/foo");
+        let (func, path) =
+            extract_path_parameters("/lambda-url/func-name/foo", &Method::GET, &state);
         assert_eq!("func-name", func);
         assert_eq!("/foo", path);
 
-        let (func, path) = extract_path_parameters("/lambda-url/func-name/foo/");
+        let (func, path) =
+            extract_path_parameters("/lambda-url/func-name/foo/", &Method::GET, &state);
         assert_eq!("func-name", func);
         assert_eq!("/foo/", path);
+
+        let mut new_router = FunctionRouter::default();
+        new_router
+            .insert("/foo", FunctionRoutes::Single("bar".to_string()))
+            .unwrap();
+        let state = Arc::new(RuntimeState::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
+            None,
+            PathBuf::new(),
+            HashSet::new(),
+            Some(new_router),
+        ));
+
+        let (func, path) = extract_path_parameters("/foo", &Method::GET, &state);
+        assert_eq!("bar", func);
+        assert_eq!("/foo", path);
     }
 }

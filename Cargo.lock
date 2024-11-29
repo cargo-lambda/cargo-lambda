@@ -760,7 +760,7 @@ dependencies = [
  "hyper 1.5.0",
  "hyper-util",
  "itoa",
- "matchit",
+ "matchit 0.7.3",
  "memchr",
  "mime",
  "percent-encoding",
@@ -1165,6 +1165,7 @@ dependencies = [
  "cargo_metadata 0.15.4",
  "clap",
  "env-file-reader",
+ "matchit 0.8.5",
  "miette 4.7.1",
  "remove_dir_all",
  "serde",
@@ -4169,6 +4170,12 @@ name = "matchit"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
+
+[[package]]
+name = "matchit"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd0aa4b8ca861b08d68afc8702af3250776898c1508b278e1da9d01e01d4b45c"
 
 [[package]]
 name = "maybe-async"

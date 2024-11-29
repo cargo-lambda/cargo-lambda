@@ -1,7 +1,10 @@
 use axum::{extract::Extension, http::header::HeaderName, Router};
 use bytes::Bytes;
 use cargo_lambda_metadata::{
-    cargo::{filter_binary_targets, kind_bin_filter, CargoPackage},
+    cargo::{
+        filter_binary_targets_from_metadata, kind_bin_filter, load_metadata, watch_metadata,
+        CargoPackage, WatchConfig,
+    },
     env::EnvOptions,
     lambda::Timeout,
     DEFAULT_PACKAGE_FUNCTION,
@@ -98,7 +101,7 @@ pub struct Watch {
     #[arg(long)]
     print_traces: bool,
 
-    /// Wait for the first invocation to run the function
+    /// Wait for the first invocation to compile the function
     #[arg(long, short)]
     wait: bool,
 
@@ -166,12 +169,11 @@ impl Watch {
             .as_ref()
             .map(|package| move |p: &&CargoPackage| p.name == *package);
 
-        let binary_packages = filter_binary_targets(
-            &cargo_options.manifest_path,
-            kind_bin_filter,
-            package_filter,
-        )
-        .map_err(ServerError::FailedToReadMetadata)?;
+        let metadata = load_metadata(&cargo_options.manifest_path)
+            .map_err(ServerError::FailedToReadMetadata)?;
+
+        let binary_packages =
+            filter_binary_targets_from_metadata(&metadata, kind_bin_filter, package_filter);
 
         if binary_packages.is_empty() {
             Err(ServerError::NoBinaryPackages)?;
@@ -188,8 +190,14 @@ impl Watch {
             ..Default::default()
         };
 
-        let runtime_state =
-            self.build_runtime_state(&cargo_options.manifest_path, binary_packages)?;
+        let watch_metadata =
+            watch_metadata(&metadata).map_err(ServerError::FailedToReadMetadata)?;
+
+        let runtime_state = self.build_runtime_state(
+            &cargo_options.manifest_path,
+            &watch_metadata,
+            binary_packages,
+        )?;
 
         let disable_cors = self.disable_cors;
         let timeout = self.timeout.clone();
@@ -237,6 +245,7 @@ impl Watch {
     fn build_runtime_state(
         &self,
         manifest_path: &Path,
+        metadata: &WatchConfig,
         binary_packages: HashSet<String>,
     ) -> Result<RuntimeState> {
         let ip = IpAddr::from_str(&self.invoke_address)
@@ -257,6 +266,7 @@ impl Watch {
             proxy_addr,
             manifest_path.to_path_buf(),
             binary_packages,
+            metadata.router.clone(),
         ))
     }
 }

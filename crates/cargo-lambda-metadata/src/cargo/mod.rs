@@ -22,6 +22,9 @@ pub use deploy::*;
 mod profile;
 pub use profile::*;
 
+mod watch;
+pub use watch::*;
+
 const STRIP_CONFIG: &str = "profile.release.strip=\"symbols\"";
 const LTO_CONFIG: &str = "profile.release.lto=\"thin\"";
 const CODEGEN_CONFIG: &str = "profile.release.codegen-units=1";
@@ -54,6 +57,8 @@ pub struct PackageMetadata {
     pub deploy: Option<DeployConfig>,
     #[serde(default)]
     pub build: BuildConfig,
+    #[serde(default)]
+    pub watch: Option<WatchConfig>,
 }
 
 /// Extract all the binary target names from a Cargo.toml file
@@ -284,7 +289,12 @@ pub fn function_environment_metadata<P: AsRef<Path> + Debug>(
 /// Use this function when the user didn't provide any funcion name
 /// assuming that there is only one binary in the project
 pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String, MetadataError> {
-    let targets = binary_targets(manifest_path, false)?;
+    let metadata = load_metadata(manifest_path)?;
+    main_binary_from_metadata(&metadata)
+}
+
+pub fn main_binary_from_metadata(metadata: &CargoMetadata) -> Result<String, MetadataError> {
+    let targets = binary_targets_from_metadata(metadata, false);
     if targets.len() > 1 {
         let mut vec = targets.into_iter().collect::<Vec<_>>();
         vec.sort();

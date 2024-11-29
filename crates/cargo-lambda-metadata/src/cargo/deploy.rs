@@ -7,7 +7,7 @@ use std::{
 use urlencoding::encode;
 
 use crate::{
-    cargo::{load_metadata, LambdaMetadata, Metadata},
+    cargo::{load_metadata, Metadata},
     env::{lambda_environment, Environment},
     error::MetadataError,
     lambda::{Memory, Timeout, Tracing},
@@ -161,12 +161,12 @@ pub fn function_deploy_metadata<P: AsRef<Path> + Debug>(
     default: DeployConfig,
 ) -> Result<DeployConfig, MetadataError> {
     let metadata = load_metadata(manifest_path)?;
-    let ws_metadata: LambdaMetadata =
+    let ws_metadata: Metadata =
         serde_json::from_value(metadata.workspace_metadata).unwrap_or_default();
 
-    let mut config = ws_metadata.package.deploy.unwrap_or(default);
+    let mut config = ws_metadata.lambda.package.deploy.unwrap_or(default);
 
-    if let Some(package_metadata) = ws_metadata.bin.get(name) {
+    if let Some(package_metadata) = ws_metadata.lambda.bin.get(name) {
         merge_deploy_config(&mut config, &package_metadata.deploy);
     }
 

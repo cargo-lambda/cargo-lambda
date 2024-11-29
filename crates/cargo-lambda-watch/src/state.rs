@@ -3,7 +3,7 @@ use crate::{
     requests::{InvokeRequest, LambdaResponse, NextEvent},
     RUNTIME_EMULATOR_PATH,
 };
-use cargo_lambda_metadata::cargo::binary_targets;
+use cargo_lambda_metadata::cargo::{binary_targets, FunctionRouter};
 use miette::Result;
 use mpsc::{channel, Receiver, Sender};
 use std::{
@@ -23,6 +23,7 @@ pub(crate) struct RuntimeState {
     runtime_url: String,
     manifest_path: PathBuf,
     pub initial_functions: HashSet<String>,
+    pub function_router: Option<FunctionRouter>,
     pub req_cache: RequestCache,
     pub res_cache: ResponseCache,
     pub ext_cache: ExtensionCache,
@@ -36,12 +37,14 @@ impl RuntimeState {
         proxy_addr: Option<SocketAddr>,
         manifest_path: PathBuf,
         initial_functions: HashSet<String>,
+        function_router: Option<FunctionRouter>,
     ) -> RuntimeState {
         RuntimeState {
             runtime_addr,
             proxy_addr,
             manifest_path,
             initial_functions,
+            function_router,
             runtime_url: format!("http://{runtime_addr}{RUNTIME_EMULATOR_PATH}"),
             req_cache: RequestCache::new(),
             res_cache: ResponseCache::new(),

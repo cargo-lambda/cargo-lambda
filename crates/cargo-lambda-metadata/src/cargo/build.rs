@@ -1,10 +1,7 @@
 use cargo_metadata::Metadata as CargoMetadata;
 use serde::Deserialize;
 
-use crate::{
-    cargo::{LambdaMetadata, Metadata},
-    error::MetadataError,
-};
+use crate::{cargo::Metadata, error::MetadataError};
 
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct BuildConfig {
@@ -70,10 +67,10 @@ pub fn merge_build_config(base: &mut BuildConfig, package_build: &BuildConfig) {
 /// with the configuration from the first binary target in the project.
 /// It assumes that all functions in the workspace will use the same compiler configuration.
 pub fn function_build_metadata(metadata: &CargoMetadata) -> Result<BuildConfig, MetadataError> {
-    let ws_metadata: LambdaMetadata =
+    let ws_metadata: Metadata =
         serde_json::from_value(metadata.workspace_metadata.clone()).unwrap_or_default();
 
-    let mut config = ws_metadata.package.build;
+    let mut config = ws_metadata.lambda.package.build;
 
     'outer: for pkg in &metadata.packages {
         for target in &pkg.targets {
