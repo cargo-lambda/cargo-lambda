@@ -24,7 +24,7 @@ dunce.workspace = true
 http = "1.0"
 http-body-util = "0.1"
 http-serde = "2"
-hyper = "1"
+hyper = { version = "1", features = ["full"] }
 hyper-util = { version = "0.1.10", features = ["tokio"] }
 ignore-files = "=1.2.0"
 miette.workspace = true

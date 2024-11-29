@@ -219,7 +219,7 @@ mod tests {
     #[test]
     fn test_parse_template_config_prompts() {
         let config = parse_template_config("../../tests/templates/config-template").unwrap();
-        assert_eq!(config.disable_default_prompts, true);
+        assert!(config.disable_default_prompts);
         assert_eq!(config.prompts.len(), 9);
 
         assert_eq!(
@@ -264,9 +264,9 @@ mod tests {
         let config = parse_template_config("../../tests/templates/config-template").unwrap();
         assert_eq!(
             config.render_files,
-            vec!["Cargo.toml", "README.md", "main.rs"]
+            ["Cargo.toml", "README.md", "main.rs"]
                 .iter()
-                .map(|s| PathBuf::from(s))
+                .map(PathBuf::from)
                 .collect::<Vec<PathBuf>>()
         );
         assert!(config.render_all_files);
@@ -277,9 +277,9 @@ mod tests {
         let config = parse_template_config("../../tests/templates/config-template").unwrap();
         assert_eq!(
             config.ignore_files,
-            vec!["README.md"]
+            ["README.md"]
                 .iter()
-                .map(|s| PathBuf::from(s))
+                .map(PathBuf::from)
                 .collect::<Vec<PathBuf>>()
         );
     }

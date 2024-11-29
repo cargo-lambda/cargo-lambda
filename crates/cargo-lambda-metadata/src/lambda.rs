@@ -133,7 +133,7 @@ impl<'de> Deserialize<'de> for Memory {
         D: Deserializer<'de>,
     {
         struct MemoryVisitor;
-        impl<'de> Visitor<'de> for MemoryVisitor {
+        impl Visitor<'_> for MemoryVisitor {
             type Value = Memory;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -185,7 +185,7 @@ impl<'de> Deserialize<'de> for Tracing {
         D: Deserializer<'de>,
     {
         struct TracingVisitor;
-        impl<'de> Visitor<'de> for TracingVisitor {
+        impl Visitor<'_> for TracingVisitor {
             type Value = Tracing;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

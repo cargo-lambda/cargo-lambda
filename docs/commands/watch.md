@@ -306,3 +306,36 @@ tree $HOME/.config/cargo-lambda
 ::: tip
 We recommend using [mkcert](https://github.com/FiloSottile/mkcert) to generate the TLS certificate and key files for development purposes.
 :::
+
+## Custom HTTP routes
+
+You can add custom HTTP routes to the emulator by setting the `routes` field in the `watch` section of your Cargo.toml file. This is useful if you have several functions in your package and you want to access them using paths without the `/lambda-url` prefix.
+
+This configuration can be managed at the workspace level when you have more than one function in your workspace, or at the package level if you want to separate the routes for each package. Routes at the package level will override the ones in the workspace.
+
+Cargo Lambda uses [Matchit](https://crates.io/crates/matchit/) to match the HTTP routes to the functions. The syntax to specify the route paths is similar to the one used by the [Axum router](https://docs.rs/axum/latest/axum/routing/index.html).
+
+Each route is a key-value pair where the key is the path and the value is either a string with the function name, or a table with the HTTP method to match and the function name.
+
+### Workspace level
+
+This configuration is applied to all functions in your workspace.
+
+```toml
+[package.metadata.lambda.watch.router]
+"/get-product/:id" = "get-product"
+"/add-product" = "add-product"
+"/users" = [
+    { method = "GET", function = "get-users" },
+    { method = "POST", function = "add-user" }
+]
+```
+
+### Package level
+
+This configuration is applied to a function in a package. It will be merged with the workspace level configuration if it exists.
+
+```toml
+[package.metadata.lambda.watch.router]
+"/products" = "handle-products"
+```

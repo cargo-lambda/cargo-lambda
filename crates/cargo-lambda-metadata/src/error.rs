@@ -1,5 +1,6 @@
 use std::{num::ParseIntError, path::PathBuf};
 
+use matchit::MergeError;
 use miette::Diagnostic;
 use thiserror::Error;
 
@@ -38,4 +39,7 @@ pub enum MetadataError {
     #[error(transparent)]
     #[diagnostic()]
     InvalidTomlManifest(toml::de::Error),
+    #[error(transparent)]
+    #[diagnostic()]
+    MergeError(#[from] MergeError),
 }

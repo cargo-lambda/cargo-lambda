@@ -1,2 +1,9 @@
 [workspace]
-members = ["crate-1", "crate-2"]
+members = ["crate-1", "crate-2", "crate-3"]
+
+[workspace.metadata.lambda.watch.router]
+"/foo" = "crate-1"
+"/bar" = [
+    { method = "GET", function = "crate-1" },
+    { method = "POST", function = "crate-2" },
+]

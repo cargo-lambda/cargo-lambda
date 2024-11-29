@@ -558,7 +558,7 @@ mod tests {
         variables.insert("render_main_rs".into(), Value::scalar(true));
 
         assert!(should_render_file(
-            &path,
+            path,
             &render_files,
             &template_config,
             &variables
@@ -576,7 +576,7 @@ mod tests {
         let template_config = TemplateConfig::default();
         let variables = Object::new();
         assert!(should_render_file(
-            &path,
+            path,
             &render_files,
             &template_config,
             &variables
@@ -594,7 +594,7 @@ mod tests {
         let template_config = TemplateConfig::default();
         let variables = Object::new();
         assert!(!should_render_file(
-            &path,
+            path,
             &render_files,
             &template_config,
             &variables
@@ -613,7 +613,7 @@ mod tests {
         template_config.render_all_files = true;
         let variables = Object::new();
         assert!(should_render_file(
-            &path,
+            path,
             &render_files,
             &template_config,
             &variables
@@ -637,7 +637,7 @@ mod tests {
         variables.insert("ci_provider".into(), Value::scalar(".github"));
 
         assert_eq!(
-            render_path_with_variables(&path, &parser, &variables),
+            render_path_with_variables(path, &parser, &variables),
             Some(expected)
         );
     }
@@ -664,7 +664,7 @@ mod tests {
         variables.insert("http_function".into(), Value::scalar(false));
 
         assert!(should_ignore_file(
-            &path,
+            path,
             &ignore_files,
             &template_config,
             &variables
@@ -693,7 +693,7 @@ mod tests {
         variables.insert("http_function".into(), Value::scalar(true));
 
         assert!(!should_ignore_file(
-            &path,
+            path,
             &ignore_files,
             &template_config,
             &variables
