@@ -343,9 +343,10 @@ mod tests {
     #[test]
     fn test_binary_packages_with_workspace() {
         let bins = binary_targets(fixture("workspace-package"), false).unwrap();
-        assert_eq!(2, bins.len());
+        assert_eq!(3, bins.len());
         assert!(bins.contains("basic-lambda-1"));
         assert!(bins.contains("basic-lambda-2"));
+        assert!(bins.contains("crate-3"));
     }
 
     #[test]
