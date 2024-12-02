@@ -16,7 +16,16 @@ jobs:
   action:
     runs-on: ubuntu-latest
     steps:
-      - uses: dessant/lock-threads@v4
+      - uses: dessant/lock-threads@v5
         with:
           issue-inactive-days: '0'
           pr-inactive-days: '0'
+          issue-comment: >
+            This issue has been automatically locked.
+            Create a new discussion if you'd like to continue the conversation.
+            https://github.com/cargo-lambda/cargo-lambda/discussions/new?category=general
+          pr-comment: >
+            This pull request has been automatically locked.
+            Create a new discussion if you'd like to continue the conversation.
+            https://github.com/cargo-lambda/cargo-lambda/discussions/new?category=general
+          process-only: 'issues, prs'
