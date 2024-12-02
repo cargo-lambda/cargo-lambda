@@ -156,10 +156,29 @@ impl RequestCache {
     pub async fn pop(&self, function_name: &str) -> Option<InvokeRequest> {
         let inner = self.inner.read().await;
         let stack = match inner.get(function_name) {
-            None => return None,
-            Some(s) => s.clone(),
+            None => {
+                drop(inner);
+                let mut inner = self.inner.write().await;
+                let stack = match inner.entry(function_name.to_owned()) {
+                    Entry::Occupied(o) => o.into_mut().clone(),
+                    Entry::Vacant(v) => {
+                        let stack = v.insert(RequestQueue::new()).clone();
+                        debug!(
+                            ?function_name,
+                            "request stack initialized in first lambda connection"
+                        );
+                        stack
+                    }
+                };
+                drop(inner);
+                stack
+            }
+            Some(s) => {
+                let stack = s.clone();
+                drop(inner);
+                stack
+            }
         };
-        drop(inner);
 
         stack.pop().await
     }
