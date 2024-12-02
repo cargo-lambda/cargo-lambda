@@ -33,10 +33,6 @@ pub struct DeployConfig {
     pub tags: Option<HashMap<String, String>>,
     #[serde(skip)]
     pub use_for_update: bool,
-    #[serde(default)]
-    pub subnet_ids: Option<Vec<String>>,
-    #[serde(default)]
-    pub security_group_ids: Option<Vec<String>>,
     #[serde(default = "default_runtime")]
     pub runtime: String,
     #[serde(default)]
@@ -45,6 +41,36 @@ pub struct DeployConfig {
     pub s3_bucket: Option<String>,
     #[serde(default)]
     pub s3_key: Option<String>,
+    #[serde(flatten)]
+    pub vpc: Option<VpcConfig>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct VpcConfig {
+    #[serde(default)]
+    pub subnet_ids: Option<Vec<String>>,
+    #[serde(default)]
+    pub security_group_ids: Option<Vec<String>>,
+    #[serde(default)]
+    pub ipv6_allowed_for_dual_stack: bool,
+}
+
+impl VpcConfig {
+    pub fn build(
+        subnet_ids: Option<Vec<String>>,
+        security_group_ids: Option<Vec<String>>,
+        ipv6_allowed_for_dual_stack: bool,
+    ) -> Option<Self> {
+        if subnet_ids.is_some() || security_group_ids.is_some() || ipv6_allowed_for_dual_stack {
+            Some(Self {
+                subnet_ids,
+                security_group_ids,
+                ipv6_allowed_for_dual_stack,
+            })
+        } else {
+            None
+        }
+    }
 }
 
 fn default_runtime() -> String {
@@ -124,13 +150,24 @@ pub fn merge_deploy_config(base: &mut DeployConfig, package_deploy: &Option<Depl
     if package_deploy.layers.is_some() {
         base.layers.clone_from(&package_deploy.layers);
     }
-    if package_deploy.subnet_ids.is_some() {
-        base.subnet_ids.clone_from(&package_deploy.subnet_ids);
+
+    if let Some(vpc) = &package_deploy.vpc {
+        let mut base_vpc = base.vpc.clone().unwrap_or_default();
+        if vpc.subnet_ids.is_some() {
+            base_vpc.subnet_ids.clone_from(&vpc.subnet_ids);
+        }
+        if vpc.security_group_ids.is_some() {
+            base_vpc
+                .security_group_ids
+                .clone_from(&vpc.security_group_ids);
+        }
+        if vpc.ipv6_allowed_for_dual_stack {
+            base_vpc.ipv6_allowed_for_dual_stack = vpc.ipv6_allowed_for_dual_stack;
+        }
+
+        base.vpc = Some(base_vpc);
     }
-    if package_deploy.security_group_ids.is_some() {
-        base.security_group_ids
-            .clone_from(&package_deploy.security_group_ids);
-    }
+
     base.runtime.clone_from(&package_deploy.runtime);
     if let Some(package_include) = &package_deploy.include {
         let mut include = base.include.clone().unwrap_or_default();
