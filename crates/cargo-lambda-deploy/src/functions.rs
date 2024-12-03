@@ -4,7 +4,7 @@ use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
 use cargo_lambda_build::BinaryArchive;
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::{
-    cargo::{function_deploy_metadata, DeployConfig},
+    cargo::{function_deploy_metadata, DeployConfig, VpcConfig},
     env::EnvOptions,
     lambda::{Memory, Timeout, Tracing},
 };
@@ -22,7 +22,7 @@ use cargo_lambda_remote::{
         primitives::Blob,
         types::{
             Architecture, Environment, FunctionCode, FunctionConfiguration, FunctionUrlAuthType,
-            LastUpdateStatus, Runtime, State, TracingConfig, VpcConfig,
+            LastUpdateStatus, Runtime, State, TracingConfig, VpcConfig as LambdaVpcConfig,
         },
         Client as LambdaClient,
     },
@@ -82,6 +82,10 @@ pub struct FunctionDeployConfig {
     #[arg(long, value_delimiter = ',')]
     pub security_group_ids: Option<Vec<String>>,
 
+    /// Allow outbound IPv6 traffic on VPC functions that are connected to dual-stack subnets
+    #[arg(long)]
+    pub ipv6_allowed_for_dual_stack: bool,
+
     /// Choose a different Lambda runtime to deploy with.
     /// The only other option that might work is `provided.al2`.
     #[arg(long, default_value = "provided.al2023")]
@@ -94,8 +98,11 @@ impl FunctionDeployConfig {
             iam_role: self.role.clone(),
             tracing: self.tracing.clone().unwrap_or_default(),
             layers: self.layer.clone(),
-            subnet_ids: self.subnet_ids.clone(),
-            security_group_ids: self.security_group_ids.clone(),
+            vpc: VpcConfig::build(
+                self.subnet_ids.clone(),
+                self.security_group_ids.clone(),
+                self.ipv6_allowed_for_dual_stack,
+            ),
             ..Default::default()
         }
     }
@@ -270,14 +277,18 @@ async fn upsert_function(
                 let memory = deploy_metadata.memory.clone().map(Into::into);
                 let timeout = deploy_metadata.timeout.clone().unwrap_or_default().into();
 
-                let result = client
-                    .create_function()
-                    .vpc_config(
-                        VpcConfig::builder()
-                            .set_security_group_ids(deploy_metadata.security_group_ids.clone())
-                            .set_subnet_ids(deploy_metadata.subnet_ids.clone())
+                let mut function = client.create_function();
+                if let Some(vpc) = &deploy_metadata.vpc {
+                    function = function.vpc_config(
+                        LambdaVpcConfig::builder()
+                            .set_security_group_ids(vpc.security_group_ids.clone())
+                            .set_subnet_ids(vpc.subnet_ids.clone())
+                            .ipv6_allowed_for_dual_stack(vpc.ipv6_allowed_for_dual_stack)
                             .build(),
-                    )
+                    );
+                }
+
+                let result = function
                     .runtime(runtime.clone())
                     .handler("bootstrap")
                     .function_name(name)
@@ -390,6 +401,17 @@ async fn upsert_function(
                 if tracing_config.mode != conf.tracing_config.map(|t| t.mode).unwrap_or_default() {
                     update_config = true;
                     builder = builder.tracing_config(tracing_config);
+                }
+
+                if let Some(vpc) = &deploy_metadata.vpc {
+                    update_config = true;
+                    builder = builder.vpc_config(
+                        LambdaVpcConfig::builder()
+                            .set_security_group_ids(vpc.security_group_ids.clone())
+                            .set_subnet_ids(vpc.subnet_ids.clone())
+                            .ipv6_allowed_for_dual_stack(vpc.ipv6_allowed_for_dual_stack)
+                            .build(),
+                    );
                 }
             }
 
@@ -518,16 +540,33 @@ fn merge_configuration(
         deploy_metadata.memory.clone_from(&function_config.memory);
     }
 
-    if function_config.subnet_ids.is_some() {
-        deploy_metadata
-            .subnet_ids
-            .clone_from(&function_config.subnet_ids);
-    }
+    if function_config.security_group_ids.is_some()
+        || function_config.subnet_ids.is_some()
+        || function_config.ipv6_allowed_for_dual_stack
+    {
+        let mut vpc = VpcConfig::default();
+        let mut update_vpc = false;
 
-    if function_config.security_group_ids.is_some() {
-        deploy_metadata
-            .security_group_ids
-            .clone_from(&function_config.security_group_ids);
+        if function_config.subnet_ids.is_some() {
+            vpc.subnet_ids.clone_from(&function_config.subnet_ids);
+            update_vpc = true;
+        }
+
+        if function_config.security_group_ids.is_some() {
+            vpc.security_group_ids
+                .clone_from(&function_config.security_group_ids);
+            update_vpc = true;
+        }
+
+        if function_config.ipv6_allowed_for_dual_stack {
+            vpc.ipv6_allowed_for_dual_stack = true;
+            update_vpc = true;
+        }
+
+        if update_vpc {
+            deploy_metadata.use_for_update = true;
+            deploy_metadata.vpc = Some(vpc);
+        }
     }
 
     if let Some(timeout) = &function_config.timeout {
