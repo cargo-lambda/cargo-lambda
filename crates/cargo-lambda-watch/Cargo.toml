@@ -26,6 +26,7 @@ http-body-util = "0.1"
 http-serde = "2"
 hyper = { version = "1", features = ["full"] }
 hyper-util = { version = "0.1.10", features = ["tokio"] }
+ignore = "0.4.23"
 ignore-files = "=1.2.0"
 miette.workspace = true
 opentelemetry = "0.17.0"
@@ -52,4 +53,3 @@ tracing-opentelemetry = "0.17.2"
 tracing-subscriber.workspace = true
 uuid.workspace = true
 watchexec = "2.3.0"
-watchexec-filterer-ignore = "1.0.0"
