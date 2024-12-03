@@ -1,5 +1,3 @@
-#[cfg(target_os = "linux")]
-use std::env::consts::ARCH;
 use std::{fmt::Display, str::FromStr};
 
 use miette::{Context, IntoDiagnostic, Result};
@@ -78,7 +76,8 @@ impl TargetArch {
 
     #[cfg(target_os = "linux")]
     pub fn is_static_linking(&self) -> bool {
-        self.rustc_target == format!("{}-unknown-linux-musl", ARCH)
+        self.rustc_target == "x86_64-unknown-linux-musl"
+            || self.rustc_target == "aarch64-unknown-linux-musl"
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -191,7 +190,7 @@ mod test {
         assert!(TargetArch::from_str("x86_64-unknown-linux-musl")
             .unwrap()
             .is_static_linking());
-        assert!(!TargetArch::from_str("aarch64-unknown-linux-musl")
+        assert!(TargetArch::from_str("aarch64-unknown-linux-musl")
             .unwrap()
             .is_static_linking());
     }
@@ -202,7 +201,7 @@ mod test {
         assert!(TargetArch::from_str("aarch64-unknown-linux-musl")
             .unwrap()
             .is_static_linking());
-        assert!(!TargetArch::from_str("x86_64-unknown-linux-musl")
+        assert!(TargetArch::from_str("x86_64-unknown-linux-musl")
             .unwrap()
             .is_static_linking());
     }
