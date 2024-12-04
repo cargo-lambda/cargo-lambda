@@ -1,6 +1,7 @@
 use crate::{error::ServerError, requests::NextEvent, state::ExtensionCache};
 use cargo_lambda_metadata::cargo::function_environment_metadata;
-use ignore_files::{IgnoreFile, IgnoreFilter};
+use ignore::create_filter;
+use ignore_files::IgnoreFile;
 use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
 use tracing::{debug, error, trace};
 use watchexec::{
@@ -13,6 +14,8 @@ use watchexec::{
     signal::source::MainSignal,
     ErrorHook, Watchexec,
 };
+
+pub(crate) mod ignore;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct WatcherConfig {
@@ -87,24 +90,10 @@ async fn runtime(
 ) -> Result<RuntimeConfig, ServerError> {
     let mut config = RuntimeConfig::default();
 
-    debug!(ignore_files = ?wc.ignore_files, "creating watcher config");
-
     config.pathset([wc.base.clone()]);
     config.commands(vec![cmd]);
 
-    let mut filter = IgnoreFilter::new(&wc.base, &wc.ignore_files)
-        .await
-        .map_err(ServerError::InvalidIgnoreFiles)?;
-    filter
-        .add_globs(&["target/*", "target*"], Some(&wc.base))
-        .map_err(ServerError::InvalidIgnoreFiles)?;
-
-    if wc.ignore_changes {
-        filter
-            .add_globs(&["**/*"], Some(&wc.base))
-            .map_err(ServerError::InvalidIgnoreFiles)?;
-    }
-    config.filterer(Arc::new(watchexec_filterer_ignore::IgnoreFilterer(filter)));
+    config.filterer(create_filter(&wc.base, &wc.ignore_files, wc.ignore_changes).await?);
 
     config.action_throttle(Duration::from_secs(3));
 

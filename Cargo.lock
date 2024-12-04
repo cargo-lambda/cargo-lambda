@@ -1253,6 +1253,7 @@ dependencies = [
  "http-serde",
  "hyper 1.5.0",
  "hyper-util",
+ "ignore",
  "ignore-files",
  "miette 5.10.0",
  "opentelemetry",
@@ -1273,7 +1274,6 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "watchexec",
- "watchexec-filterer-ignore",
 ]
 
 [[package]]
@@ -6725,19 +6725,6 @@ checksum = "01603bbe02fd75918f010dadad456d47eda14fb8fdcab276b0b4b8362f142ae3"
 dependencies = [
  "nix",
  "notify",
- "watchexec-signals",
-]
-
-[[package]]
-name = "watchexec-filterer-ignore"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b77dba02357d16307c4c53d252a59d08cece5e274314956e0aa0160ff721b08"
-dependencies = [
- "ignore",
- "ignore-files",
- "tracing",
- "watchexec",
  "watchexec-signals",
 ]
 
