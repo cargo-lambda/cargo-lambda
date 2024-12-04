@@ -277,14 +277,17 @@ fn find_local_zip_file(value: &str) -> Option<PathBuf> {
     None
 }
 
-fn match_git_http_url(path: &str) -> Option<GitRepo> {
+fn match_git_http_url(original: &str) -> Option<GitRepo> {
+    let uri = translate_shortcut(original);
+    let uri = uri.as_deref().unwrap_or(original);
+
     let repo_regex = regex::Regex::new(
         r"https://(?P<host>[a-zA-Z0-9.-]+)/(?P<repo>[a-zA-Z0-9][a-zA-Z0-9_-]+/[a-zA-Z0-9][a-zA-Z0-9_-]+)/?((branch|tag|tree)/(?P<ref>.+))?$",
     )
     .into_diagnostic()
     .expect("invalid HTTP regex");
 
-    let caps = repo_regex.captures(path)?;
+    let caps = repo_regex.captures(uri)?;
 
     let host = caps.name("host")?;
     let repo = caps.name("repo")?;
@@ -360,6 +363,18 @@ fn clone_git_repo(repo: &GitRepo, path: &Path) -> Result<()> {
 fn cleanup_tmp_dir(path: &Path) {
     let _ = remove_dir_all(path.join(".git"));
     let _ = remove_file(path.join("cargo-lambda-template.zip"));
+}
+
+fn translate_shortcut(uri: &str) -> Option<String> {
+    if uri.starts_with("gh:") {
+        Some(uri.replace("gh:", "https://github.com/"))
+    } else if uri.starts_with("gl:") {
+        Some(uri.replace("gl:", "https://gitlab.com/"))
+    } else if uri.starts_with("bb:") {
+        Some(uri.replace("bb:", "https://bitbucket.org/"))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -439,6 +454,13 @@ mod test {
         let repo =
             match_git_http_url("https://github.com/cargo-lambda/cargo-lambda/tree/main").unwrap();
         assert_eq!(Some("main".into()), repo.reference);
+
+        let repo = match_git_http_url("gh:cargo-lambda/cargo-lambda").unwrap();
+        assert_eq!("github.com", repo.host);
+        assert_eq!("cargo-lambda/cargo-lambda", repo.repo);
+        assert_eq!(None, repo.reference);
+        assert_eq!(GitProtocol::Http, repo.protocol);
+        assert_eq!(None, repo.auth_user);
     }
 
     #[test]
@@ -583,5 +605,21 @@ mod test {
 
         let root = TemplateRoot::TempDir((tmpdir, Some(base.clone())));
         assert_eq!(root.final_path(), base.join("template"));
+    }
+
+    #[test]
+    fn test_translate_shortcut() {
+        assert_eq!(
+            Some("https://github.com/cargo-lambda/cargo-lambda".into()),
+            translate_shortcut("gh:cargo-lambda/cargo-lambda")
+        );
+        assert_eq!(
+            Some("https://gitlab.com/cargo-lambda/cargo-lambda".into()),
+            translate_shortcut("gl:cargo-lambda/cargo-lambda")
+        );
+        assert_eq!(
+            Some("https://bitbucket.org/cargo-lambda/cargo-lambda".into()),
+            translate_shortcut("bb:cargo-lambda/cargo-lambda")
+        );
     }
 }

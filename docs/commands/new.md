@@ -50,6 +50,12 @@ cargo lambda new \
     new-project
 ```
 
+:::tip
+
+You can use shortcuts like `gh:`, `gl:`, or `bb:` to refer to GitHub, GitLab, and Bitbucket repositories. For example, `cargo lambda new --template gh:calavera/custom-template new-project` is equivalent to `cargo lambda new --template https://github.com/calavera/custom-template new-project`.
+
+:::
+
 ### Private template repositories
 
 If you want to use a template that's in a private repository, Cargo Lambda uses the same method as `git clone` to download the repository. This means that you need to have access to the repository and that you need to have the credentials to access it configured in your machine.
