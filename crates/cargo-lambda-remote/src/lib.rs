@@ -7,35 +7,45 @@ use aws_config::{
 };
 use aws_types::{region::Region, SdkConfig};
 use clap::Args;
-
+use serde::{ser::SerializeStruct, Deserialize, Serialize};
 pub mod tls;
 
 const DEFAULT_REGION: &str = "us-east-1";
 
-#[derive(Args, Clone, Debug)]
+#[derive(Args, Clone, Debug, Default, Deserialize, Serialize)]
 pub struct RemoteConfig {
     /// AWS configuration profile to use for authorization
     #[arg(short, long)]
+    #[serde(default)]
     pub profile: Option<String>,
 
     /// AWS region to deploy, if there is no default
     #[arg(short, long)]
+    #[serde(default)]
     pub region: Option<String>,
 
     /// AWS Lambda alias to associate the function to
     #[arg(short, long)]
+    #[serde(default)]
     pub alias: Option<String>,
 
     /// Number of attempts to try failed operations
     #[arg(long, default_value = "1")]
-    retry_attempts: u32,
+    #[serde(default)]
+    pub retry_attempts: Option<u32>,
 
     /// Custom endpoint URL to target
     #[arg(long)]
+    #[serde(default)]
     pub endpoint_url: Option<String>,
 }
 
 impl RemoteConfig {
+    fn retry_policy(&self) -> RetryConfig {
+        let attempts = self.retry_attempts.unwrap_or(1);
+        RetryConfig::standard().with_max_attempts(attempts)
+    }
+
     pub async fn sdk_config(&self, retry: Option<RetryConfig>) -> SdkConfig {
         let explicit_region = self.region.clone().map(Region::new);
 
@@ -43,8 +53,7 @@ impl RemoteConfig {
             .or_default_provider()
             .or_else(Region::new(DEFAULT_REGION));
 
-        let retry =
-            retry.unwrap_or_else(|| RetryConfig::standard().with_max_attempts(self.retry_attempts));
+        let retry = retry.unwrap_or_else(|| self.retry_policy());
         let mut config_loader = if let Some(ref endpoint_url) = self.endpoint_url {
             aws_config::defaults(BehaviorVersion::latest())
                 .endpoint_url(endpoint_url)
@@ -78,6 +87,40 @@ impl RemoteConfig {
         }
 
         config_loader.load().await
+    }
+
+    pub fn count_fields(&self) -> usize {
+        self.profile.is_some() as usize
+            + self.region.is_some() as usize
+            + self.alias.is_some() as usize
+            + self.retry_attempts.is_some() as usize
+            + self.endpoint_url.is_some() as usize
+    }
+
+    pub fn serialize_fields<S>(
+        &self,
+        state: &mut <S as serde::Serializer>::SerializeStruct,
+    ) -> Result<(), S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if let Some(ref profile) = self.profile {
+            state.serialize_field("profile", profile)?;
+        }
+        if let Some(ref region) = self.region {
+            state.serialize_field("region", region)?;
+        }
+        if let Some(ref alias) = self.alias {
+            state.serialize_field("alias", alias)?;
+        }
+        if let Some(ref retry_attempts) = self.retry_attempts {
+            state.serialize_field("retry_attempts", retry_attempts)?;
+        }
+        if let Some(ref endpoint_url) = self.endpoint_url {
+            state.serialize_field("endpoint_url", endpoint_url)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -116,7 +159,7 @@ mod tests {
             profile: Some("durian".to_owned()),
             region: None,
             alias: None,
-            retry_attempts: 1,
+            retry_attempts: Some(1),
             endpoint_url: None,
         };
 
@@ -143,7 +186,7 @@ mod tests {
             profile: Some("cherry".to_owned()),
             region: None,
             alias: None,
-            retry_attempts: 1,
+            retry_attempts: Some(1),
             endpoint_url: None,
         };
 
@@ -171,7 +214,7 @@ mod tests {
             profile: Some("apple".to_owned()),
             region: None,
             alias: None,
-            retry_attempts: 1,
+            retry_attempts: Some(1),
             endpoint_url: None,
         };
 
@@ -199,7 +242,7 @@ mod tests {
             profile: Some("banana".to_owned()),
             region: None,
             alias: None,
-            retry_attempts: 1,
+            retry_attempts: Some(1),
             endpoint_url: None,
         };
 
@@ -227,7 +270,7 @@ mod tests {
             profile: None,
             region: None,
             alias: None,
-            retry_attempts: 1,
+            retry_attempts: Some(1),
             endpoint_url: None,
         };
 

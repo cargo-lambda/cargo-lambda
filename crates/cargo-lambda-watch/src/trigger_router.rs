@@ -462,7 +462,7 @@ mod test {
 
     use super::extract_path_parameters;
     use cargo_lambda_metadata::{
-        cargo::{FunctionRouter, FunctionRoutes},
+        cargo::watch::{FunctionRouter, FunctionRoutes},
         DEFAULT_PACKAGE_FUNCTION,
     };
     use http::Method;

@@ -1,36 +1,37 @@
 pub use cargo_metadata::{
     Metadata as CargoMetadata, Package as CargoPackage, Target as CargoTarget,
 };
+use cargo_options::CommonOptions;
 use miette::Result;
-use serde::Deserialize;
+use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
     fs::{metadata, read_to_string},
     path::{Path, PathBuf},
 };
-use tracing::{debug, enabled, trace, Level};
+use tracing::{enabled, trace, Level};
 
 use crate::error::MetadataError;
 
-mod build;
-pub use build::*;
+pub mod build;
+use build::Build;
 
-mod deploy;
-pub use deploy::*;
+pub mod deploy;
+use deploy::Deploy;
 
-mod profile;
-pub use profile::*;
+pub mod profile;
+use profile::CargoProfile;
 
-mod watch;
-pub use watch::*;
-
+pub mod watch;
+use watch::Watch;
 const STRIP_CONFIG: &str = "profile.release.strip=\"symbols\"";
 const LTO_CONFIG: &str = "profile.release.lto=\"thin\"";
 const CODEGEN_CONFIG: &str = "profile.release.codegen-units=1";
 const PANIC_CONFIG: &str = "profile.release.panic=\"abort\"";
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[non_exhaustive]
 pub struct Metadata {
     #[serde(default)]
@@ -39,7 +40,7 @@ pub struct Metadata {
     profile: Option<CargoProfile>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[non_exhaustive]
 pub struct LambdaMetadata {
     #[serde(flatten)]
@@ -48,17 +49,17 @@ pub struct LambdaMetadata {
     pub bin: HashMap<String, PackageMetadata>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[non_exhaustive]
 pub struct PackageMetadata {
     #[serde(default)]
     pub env: HashMap<String, String>,
     #[serde(default)]
-    pub deploy: Option<DeployConfig>,
+    pub deploy: Option<Deploy>,
     #[serde(default)]
-    pub build: BuildConfig,
+    pub build: Option<Build>,
     #[serde(default)]
-    pub watch: Option<WatchConfig>,
+    pub watch: Option<Watch>,
 }
 
 /// Extract all the binary target names from a Cargo.toml file
@@ -145,11 +146,6 @@ where
 /// This fetches the target directory from `cargo metadata`, resolving the
 /// user and project configuration and the environment variables in the right
 /// way.
-pub fn target_dir<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<PathBuf> {
-    let metadata = load_metadata(manifest_path)?;
-    Ok(metadata.target_directory.into_std_path_buf())
-}
-
 pub fn target_dir_from_metadata(metadata: &CargoMetadata) -> Result<PathBuf> {
     Ok(metadata.target_directory.clone().into_std_path_buf())
 }
@@ -230,69 +226,10 @@ pub fn load_metadata<P: AsRef<Path> + Debug>(
     Ok(meta)
 }
 
-/// Create a HashMap of environment varibales from the package and workspace manifest
-/// See the documentation to learn about how we use this metadata:
-/// https://www.cargo-lambda.info/commands/watch.html#environment-variables
-#[tracing::instrument(target = "cargo_lambda")]
-pub fn function_environment_metadata<P: AsRef<Path> + Debug>(
-    manifest_path: P,
-    name: Option<&str>,
-) -> Result<HashMap<String, String>> {
-    let metadata = load_metadata(manifest_path)?;
-    let ws_metadata: LambdaMetadata =
-        serde_json::from_value(metadata.workspace_metadata).unwrap_or_default();
-
-    let mut env = HashMap::new();
-    env.extend(ws_metadata.package.env);
-
-    if let Some(name) = name {
-        if let Some(res) = ws_metadata.bin.get(name) {
-            env.extend(res.env.clone());
-        }
-    }
-
-    for pkg in &metadata.packages {
-        let name = name.unwrap_or(&pkg.name);
-
-        for target in &pkg.targets {
-            let target_matches = target.name == name
-                && target.kind.iter().any(|kind| kind == "bin")
-                && pkg.metadata.is_object();
-
-            debug!(
-                name = name,
-                target_name = ?target.name,
-                target_kind = ?target.kind,
-                metadata_object = pkg.metadata.is_object(),
-                target_matches = target_matches,
-                "searching package metadata"
-            );
-
-            if target_matches {
-                let package_metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
-                    .map_err(MetadataError::InvalidCargoMetadata)?;
-
-                env.extend(package_metadata.lambda.package.env);
-                if let Some(res) = package_metadata.lambda.bin.get(name) {
-                    env.extend(res.env.clone());
-                }
-            }
-        }
-    }
-
-    debug!(env = ?env, "using environment variables from metadata");
-    Ok(env)
-}
-
 /// Load the main binary in the project.
 /// It returns an error if the project includes from than one binary.
 /// Use this function when the user didn't provide any funcion name
 /// assuming that there is only one binary in the project
-pub fn main_binary<P: AsRef<Path> + Debug>(manifest_path: P) -> Result<String, MetadataError> {
-    let metadata = load_metadata(manifest_path)?;
-    main_binary_from_metadata(&metadata)
-}
-
 pub fn main_binary_from_metadata(metadata: &CargoMetadata) -> Result<String, MetadataError> {
     let targets = binary_targets_from_metadata(metadata, false);
     if targets.len() > 1 {
@@ -313,25 +250,135 @@ fn is_project_metadata_ok(path: &Path) -> bool {
     path.is_dir() && metadata(path).is_ok()
 }
 
+pub(crate) fn serialize_common_options<S>(
+    state: &mut <S as serde::Serializer>::SerializeStruct,
+    opts: &CommonOptions,
+) -> Result<(), S::Error>
+where
+    S: serde::Serializer,
+{
+    if opts.quiet {
+        state.serialize_field("quiet", &true)?;
+    }
+    if let Some(jobs) = opts.jobs {
+        state.serialize_field("jobs", &jobs)?;
+    }
+    if opts.keep_going {
+        state.serialize_field("keep_going", &true)?;
+    }
+    if let Some(profile) = &opts.profile {
+        state.serialize_field("profile", profile)?;
+    }
+    if !opts.features.is_empty() {
+        state.serialize_field("features", &opts.features)?;
+    }
+    if opts.all_features {
+        state.serialize_field("all_features", &true)?;
+    }
+    if opts.no_default_features {
+        state.serialize_field("no_default_features", &true)?;
+    }
+    if !opts.target.is_empty() {
+        state.serialize_field("target", &opts.target)?;
+    }
+    if let Some(target_dir) = &opts.target_dir {
+        state.serialize_field("target_dir", target_dir)?;
+    }
+    if !opts.message_format.is_empty() {
+        state.serialize_field("message_format", &opts.message_format)?;
+    }
+    if opts.verbose > 0 {
+        state.serialize_field("verbose", &opts.verbose)?;
+    }
+    if let Some(color) = &opts.color {
+        state.serialize_field("color", color)?;
+    }
+    if opts.frozen {
+        state.serialize_field("frozen", &true)?;
+    }
+    if opts.locked {
+        state.serialize_field("locked", &true)?;
+    }
+    if opts.offline {
+        state.serialize_field("offline", &true)?;
+    }
+    if !opts.config.is_empty() {
+        state.serialize_field("config", &opts.config)?;
+    }
+    if !opts.unstable_flags.is_empty() {
+        state.serialize_field("unstable_flags", &opts.unstable_flags)?;
+    }
+    if let Some(timings) = &opts.timings {
+        state.serialize_field("timings", timings)?;
+    }
+
+    Ok(())
+}
+
+pub(crate) fn count_common_options(opts: &CommonOptions) -> usize {
+    opts.quiet as usize
+        + opts.jobs.is_some() as usize
+        + opts.keep_going as usize
+        + opts.profile.is_some() as usize
+        + !opts.features.is_empty() as usize
+        + opts.all_features as usize
+        + opts.no_default_features as usize
+        + !opts.target.is_empty() as usize
+        + opts.target_dir.is_some() as usize
+        + !opts.message_format.is_empty() as usize
+        + (opts.verbose > 0) as usize
+        + opts.color.is_some() as usize
+        + opts.frozen as usize
+        + opts.locked as usize
+        + opts.offline as usize
+        + !opts.config.is_empty() as usize
+        + !opts.unstable_flags.is_empty() as usize
+        + opts.timings.is_some() as usize
+}
+
+pub(crate) fn deserialize_vec_or_map<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+
+    match value {
+        Value::Array(arr) => {
+            let el = arr
+                .into_iter()
+                .map(|v| v.as_str().map(String::from))
+                .collect::<Option<Vec<_>>>();
+            Ok(el)
+        }
+        Value::Object(map) => {
+            let el = map
+                .into_iter()
+                .map(|(k, v)| format!("{}={}", k, v.as_str().unwrap_or("")))
+                .collect();
+            Ok(Some(el))
+        }
+        _ => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::path::PathBuf;
+    use crate::tests::fixture_metadata;
 
-    pub fn fixture(name: &str) -> PathBuf {
-        format!("../../tests/fixtures/{name}/Cargo.toml").into()
-    }
+    use super::*;
 
     #[test]
     fn test_binary_packages() {
-        let bins = binary_targets(fixture("single-binary-package"), false).unwrap();
+        let bins = binary_targets(fixture_metadata("single-binary-package"), false).unwrap();
         assert_eq!(1, bins.len());
         assert!(bins.contains("basic-lambda"));
     }
 
     #[test]
     fn test_binary_packages_with_mutiple_bin_entries() {
-        let bins = binary_targets(fixture("multi-binary-package"), false).unwrap();
+        let bins = binary_targets(fixture_metadata("multi-binary-package"), false).unwrap();
         assert_eq!(5, bins.len());
         assert!(bins.contains("delete-product"));
         assert!(bins.contains("get-product"));
@@ -342,7 +389,7 @@ mod tests {
 
     #[test]
     fn test_binary_packages_with_workspace() {
-        let bins = binary_targets(fixture("workspace-package"), false).unwrap();
+        let bins = binary_targets(fixture_metadata("workspace-package"), false).unwrap();
         assert_eq!(3, bins.len());
         assert!(bins.contains("basic-lambda-1"));
         assert!(bins.contains("basic-lambda-2"));
@@ -351,126 +398,40 @@ mod tests {
 
     #[test]
     fn test_binary_packages_with_mixed_workspace() {
-        let bins = binary_targets(fixture("mixed-workspace-package"), false).unwrap();
+        let bins = binary_targets(fixture_metadata("mixed-workspace-package"), false).unwrap();
         assert_eq!(1, bins.len());
         assert!(bins.contains("function-crate"), "{:?}", bins);
     }
 
     #[test]
     fn test_binary_packages_with_missing_binary_info() {
-        let err = binary_targets(fixture("missing-binary-package"), false).unwrap_err();
+        let err = binary_targets(fixture_metadata("missing-binary-package"), false).unwrap_err();
         assert!(err
             .to_string()
             .contains("a [lib] section, or [[bin]] section must be present"));
     }
 
     #[test]
-    fn test_metadata_packages() {
-        let env =
-            function_environment_metadata(fixture("single-binary-package"), Some("basic-lambda"))
-                .unwrap();
-
-        assert_eq!(env.get("FOO").unwrap(), "BAR");
-    }
-
-    #[test]
-    fn test_metadata_multi_packages() {
-        let env =
-            function_environment_metadata(fixture("multi-binary-package"), Some("get-product"))
-                .unwrap();
-
-        assert_eq!(env.get("FOO").unwrap(), "BAR");
-
-        let env =
-            function_environment_metadata(fixture("multi-binary-package"), Some("delete-product"))
-                .unwrap();
-
-        assert_eq!(env.get("BAZ").unwrap(), "QUX");
-    }
-
-    #[test]
-    fn test_invalid_metadata() {
-        let result =
-            function_environment_metadata(fixture("missing-binary-package"), Some("get-products"));
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_metadata_workspace_packages() {
-        let env =
-            function_environment_metadata(fixture("workspace-package"), Some("basic-lambda-1"))
-                .unwrap();
-
-        assert_eq!(env.get("FOO").unwrap(), "BAR");
-
-        let env =
-            function_environment_metadata(fixture("workspace-package"), Some("basic-lambda-2"))
-                .unwrap();
-
-        assert_eq!(env.get("FOO").unwrap(), "BAR");
-    }
-
-    #[test]
-    fn test_metadata_packages_without_name() {
-        let env = function_environment_metadata(fixture("single-binary-package"), None).unwrap();
-
-        assert_eq!(env.get("FOO").unwrap(), "BAR");
-    }
-
-    #[test]
-    #[ignore = "changing the environment is not reliable"]
-    fn test_target_dir_non_set() {
-        std::env::remove_var("CARGO_TARGET_DIR");
-        let target_dir = target_dir(fixture("single-binary-package")).unwrap();
-        assert!(
-            target_dir.ends_with("tests/fixtures/single-binary-package/target"),
-            "unexpected directory {:?}",
-            target_dir
-        );
-    }
-
-    #[test]
-    #[ignore = "changing the environment is not reliable"]
-    fn test_target_dir_from_project_config() {
-        std::env::remove_var("CARGO_TARGET_DIR");
-        let target_dir = target_dir(fixture("target-dir-set-in-project")).unwrap();
-        assert!(
-            target_dir.ends_with("project_specific_target"),
-            "unexpected directory {:?}",
-            target_dir
-        );
-    }
-
-    #[test]
-    #[ignore = "changing the environment is not reliable"]
-    fn test_target_dir_from_env() {
-        std::env::set_var("CARGO_TARGET_DIR", "/tmp/exotic_path");
-        let target_dir = target_dir(fixture("single-binary-package")).unwrap();
-        assert!(
-            target_dir.ends_with("/tmp/exotic_path"),
-            "unexpected directory {:?}",
-            target_dir
-        );
-    }
-
-    #[test]
     fn test_main_binary_with_package_name() {
-        let manifest_path = fixture("single-binary-package");
-        let name = main_binary(manifest_path).unwrap();
+        let manifest_path = fixture_metadata("single-binary-package");
+        let metadata = load_metadata(manifest_path).unwrap();
+        let name = main_binary_from_metadata(&metadata).unwrap();
         assert_eq!("basic-lambda", name);
     }
 
     #[test]
     fn test_main_binary_with_binary_name() {
-        let manifest_path = fixture("single-binary-different-name");
-        let name = main_binary(manifest_path).unwrap();
+        let manifest_path = fixture_metadata("single-binary-different-name");
+        let metadata = load_metadata(manifest_path).unwrap();
+        let name = main_binary_from_metadata(&metadata).unwrap();
         assert_eq!("basic-lambda-binary", name);
     }
 
     #[test]
     fn test_main_binary_multi_binaries() {
-        let manifest_path = fixture("multi-binary-package");
-        let err = main_binary(manifest_path).unwrap_err();
+        let manifest_path = fixture_metadata("multi-binary-package");
+        let metadata = load_metadata(manifest_path).unwrap();
+        let err = main_binary_from_metadata(&metadata).unwrap_err();
         assert_eq!(
             "there are more than one binary in the project, please specify a binary name with --binary-name or --binary-path. This is the list of binaries I found: delete-product, dynamodb-streams, get-product, get-products, put-product",
             err.to_string()
@@ -479,7 +440,7 @@ mod tests {
 
     #[test]
     fn test_example_packages() {
-        let bins = binary_targets(fixture("examples-package"), true).unwrap();
+        let bins = binary_targets(fixture_metadata("examples-package"), true).unwrap();
         assert_eq!(1, bins.len());
         assert!(bins.contains("example-lambda"));
     }

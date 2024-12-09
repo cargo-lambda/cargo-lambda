@@ -145,8 +145,8 @@ impl Invoke {
                         .into_diagnostic()
                         .wrap_err("error reading data file")?
                 }
-                _ if self.skip_cache => download_example(&name, None).await?,
-                _ => download_example(&name, cache).await?,
+                _ if self.skip_cache => download_example(&name, None, None).await?,
+                _ => download_example(&name, cache, None).await?,
             }
         } else {
             return Err(InvokeError::MissingPayload.into());
@@ -300,8 +300,13 @@ fn example_name(example: &str) -> String {
     name
 }
 
-async fn download_example(name: &str, cache: Option<PathBuf>) -> Result<String> {
-    let target = format!("{EXAMPLES_URL}/{name}");
+async fn download_example(
+    name: &str,
+    cache: Option<PathBuf>,
+    authority: Option<&str>,
+) -> Result<String> {
+    let authority = authority.unwrap_or(EXAMPLES_URL);
+    let target = format!("{authority}/{name}");
 
     tracing::debug!(?target, "downloading remote example");
     let response = reqwest::get(&target)
@@ -341,14 +346,64 @@ fn parse_invoke_ip_address(address: &str) -> Result<String> {
 
 #[cfg(test)]
 mod test {
+    use httpmock::MockServer;
+
     use super::*;
 
     #[tokio::test]
     async fn test_download_example() {
-        let data = download_example("example-apigw-request.json", None)
-            .await
-            .expect("failed to download json");
+        let server = MockServer::start_async().await;
+
+        let mock = server.mock(|when, then| {
+            when.path("/example-apigw-request.json");
+            then.status(200)
+                .header("Content-Type", "application/json")
+                .body_from_file("../../tests/fixtures/events/example-apigw-request.json");
+        });
+
+        let data = download_example(
+            "example-apigw-request.json",
+            None,
+            Some(&format!("http://{}", server.address())),
+        )
+        .await
+        .expect("failed to download json");
+
+        mock.assert();
         assert!(data.contains("\"path\": \"/hello/world\""));
+    }
+
+    #[tokio::test]
+    async fn test_download_example_with_cache() {
+        let server = MockServer::start_async().await;
+
+        let mock = server.mock(|when, then| {
+            when.path("/example-apigw-request.json");
+            then.status(200)
+                .header("Content-Type", "application/json")
+                .body_from_file("../../tests/fixtures/events/example-apigw-request.json");
+        });
+
+        let cache = tempfile::TempDir::new()
+            .unwrap()
+            .path()
+            .join("cargo-lambda")
+            .join("example-apigw-request.json");
+
+        let data = download_example(
+            "example-apigw-request.json",
+            Some(cache.to_path_buf()),
+            Some(&format!("http://{}", server.address())),
+        )
+        .await
+        .unwrap();
+
+        mock.assert();
+        assert!(data.contains("\"path\": \"/hello/world\""));
+        assert!(cache.exists());
+
+        let content = read_to_string(cache).unwrap();
+        assert_eq!(content, data);
     }
 
     #[test]

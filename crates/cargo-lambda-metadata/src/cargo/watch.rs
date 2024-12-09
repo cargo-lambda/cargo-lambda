@@ -1,12 +1,226 @@
-use std::collections::HashMap;
+use cargo_options::Run;
+use clap::Args;
+use matchit::{InsertError, MatchError, Router};
+use serde::{
+    de::{Error, Visitor},
+    ser::SerializeSeq,
+    Deserialize, Serialize,
+};
+use serde_json::{json, Value};
+use std::{collections::HashMap, path::PathBuf};
 
-use cargo_metadata::Metadata as CargoMetadata;
-use matchit::{InsertError, MatchError, MergeError, Router};
-use serde::Deserialize;
+use crate::{
+    cargo::{count_common_options, serialize_common_options},
+    env::{EnvOptions, Environment},
+    error::MetadataError,
+    lambda::Timeout,
+};
 
-use crate::{cargo::Metadata, error::MetadataError};
+use cargo_lambda_remote::tls::TlsOptions;
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[cfg(windows)]
+const DEFAULT_INVOKE_ADDRESS: &str = "127.0.0.1";
+
+#[cfg(not(windows))]
+const DEFAULT_INVOKE_ADDRESS: &str = "::";
+
+const DEFAULT_INVOKE_PORT: u16 = 9000;
+
+#[derive(Args, Clone, Debug, Default, Deserialize)]
+#[command(
+    name = "watch",
+    visible_alias = "start",
+    after_help = "Full command documentation: https://www.cargo-lambda.info/commands/watch.html"
+)]
+pub struct Watch {
+    /// Ignore any code changes, and don't reload the function automatically
+    #[arg(long, visible_alias = "no-reload")]
+    #[serde(default)]
+    pub ignore_changes: bool,
+
+    /// Start the Lambda runtime APIs without starting the function.
+    /// This is useful if you start (and debug) your function in your IDE.
+    #[arg(long)]
+    #[serde(default)]
+    pub only_lambda_apis: bool,
+
+    #[arg(short = 'a', long, default_value = DEFAULT_INVOKE_ADDRESS)]
+    #[serde(default = "default_invoke_address")]
+    /// Address where users send invoke requests
+    pub invoke_address: String,
+
+    /// Address port where users send invoke requests
+    #[arg(short = 'p', long, default_value_t = DEFAULT_INVOKE_PORT)]
+    #[serde(default = "default_invoke_port")]
+    pub invoke_port: u16,
+
+    /// Print OpenTelemetry traces after each function invocation
+    #[arg(long)]
+    #[serde(default)]
+    pub print_traces: bool,
+
+    /// Wait for the first invocation to compile the function
+    #[arg(long, short)]
+    #[serde(default)]
+    pub wait: bool,
+
+    /// Disable the default CORS configuration
+    #[arg(long)]
+    #[serde(default)]
+    pub disable_cors: bool,
+
+    /// How long the invoke request waits for a response
+    #[arg(long)]
+    #[serde(default)]
+    pub timeout: Option<Timeout>,
+
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub cargo_opts: Run,
+
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub env_options: EnvOptions,
+
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub tls_options: TlsOptions,
+
+    #[arg(skip)]
+    #[serde(default)]
+    pub router: Option<FunctionRouter>,
+}
+
+impl Watch {
+    pub fn manifest_path(&self) -> PathBuf {
+        self.cargo_opts
+            .manifest_path
+            .clone()
+            .unwrap_or_else(|| "Cargo.toml".into())
+    }
+
+    /// Returns the package name if there is only one package in the list of `packages`,
+    /// otherwise None.
+    pub fn package(&self) -> Option<String> {
+        if self.cargo_opts.packages.len() > 1 {
+            return None;
+        }
+        self.cargo_opts.packages.first().map(|s| s.to_string())
+    }
+
+    pub fn lambda_environment(
+        &self,
+        base: &HashMap<String, String>,
+    ) -> Result<Environment, MetadataError> {
+        self.env_options.lambda_environment(base)
+    }
+}
+
+impl Serialize for Watch {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        // Count non-empty fields
+        let field_count = self.ignore_changes as usize
+            + self.only_lambda_apis as usize
+            + !self.invoke_address.is_empty() as usize
+            + (self.invoke_port != 0) as usize
+            + self.print_traces as usize
+            + self.wait as usize
+            + self.disable_cors as usize
+            + self.timeout.is_some() as usize
+            + self.router.is_some() as usize
+            + self.cargo_opts.manifest_path.is_some() as usize
+            + self.cargo_opts.release as usize
+            + self.cargo_opts.ignore_rust_version as usize
+            + self.cargo_opts.unit_graph as usize
+            + !self.cargo_opts.packages.is_empty() as usize
+            + !self.cargo_opts.bin.is_empty() as usize
+            + !self.cargo_opts.example.is_empty() as usize
+            + !self.cargo_opts.args.is_empty() as usize
+            + count_common_options(&self.cargo_opts.common)
+            + self.env_options.count_fields()
+            + self.tls_options.count_fields();
+
+        let mut state = serializer.serialize_struct("Watch", field_count)?;
+
+        // Only serialize bool fields that are true
+        if self.ignore_changes {
+            state.serialize_field("ignore_changes", &true)?;
+        }
+        if self.only_lambda_apis {
+            state.serialize_field("only_lambda_apis", &true)?;
+        }
+        if !self.invoke_address.is_empty() {
+            state.serialize_field("invoke_address", &self.invoke_address)?;
+        }
+        if self.invoke_port != 0 {
+            state.serialize_field("invoke_port", &self.invoke_port)?;
+        }
+        if self.print_traces {
+            state.serialize_field("print_traces", &true)?;
+        }
+        if self.wait {
+            state.serialize_field("wait", &true)?;
+        }
+        if self.disable_cors {
+            state.serialize_field("disable_cors", &true)?;
+        }
+
+        // Only serialize Some values for Options
+        if let Some(timeout) = &self.timeout {
+            state.serialize_field("timeout", timeout)?;
+        }
+        if let Some(router) = &self.router {
+            state.serialize_field("router", router)?;
+        }
+
+        // Flatten the fields from cargo_opts and env_options
+        self.env_options.serialize_fields::<S>(&mut state)?;
+        self.tls_options.serialize_fields::<S>(&mut state)?;
+
+        if let Some(manifest_path) = &self.cargo_opts.manifest_path {
+            state.serialize_field("manifest_path", manifest_path)?;
+        }
+        if self.cargo_opts.release {
+            state.serialize_field("release", &true)?;
+        }
+        if self.cargo_opts.ignore_rust_version {
+            state.serialize_field("ignore_rust_version", &true)?;
+        }
+        if self.cargo_opts.unit_graph {
+            state.serialize_field("unit_graph", &true)?;
+        }
+        if !self.cargo_opts.packages.is_empty() {
+            state.serialize_field("packages", &self.cargo_opts.packages)?;
+        }
+        if !self.cargo_opts.bin.is_empty() {
+            state.serialize_field("bin", &self.cargo_opts.bin)?;
+        }
+        if !self.cargo_opts.example.is_empty() {
+            state.serialize_field("example", &self.cargo_opts.example)?;
+        }
+        if !self.cargo_opts.args.is_empty() {
+            state.serialize_field("args", &self.cargo_opts.args)?;
+        }
+        serialize_common_options::<S>(&mut state, &self.cargo_opts.common)?;
+
+        state.end()
+    }
+}
+
+fn default_invoke_address() -> String {
+    DEFAULT_INVOKE_ADDRESS.to_string()
+}
+
+fn default_invoke_port() -> u16 {
+    DEFAULT_INVOKE_PORT
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct WatchConfig {
     pub router: Option<FunctionRouter>,
 }
@@ -14,6 +228,7 @@ pub struct WatchConfig {
 #[derive(Clone, Debug, Default)]
 pub struct FunctionRouter {
     inner: Router<FunctionRoutes>,
+    pub(crate) raw: Vec<(String, FunctionRoutes)>,
 }
 
 impl FunctionRouter {
@@ -42,21 +257,66 @@ impl FunctionRoutes {
     }
 }
 
+struct FunctionRouterVisitor;
+
+impl<'de> Visitor<'de> for FunctionRouterVisitor {
+    type Value = FunctionRouter;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a map or sequence of function routes")
+    }
+
+    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        let routes: HashMap<String, FunctionRoutes> =
+            Deserialize::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
+        let mut inner = Router::new();
+
+        for (path, route) in &routes {
+            inner.insert(path, route.clone()).map_err(|e| {
+                serde::de::Error::custom(format!("Failed to insert route {path}: {e}"))
+            })?;
+        }
+
+        let raw: Vec<(String, FunctionRoutes)> = routes.into_iter().collect();
+        Ok(FunctionRouter { inner, raw })
+    }
+
+    fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
+        let raw: Vec<(String, FunctionRoutes)> =
+            Deserialize::deserialize(serde::de::value::SeqAccessDeserializer::new(seq))?;
+        let mut inner = Router::new();
+
+        for (path, route) in &raw {
+            inner.insert(path, route.clone()).map_err(|e| {
+                serde::de::Error::custom(format!("Failed to insert route {path}: {e}"))
+            })?;
+        }
+
+        Ok(FunctionRouter { inner, raw })
+    }
+}
+
 impl<'de> Deserialize<'de> for FunctionRouter {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let routes = HashMap::<String, FunctionRoutes>::deserialize(deserializer)?;
-        let mut inner = Router::new();
+        deserializer.deserialize_any(FunctionRouterVisitor)
+    }
+}
 
-        for (path, route) in routes {
-            inner.insert(&path, route).map_err(|e| {
-                serde::de::Error::custom(format!("Failed to insert route {path}: {e}"))
-            })?;
-        }
-
-        Ok(FunctionRouter { inner })
+impl Serialize for FunctionRouter {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.raw.serialize(serializer)
     }
 }
 
@@ -65,9 +325,6 @@ impl<'de> Deserialize<'de> for FunctionRoutes {
     where
         D: serde::Deserializer<'de>,
     {
-        use serde::de::Error;
-        use serde_json::Value;
-
         let value = Value::deserialize(deserializer)?;
         match value {
             Value::String(s) => Ok(FunctionRoutes::Single(s)),
@@ -99,52 +356,33 @@ impl<'de> Deserialize<'de> for FunctionRoutes {
     }
 }
 
-#[tracing::instrument(target = "cargo_lambda")]
-pub fn watch_metadata(metadata: &CargoMetadata) -> Result<WatchConfig, MetadataError> {
-    tracing::trace!(meta = ?metadata.workspace_metadata, "workspace metadata");
-
-    let ws_metadata: Metadata =
-        serde_json::from_value(metadata.workspace_metadata.clone()).unwrap_or_default();
-    let mut config = ws_metadata.lambda.package.watch.unwrap_or_default();
-
-    // Check package-specific metadata
-    for pkg in &metadata.packages {
-        for target in &pkg.targets {
-            let target_matches =
-                target.kind.iter().any(|kind| kind == "bin") && pkg.metadata.is_object();
-
-            if target_matches {
-                let package_metadata: Metadata = serde_json::from_value(pkg.metadata.clone())
-                    .map_err(MetadataError::InvalidCargoMetadata)?;
-
-                if let Some(package_watch) = package_metadata.lambda.package.watch {
-                    merge_watch_config(&mut config, &package_watch)?;
+impl Serialize for FunctionRoutes {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            FunctionRoutes::Single(function) => function.serialize(serializer),
+            FunctionRoutes::Multiple(routes) => {
+                let mut seq = serializer.serialize_seq(Some(routes.len()))?;
+                for (method, function) in routes {
+                    let mut map = serde_json::Map::new();
+                    map.insert("method".to_string(), json!(method));
+                    map.insert("function".to_string(), json!(function));
+                    seq.serialize_element(&Value::Object(map))?;
                 }
-                break;
+                seq.end()
             }
         }
     }
-
-    tracing::debug!(?config, "using watch configuration from metadata");
-    Ok(config)
-}
-
-fn merge_watch_config(
-    base: &mut WatchConfig,
-    package_watch: &WatchConfig,
-) -> Result<(), MergeError> {
-    if let Some(router) = &package_watch.router {
-        let mut base_router = base.router.take().unwrap_or_default();
-        base_router.inner.merge(router.inner.clone())?;
-
-        base.router = Some(base_router);
-    }
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::cargo::{load_metadata, tests::fixture};
+
+    use cargo_options::CommonOptions;
+    use serde_json::{json, Value};
+    use std::path::PathBuf;
 
     use super::*;
 
@@ -187,7 +425,10 @@ mod tests {
                 FunctionRoutes::Single("user_handler".to_string()),
             )
             .unwrap();
-        let router = FunctionRouter { inner };
+        let router = FunctionRouter {
+            inner,
+            ..Default::default()
+        };
         assert_eq!(router.at("/api/v1/users", "GET"), Ok("user_handler"));
         assert_eq!(router.at("/api/v1/users", "POST"), Ok("user_handler"));
 
@@ -201,23 +442,180 @@ mod tests {
                 ])),
             )
             .unwrap();
-        let router = FunctionRouter { inner };
+        let router = FunctionRouter {
+            inner,
+            ..Default::default()
+        };
         assert_eq!(router.at("/api/v1/users", "GET"), Ok("get_user"));
         assert_eq!(router.at("/api/v1/users", "POST"), Ok("create_user"));
         assert_eq!(router.at("/api/v1/users", "PUT"), Err(MatchError::NotFound));
     }
 
     #[test]
-    fn test_watch_config_metadata() {
-        let metadata = load_metadata(fixture("workspace-package")).unwrap();
+    fn test_router_serialize() {
+        let config = r#"
+            "/api/v1/users" = [
+                { function = "get_user", method = "GET" },
+                { function = "create_user", method = "POST" }
+            ]
+            "/api/v1/all_methods" = "all_methods"
+        "#;
+        let router: FunctionRouter = toml::from_str(config).unwrap();
 
-        let watch_config = watch_metadata(&metadata).unwrap();
-        let router = watch_config.router.unwrap();
-        assert_eq!(router.at("/foo", "GET"), Ok("crate-1"));
-        assert_eq!(router.at("/foo", "POST"), Ok("crate-1"));
-        assert_eq!(router.at("/bar", "GET"), Ok("crate-1"));
-        assert_eq!(router.at("/bar", "POST"), Ok("crate-2"));
-        assert_eq!(router.at("/baz", "GET"), Err(MatchError::NotFound));
-        assert_eq!(router.at("/qux", "GET"), Ok("crate-3"));
+        let json = serde_json::to_value(&router).unwrap();
+
+        let new_router: FunctionRouter = serde_json::from_value(json).unwrap();
+        assert_eq!(new_router.raw, router.raw);
+
+        assert_eq!(
+            new_router.inner.at("/api/v1/users").unwrap().value,
+            &FunctionRoutes::Multiple(HashMap::from([
+                ("GET".to_string(), "get_user".to_string()),
+                ("POST".to_string(), "create_user".to_string()),
+            ]))
+        );
+
+        assert_eq!(
+            new_router.inner.at("/api/v1/all_methods").unwrap().value,
+            &FunctionRoutes::Single("all_methods".to_string())
+        );
+    }
+
+    #[test]
+    fn test_watch_serialization() {
+        let watch = Watch {
+            invoke_address: "127.0.0.1".to_string(),
+            invoke_port: 9000,
+            env_options: EnvOptions {
+                env_file: Some(PathBuf::from("/tmp/env")),
+                env_var: Some(vec!["FOO=BAR".to_string()]),
+            },
+            tls_options: TlsOptions::new(
+                Some(PathBuf::from("/tmp/cert.pem")),
+                Some(PathBuf::from("/tmp/key.pem")),
+                Some(PathBuf::from("/tmp/ca.pem")),
+            ),
+            cargo_opts: Run {
+                common: CommonOptions {
+                    quiet: false,
+                    jobs: None,
+                    keep_going: false,
+                    profile: None,
+                    features: vec!["feature1".to_string()],
+                    all_features: false,
+                    no_default_features: true,
+                    target: vec!["x86_64-unknown-linux-gnu".to_string()],
+                    target_dir: Some(PathBuf::from("/tmp/target")),
+                    message_format: vec!["json".to_string()],
+                    verbose: 1,
+                    color: Some("auto".to_string()),
+                    frozen: true,
+                    locked: true,
+                    offline: true,
+                    config: vec!["config.toml".to_string()],
+                    unstable_flags: vec!["flag1".to_string()],
+                    timings: None,
+                },
+                manifest_path: None,
+                release: false,
+                ignore_rust_version: false,
+                unit_graph: false,
+                packages: vec![],
+                bin: vec![],
+                example: vec![],
+                args: vec![],
+            },
+            ..Default::default()
+        };
+
+        let json = serde_json::to_value(&watch).unwrap();
+        assert_eq!(json["invoke_address"], "127.0.0.1");
+        assert_eq!(json["invoke_port"], 9000);
+        assert_eq!(json["env_file"], "/tmp/env");
+        assert_eq!(json["env_var"], json!(["FOO=BAR"]));
+        assert_eq!(json["tls_cert"], "/tmp/cert.pem");
+        assert_eq!(json["tls_key"], "/tmp/key.pem");
+        assert_eq!(json["tls_ca"], "/tmp/ca.pem");
+        assert_eq!(json["features"], json!(["feature1"]));
+        assert_eq!(json["no_default_features"], true);
+        assert_eq!(json["target"], json!(["x86_64-unknown-linux-gnu"]));
+        assert_eq!(json["target_dir"], "/tmp/target");
+        assert_eq!(json["message_format"], json!(["json"]));
+        assert_eq!(json["verbose"], 1);
+        assert_eq!(json["color"], "auto");
+        assert_eq!(json["frozen"], true);
+        assert_eq!(json["locked"], true);
+        assert_eq!(json["offline"], true);
+        assert_eq!(json["config"], json!(["config.toml"]));
+        assert_eq!(json["unstable_flags"], json!(["flag1"]));
+        assert_eq!(json["timings"], Value::Null);
+
+        let deserialized: Watch = serde_json::from_value(json).unwrap();
+
+        assert_eq!(deserialized.invoke_address, watch.invoke_address);
+        assert_eq!(deserialized.invoke_port, watch.invoke_port);
+        assert_eq!(
+            deserialized.env_options.env_file,
+            watch.env_options.env_file
+        );
+        assert_eq!(deserialized.env_options.env_var, watch.env_options.env_var);
+        assert_eq!(
+            deserialized.tls_options.tls_cert,
+            watch.tls_options.tls_cert
+        );
+        assert_eq!(deserialized.tls_options.tls_key, watch.tls_options.tls_key);
+        assert_eq!(deserialized.tls_options.tls_ca, watch.tls_options.tls_ca);
+        assert_eq!(
+            deserialized.cargo_opts.common.features,
+            watch.cargo_opts.common.features
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.no_default_features,
+            watch.cargo_opts.common.no_default_features
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.target,
+            watch.cargo_opts.common.target
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.target_dir,
+            watch.cargo_opts.common.target_dir
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.message_format,
+            watch.cargo_opts.common.message_format
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.verbose,
+            watch.cargo_opts.common.verbose
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.color,
+            watch.cargo_opts.common.color
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.frozen,
+            watch.cargo_opts.common.frozen
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.locked,
+            watch.cargo_opts.common.locked
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.offline,
+            watch.cargo_opts.common.offline
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.config,
+            watch.cargo_opts.common.config
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.unstable_flags,
+            watch.cargo_opts.common.unstable_flags
+        );
+        assert_eq!(
+            deserialized.cargo_opts.common.timings,
+            watch.cargo_opts.common.timings
+        );
     }
 }

@@ -18,6 +18,7 @@ base64.workspace = true
 bytes = "1.8.0"
 cargo-lambda-metadata.workspace = true
 cargo-lambda-remote.workspace = true
+cargo-options.workspace = true
 chrono = "0.4.19"
 clap.workspace = true
 dunce.workspace = true

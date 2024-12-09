@@ -1,0 +1,8 @@
+[deploy]
+memory = 256
+
+[development.deploy]
+memory = 512
+
+[production.deploy]
+memory = 1024

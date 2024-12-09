@@ -1,13 +1,13 @@
 use serde::{
     de::{Deserializer, Error, Visitor},
-    Deserialize,
+    Deserialize, Serialize, Serializer,
 };
 use std::{fmt, str::FromStr, time::Duration};
 use strum_macros::{Display, EnumString};
 
 use crate::error::MetadataError;
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Timeout(u32);
 
 impl Timeout {
@@ -43,6 +43,18 @@ impl FromStr for Timeout {
 impl From<Timeout> for i32 {
     fn from(t: Timeout) -> i32 {
         t.0 as i32
+    }
+}
+
+impl From<&Timeout> for i32 {
+    fn from(t: &Timeout) -> i32 {
+        t.0 as i32
+    }
+}
+
+impl From<i32> for Timeout {
+    fn from(t: i32) -> Timeout {
+        Timeout(t as u32)
     }
 }
 
@@ -82,6 +94,12 @@ pub enum Memory {
 
 impl From<Memory> for i32 {
     fn from(m: Memory) -> i32 {
+        (&m).into()
+    }
+}
+
+impl From<&Memory> for i32 {
+    fn from(m: &Memory) -> i32 {
         match m {
             Memory::Mb128 => 128,
             Memory::Mb256 => 256,
@@ -159,7 +177,16 @@ impl<'de> Deserialize<'de> for Memory {
     }
 }
 
-#[derive(Clone, Debug, Default, Display, EnumString, Eq, PartialEq)]
+impl Serialize for Memory {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_i32(self.into())
+    }
+}
+
+#[derive(Clone, Debug, Default, Display, EnumString, Eq, PartialEq, Serialize)]
 #[strum(ascii_case_insensitive)]
 pub enum Tracing {
     Active,

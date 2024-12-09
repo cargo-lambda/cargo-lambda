@@ -1,4 +1,4 @@
-use cargo_lambda_metadata::cargo::CargoCompilerOptions;
+use cargo_lambda_metadata::cargo::build::CargoCompilerOptions;
 use cargo_options::Build;
 use miette::Result;
 use std::{collections::VecDeque, env, ffi::OsStr, process::Command};

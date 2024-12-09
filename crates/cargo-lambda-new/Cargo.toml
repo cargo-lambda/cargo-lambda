@@ -33,4 +33,4 @@ walkdir = "2.3.2"
 zip.workspace = true
 
 [dev-dependencies]
-assertables = "9.0.0"
+assertables.workspace = true

@@ -3,9 +3,9 @@ use crate::{
     requests::{Action, NextEvent},
     state::{ExtensionCache, RuntimeState},
     watcher::WatcherConfig,
-    CargoOptions,
 };
 use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
+use cargo_options::Run as CargoOptions;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle};
 use tracing::{error, info};
@@ -120,44 +120,19 @@ fn cargo_command(
     name: &str,
     cargo_options: &CargoOptions,
 ) -> Result<watchexec::command::Command, ServerError> {
-    let mp = cargo_options
-        .manifest_path
-        .to_str()
-        .ok_or_else(|| ServerError::InvalidManifest(cargo_options.manifest_path.clone()))?;
-
-    let mut args = vec![
-        "run".into(),
-        "--manifest-path".into(),
-        mp.to_string(),
-        "--color".into(),
-        cargo_options.color.clone(),
-    ];
-
-    if cargo_options.no_default_features {
-        args.push("--no-default-features".into());
-    }
-
-    if let Some(features) = cargo_options.features.as_deref() {
-        args.push("--features".into());
-        args.push(features.into());
-    }
-
-    if cargo_options.release {
-        args.push("--release".into());
-    }
-
-    if let Some(package) = &cargo_options.package {
-        args.push("--package".into());
-        args.push(package.into());
-    }
-
-    if is_valid_bin_name(name) {
-        args.push("--bin".into());
-        args.push(name.into());
-    }
+    let cmd = if is_valid_bin_name(name) {
+        let mut command_opts = cargo_options.clone();
+        command_opts.bin.push(name.to_string());
+        command_opts.command()
+    } else {
+        cargo_options.command()
+    };
 
     Ok(Command::Exec {
-        prog: "cargo".into(),
-        args,
+        prog: cmd.get_program().to_string_lossy().to_string(),
+        args: cmd
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect(),
     })
 }

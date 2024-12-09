@@ -1,53 +1,63 @@
-use clap::{Args, ValueHint};
+use clap::{ArgAction, Args, ValueHint};
 use env_file_reader::read_file;
 use miette::Result;
+use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::error::MetadataError;
+use crate::{cargo::deserialize_vec_or_map, error::MetadataError};
 
 pub type Environment = HashMap<String, String>;
 
-#[derive(Args, Clone, Debug, Default)]
+#[derive(Args, Clone, Debug, Default, Deserialize, Serialize)]
 pub struct EnvOptions {
-    /// Option to add one or many environment variables, allows multiple repetitions (--env-var KEY=VALUE --env-var OTHER=NEW-VALUE)
-    /// This option overrides any values set with the --env-vars flag.
-    #[arg(long, conflicts_with = "env_vars")]
+    /// Option to add one or many environment variables,
+    /// allows multiple repetitions (--env-var KEY=VALUE --env-var OTHER=NEW-VALUE).
+    /// It also allows to set a list of environment variables separated by commas
+    /// (e.g. --env-var KEY=VALUE,OTHER=NEW-VALUE).
+    #[arg(long, value_delimiter = ',', action = ArgAction::Append, visible_alias = "env-vars")]
+    #[serde(default, alias = "env", deserialize_with = "deserialize_vec_or_map")]
     pub env_var: Option<Vec<String>>,
-
-    /// Command separated list of environment variables (--env-vars KEY=VALUE,OTHER=NEW-VALUE)
-    /// This option overrides any values set with the --env-var flag that match the same key.
-    #[arg(long, value_delimiter = ',', conflicts_with = "env_var")]
-    pub env_vars: Option<Vec<String>>,
 
     /// Read environment variables from a file.
     /// Variables are separated by new lines in KEY=VALUE format.
     #[arg(long, value_hint = ValueHint::FilePath)]
+    #[serde(default)]
     pub env_file: Option<PathBuf>,
 }
 
 impl EnvOptions {
-    pub fn flag_vars(&self) -> Option<Vec<String>> {
-        match (&self.env_var, &self.env_vars) {
-            (None, None) => None,
-            (Some(v), None) => Some(v.clone()),
-            (None, Some(v)) => Some(v.clone()),
-            (Some(v1), Some(v2)) => {
-                let mut base = v1.clone();
-                base.extend(v2.clone());
-                Some(base)
-            }
-        }
+    pub fn lambda_environment(
+        &self,
+        base: &HashMap<String, String>,
+    ) -> Result<Environment, MetadataError> {
+        lambda_environment(Some(base), &self.env_file, self.env_var.as_ref())
     }
 
-    pub fn lambda_environment(&self) -> Result<Environment, MetadataError> {
-        lambda_environment(None, &self.env_file, self.flag_vars())
+    pub fn count_fields(&self) -> usize {
+        self.env_var.is_some() as usize + self.env_file.is_some() as usize
+    }
+
+    pub fn serialize_fields<S>(
+        &self,
+        state: &mut <S as serde::Serializer>::SerializeStruct,
+    ) -> Result<(), S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if let Some(env_var) = &self.env_var {
+            state.serialize_field("env_var", env_var)?;
+        }
+        if let Some(env_file) = &self.env_file {
+            state.serialize_field("env_file", env_file)?;
+        }
+        Ok(())
     }
 }
 
 pub(crate) fn lambda_environment(
     base: Option<&HashMap<String, String>>,
     env_file: &Option<PathBuf>,
-    vars: Option<Vec<String>>,
+    vars: Option<&Vec<String>>,
 ) -> Result<Environment, MetadataError> {
     let mut env = HashMap::new();
 
@@ -67,7 +77,7 @@ pub(crate) fn lambda_environment(
 
     if let Some(vars) = vars {
         for var in vars {
-            let (key, value) = extract_var(&var)?;
+            let (key, value) = extract_var(var)?;
             env.insert(key.to_string(), value.to_string());
         }
     }
@@ -139,7 +149,7 @@ mod test {
         base.insert("FOO".into(), "BAR".into());
 
         let flags = vec!["FOO=QUX".to_string(), "BAZ=QUUX".to_string()];
-        let env = lambda_environment(Some(&base), &None, Some(flags)).unwrap();
+        let env = lambda_environment(Some(&base), &None, Some(&flags)).unwrap();
 
         assert_eq!("QUX".to_string(), env["FOO"]);
         assert_eq!("QUUX".to_string(), env["BAZ"]);
@@ -154,7 +164,7 @@ mod test {
         base.insert("FOO".into(), "BAR".into());
 
         let flags = vec!["FOO=QUX".to_string(), "BAZ=QUUX".to_string()];
-        let vars = lambda_environment(Some(&base), &Some(file), Some(flags)).unwrap();
+        let vars = lambda_environment(Some(&base), &Some(file), Some(&flags)).unwrap();
 
         assert_eq!("QUX".to_string(), vars["FOO"]);
         assert_eq!("QUUX".to_string(), vars["BAZ"]);

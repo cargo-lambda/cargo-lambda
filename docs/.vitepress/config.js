@@ -56,6 +56,7 @@ function sidebar() {
                 { text: 'What is Cargo Lambda?', link: '/guide/what-is-cargo-lambda' },
                 { text: 'Installation', link: '/guide/installation' },
                 { text: 'Getting Started', link: '/guide/getting-started' },
+                { text: 'Configuration', link: '/guide/configuration' },
                 { text: 'Cross Compiling', link: '/guide/cross-compiling' },
                 { text: 'Release Optimizations', link: '/guide/release-optimizations' },
                 { text: 'Lambda Extensions', link: '/guide/lambda-extensions' },

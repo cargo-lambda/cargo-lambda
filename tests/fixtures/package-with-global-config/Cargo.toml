@@ -1,0 +1,10 @@
+[package]
+name = "package-with-global-config"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+lambda_runtime = "0.13.0"
+serde = "1"
+tokio = { version = "1", features = ["macros"] }

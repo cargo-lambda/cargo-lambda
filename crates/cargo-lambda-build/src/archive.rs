@@ -6,7 +6,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use cargo_lambda_metadata::{cargo::target_dir, fs::copy_and_replace};
+use cargo_lambda_metadata::{
+    cargo::{target_dir_from_metadata, CargoMetadata},
+    fs::copy_and_replace,
+};
 use chrono::{DateTime, Utc};
 use miette::{Context, IntoDiagnostic, Result};
 use object::{read::File as ObjectFile, Architecture, Object};
@@ -136,20 +139,22 @@ impl BinaryArchive {
 
 /// Search for the bootstrap file for a function inside the target directory.
 /// If the binary file exists, it creates the zip archive and extracts its architecture by reading the binary.
-pub fn create_binary_archive<M, P>(
-    manifest_path: M,
+pub fn create_binary_archive<P>(
+    metadata: Option<&CargoMetadata>,
     base_dir: &Option<P>,
     data: &BinaryData,
     include: Option<Vec<String>>,
 ) -> Result<BinaryArchive>
 where
-    M: AsRef<Path> + Debug,
     P: AsRef<Path>,
 {
     let bootstrap_dir = if let Some(dir) = base_dir {
         dir.as_ref().join(data.binary_location())
     } else {
-        let target_dir = target_dir(manifest_path).unwrap_or_else(|_| PathBuf::from("target"));
+        let target_dir = metadata
+            .and_then(|m| target_dir_from_metadata(m).ok())
+            .unwrap_or_else(|| PathBuf::from("target"));
+
         target_dir.join("lambda").join(data.binary_location())
     };
 
@@ -377,7 +382,7 @@ mod test {
         time::Duration,
     };
 
-    use cargo_lambda_metadata::fs::copy_without_replace;
+    use cargo_lambda_metadata::{cargo::load_metadata, fs::copy_without_replace};
     use rstest::rstest;
     use tempfile::TempDir;
 
@@ -562,7 +567,7 @@ mod test {
         create_dir_all(&bsp).expect("failed to create dir");
         copy_without_replace(bp, bsp.join("bootstrap")).expect("failed to copy bootstrap file");
 
-        let archive = create_binary_archive("Cargo.toml", &Some(dd.path()), &data, None)
+        let archive = create_binary_archive(None, &Some(dd.path()), &data, None)
             .expect("failed to create binary archive");
 
         let arch_path = bsp.join("bootstrap.zip");
@@ -580,7 +585,9 @@ mod test {
         let data = BinaryData::new("binary-x86-64", false, false);
 
         let bp = "../../tests/binaries/binary-x86-64";
-        let target_dir = target_dir("Cargo.toml").unwrap_or_else(|_| PathBuf::from("target"));
+        let metadata = load_metadata("Cargo.toml").unwrap();
+        let target_dir =
+            target_dir_from_metadata(&metadata).unwrap_or_else(|_| PathBuf::from("target"));
 
         let bsp = target_dir.join("lambda").join("binary-x86-64");
 
@@ -588,7 +595,7 @@ mod test {
         copy_without_replace(bp, bsp.join("bootstrap")).expect("failed to copy bootstrap file");
 
         let base_dir: Option<&Path> = None;
-        let archive = create_binary_archive("Cargo.toml", &base_dir, &data, None)
+        let archive = create_binary_archive(Some(&metadata), &base_dir, &data, None)
             .expect("failed to create binary archive");
 
         let arch_path = bsp.join("bootstrap.zip");

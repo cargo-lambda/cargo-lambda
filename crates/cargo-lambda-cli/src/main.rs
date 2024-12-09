@@ -1,11 +1,14 @@
 #![warn(rust_2018_idioms, unused_lifetimes)]
 #![allow(clippy::multiple_crate_versions)]
-use cargo_lambda_build::{Build, Zig};
-use cargo_lambda_deploy::Deploy;
+use cargo_lambda_build::Zig;
 use cargo_lambda_invoke::Invoke;
+use cargo_lambda_metadata::{
+    cargo::{build::Build, deploy::Deploy, load_metadata, watch::Watch},
+    config::{load_config, Config, ConfigOptions},
+};
 use cargo_lambda_new::{Init, New};
 use cargo_lambda_system::System;
-use cargo_lambda_watch::Watch;
+use cargo_lambda_watch::xray_layer;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_cargo::style::CLAP_STYLING;
 use miette::{miette, ErrorHook, IntoDiagnostic, Result};
@@ -27,9 +30,11 @@ enum App {
 struct Lambda {
     #[command(subcommand)]
     subcommand: Option<Box<LambdaSubcommand>>,
+
     /// Enable logs in any subcommand. Use `-v` for debug logs, and `-vv` for trace logs
     #[arg(short = 'v', long, action = clap::ArgAction::Count, global = true)]
     verbose: u8,
+
     /// Coloring: auto, always, never
     #[arg(
         long,
@@ -39,6 +44,19 @@ struct Lambda {
         env = "CARGO_LAMBDA_COLOR"
     )]
     color: String,
+
+    /// Path to the global configuration file
+    #[arg(long, global = true, env = "CARGO_LAMBDA_GLOBAL")]
+    global: Option<PathBuf>,
+
+    /// Context to use for the configuration file
+    #[arg(short = 'x', long, global = true, env = "CARGO_LAMBDA_CONTEXT")]
+    context: Option<String>,
+
+    /// Strict mode: override all configuration files values, without merging vector values
+    #[arg(long, global = true, env = "CARGO_LAMBDA_STRICT")]
+    strict: bool,
+
     /// Print version information
     #[arg(short = 'V', long)]
     version: bool,
@@ -62,19 +80,24 @@ impl Color {
     }
 
     fn write_env_var(&self) {
-        std::env::set_var("CARGO_LAMBDA_COLOR", self.to_string().to_lowercase());
+        std::env::set_var("CARGO_LAMBDA_COLOR", self.to_lowercase());
+    }
+
+    fn to_lowercase(&self) -> String {
+        self.to_string().to_lowercase()
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Subcommand)]
 enum LambdaSubcommand {
     /// `cargo lambda build` compiles AWS Lambda functions and extension natively.
     /// It produces artifacts which you can then upload to AWS Lambda with `cargo lambda deploy`,
     /// or use with other ecosystem tools, SAM Cli or the AWS CDK.
-    Build(Box<Build>),
+    Build(Build),
     /// `cargo lambda deploy` uploads functions and extensions to AWS Lambda.
     /// You can use the same command to create new functions as well as update existent functions code.
-    Deploy(Box<Deploy>),
+    Deploy(Deploy),
     /// `cargo lambda init` creates Rust Lambda packages in an existent directory.
     /// Files present in that directory will be preserved as they were before running this command.
     Init(Init),
@@ -91,16 +114,91 @@ enum LambdaSubcommand {
 }
 
 impl LambdaSubcommand {
-    async fn run(self, color: &str) -> Result<()> {
+    async fn run(
+        self,
+        color: &str,
+        global: Option<PathBuf>,
+        context: Option<String>,
+        strict: bool,
+    ) -> Result<()> {
         match self {
-            Self::Build(mut b) => b.run().await,
-            Self::Deploy(d) => d.run().await,
+            Self::Build(b) => Self::run_build(b, global, context, strict).await,
+            Self::Deploy(d) => Self::run_deploy(d, global, context, strict).await,
             Self::Init(mut i) => i.run().await,
             Self::Invoke(i) => i.run().await,
             Self::New(mut n) => n.run().await,
             Self::System(s) => s.run().await,
-            Self::Watch(w) => w.run(color).await,
+            Self::Watch(w) => Self::run_watch(w, color, global, context, strict).await,
         }
+    }
+
+    async fn run_build(
+        build: Build,
+        global: Option<PathBuf>,
+        context: Option<String>,
+        strict: bool,
+    ) -> Result<()> {
+        let metadata = load_metadata(build.manifest_path())?;
+        let args_config = Config {
+            build,
+            ..Default::default()
+        };
+
+        let options = ConfigOptions {
+            context,
+            global,
+            strict,
+            ..Default::default()
+        };
+        let mut config = load_config(&args_config, &metadata, &options)?;
+        cargo_lambda_build::run(&mut config.build, &metadata).await
+    }
+
+    async fn run_watch(
+        watch: Watch,
+        color: &str,
+        global: Option<PathBuf>,
+        context: Option<String>,
+        strict: bool,
+    ) -> Result<()> {
+        let name = watch.package();
+        let metadata = load_metadata(watch.manifest_path())?;
+        let args_config = Config {
+            watch,
+            ..Default::default()
+        };
+
+        let options = ConfigOptions {
+            name,
+            context,
+            global,
+            strict,
+        };
+        let config = load_config(&args_config, &metadata, &options)?;
+        cargo_lambda_watch::run(&config.watch, &config.env, &metadata, color).await
+    }
+
+    async fn run_deploy(
+        deploy: Deploy,
+        global: Option<PathBuf>,
+        context: Option<String>,
+        strict: bool,
+    ) -> Result<()> {
+        let name = deploy.name.clone();
+        let metadata = load_metadata(deploy.manifest_path())?;
+        let args_config = Config {
+            deploy,
+            ..Default::default()
+        };
+
+        let options = ConfigOptions {
+            name,
+            context,
+            global,
+            strict,
+        };
+        let config = load_config(&args_config, &metadata, &options)?;
+        cargo_lambda_deploy::run(&config.deploy, &config.env, &metadata).await
     }
 }
 
@@ -195,13 +293,18 @@ async fn run_subcommand(lambda: Lambda, color: Color) -> Result<()> {
         .with(fmt);
 
     if let LambdaSubcommand::Watch(w) = &*subcommand {
-        subscriber.with(w.xray_layer()).init();
+        subscriber.with(xray_layer(w)).init();
     } else {
         subscriber.init();
     }
 
     subcommand
-        .run(&lambda.color.to_string().to_lowercase())
+        .run(
+            &color.to_lowercase(),
+            lambda.global,
+            lambda.context,
+            lambda.strict,
+        )
         .await
 }
 
