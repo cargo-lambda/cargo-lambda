@@ -14,8 +14,8 @@ description.workspace = true
 [dependencies]
 cargo-lambda-interactive.workspace = true
 cargo-lambda-metadata.workspace = true
-cargo-options = "0.7.4"
-cargo-zigbuild = "0.19.4"
+cargo-options.workspace = true
+cargo-zigbuild.workspace = true
 clap.workspace = true
 home.workspace = true
 miette.workspace = true

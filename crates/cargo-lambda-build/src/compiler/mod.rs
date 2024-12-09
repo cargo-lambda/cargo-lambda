@@ -1,5 +1,5 @@
 use crate::TargetArch;
-use cargo_lambda_metadata::cargo::{CargoMetadata, CompilerOptions};
+use cargo_lambda_metadata::cargo::{build::CompilerOptions, CargoMetadata};
 use cargo_options::Build;
 use miette::Result;
 use std::process::Command;

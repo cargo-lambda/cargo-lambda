@@ -1,11 +1,11 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CargoProfile {
     pub release: Option<CargoProfileRelease>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct CargoProfileRelease {
     pub strip: Option<toml::Value>,
     pub lto: Option<toml::Value>,
@@ -24,7 +24,7 @@ impl CargoProfileRelease {
     }
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum CargoBool {
     Bool(bool),

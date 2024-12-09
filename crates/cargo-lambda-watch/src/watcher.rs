@@ -1,5 +1,9 @@
 use crate::{error::ServerError, requests::NextEvent, state::ExtensionCache};
-use cargo_lambda_metadata::cargo::function_environment_metadata;
+use cargo_lambda_metadata::{
+    cargo::load_metadata,
+    config::{load_config_without_cli_flags, ConfigOptions},
+};
+// use cargo_lambda_metadata::cargo::function_environment_metadata;
 use ignore::create_filter;
 use ignore_files::IgnoreFile;
 use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
@@ -188,19 +192,14 @@ async fn runtime(
         async move {
             trace!("loading watch environment metadata");
 
-            let env = function_environment_metadata(manifest_path, bin_name.as_deref())
-                .map_err(|err| {
-                    error!(error = %err, "invalid function metadata");
-                    err
-                })
-                .unwrap_or_default();
+            let new_env = reload_env(&manifest_path, &bin_name);
 
             if let Some(mut command) = prespawn.command().await {
                 command
                     .env("AWS_LAMBDA_FUNCTION_VERSION", "1")
                     .env("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", "4096")
                     .envs(base_env)
-                    .envs(env)
+                    .envs(new_env)
                     .env("AWS_LAMBDA_RUNTIME_API", &runtime_api)
                     .env("AWS_LAMBDA_FUNCTION_NAME", &name);
             }
@@ -210,4 +209,34 @@ async fn runtime(
     });
 
     Ok(config)
+}
+
+fn reload_env(manifest_path: &PathBuf, bin_name: &Option<String>) -> HashMap<String, String> {
+    let metadata = match load_metadata(manifest_path) {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            error!("failed to reload metadata: {}", e);
+            return HashMap::new();
+        }
+    };
+
+    let options = ConfigOptions {
+        name: bin_name.clone(),
+        ..Default::default()
+    };
+    let config = match load_config_without_cli_flags(&metadata, &options) {
+        Ok(config) => config,
+        Err(e) => {
+            error!("failed to reload config: {}", e);
+            return HashMap::new();
+        }
+    };
+
+    match config.watch.lambda_environment(&config.env) {
+        Ok(env) => env,
+        Err(e) => {
+            error!("failed to reload environment: {}", e);
+            HashMap::new()
+        }
+    }
 }

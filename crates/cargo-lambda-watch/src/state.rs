@@ -3,7 +3,7 @@ use crate::{
     requests::{InvokeRequest, LambdaResponse, NextEvent},
     RUNTIME_EMULATOR_PATH,
 };
-use cargo_lambda_metadata::cargo::{binary_targets, FunctionRouter};
+use cargo_lambda_metadata::cargo::{binary_targets, watch::FunctionRouter};
 use miette::Result;
 use mpsc::{channel, Receiver, Sender};
 use std::{

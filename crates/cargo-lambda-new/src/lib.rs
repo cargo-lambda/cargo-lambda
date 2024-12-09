@@ -609,8 +609,10 @@ mod tests {
         let path = Path::new("src\\main.rs");
 
         let render_files = vec![];
-        let mut template_config = TemplateConfig::default();
-        template_config.render_all_files = true;
+        let template_config = TemplateConfig {
+            render_all_files: true,
+            ..Default::default()
+        };
         let variables = Object::new();
         assert!(should_render_file(
             path,

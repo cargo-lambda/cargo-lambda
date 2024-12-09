@@ -22,7 +22,9 @@ exclude = [
     "tests/fixtures/workspace-package",
     "tests/fixtures/single-binary-different-name",
     "tests/fixtures/examples-package",
-    "tests/fixtures/watch-multi-binary"
+    "tests/fixtures/watch-multi-binary",
+    "tests/fixtures/package-with-global-config",
+    "tests/fixtures/config-with-context",
 ]
 
 resolver = "2"
@@ -39,6 +41,7 @@ description = "Cargo subcommand to work with AWS Lambda"
 rust-version = "1.80.0"
 
 [workspace.dependencies]
+assertables = "9.0.0"
 aws-config = "1.1.8"
 aws-sdk-iam = "1.17.0"
 aws-sdk-lambda = "1.17.0"
@@ -56,9 +59,13 @@ cargo-lambda-new = { version = "1.5.0", path = "crates/cargo-lambda-new" }
 cargo-lambda-remote = { version = "1.5.0", path = "crates/cargo-lambda-remote" }
 cargo-lambda-system = { version = "1.5.0", path = "crates/cargo-lambda-system" }
 cargo-lambda-watch = { version = "1.5.0", path = "crates/cargo-lambda-watch" }
+cargo_metadata = "0.15.3"
+cargo-options = { version = "0.7.5", features = ["serde"] }
+cargo-zigbuild = "0.19.4"
 clap = { version = "4.4.2", features = ["derive"] }
 dirs = "4"
 dunce = "1.0.3"
+figment = { version = "0.10.19", features = ["env", "test", "toml"] }
 home = "0.5.3"
 miette = { version = "5.10.0" }
 reqwest = { version = "0.12", default-features = false, features = [

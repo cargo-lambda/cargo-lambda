@@ -1,12 +1,12 @@
-use std::{
-    path::{Path, PathBuf},
-    sync::OnceLock,
-};
-
 use clap::Args;
 use miette::{Diagnostic, Result};
 use rustls::{ClientConfig, RootCertStore, ServerConfig};
 use rustls_pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
+use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use std::{
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 use thiserror::Error;
 
 static CELL: OnceLock<bool> = OnceLock::new();
@@ -34,23 +34,53 @@ pub enum TlsError {
     FailedToParseConfig(#[from] rustls::Error),
 }
 
-#[derive(Args, Clone, Debug, Default)]
+#[derive(Args, Clone, Debug, Deserialize, Serialize)]
 pub struct TlsOptions {
     /// Path to a TLS certificate file
     #[arg(long, conflicts_with = "remote")]
-    tls_cert: Option<PathBuf>,
+    #[serde(default)]
+    pub tls_cert: Option<PathBuf>,
     /// Path to a TLS key file
     #[arg(long, conflicts_with = "remote")]
-    tls_key: Option<PathBuf>,
+    #[serde(default)]
+    pub tls_key: Option<PathBuf>,
     /// Path to a TLS CA file
     #[arg(long, conflicts_with = "remote")]
-    tls_ca: Option<PathBuf>,
+    #[serde(default)]
+    pub tls_ca: Option<PathBuf>,
 
     #[cfg(test)]
-    config_dir: PathBuf,
+    pub config_dir: PathBuf,
 }
 
 impl TlsOptions {
+    #[cfg(not(test))]
+    pub fn new(
+        tls_cert: Option<PathBuf>,
+        tls_key: Option<PathBuf>,
+        tls_ca: Option<PathBuf>,
+    ) -> Self {
+        Self {
+            tls_cert,
+            tls_key,
+            tls_ca,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new(
+        tls_cert: Option<PathBuf>,
+        tls_key: Option<PathBuf>,
+        tls_ca: Option<PathBuf>,
+    ) -> Self {
+        Self {
+            tls_cert,
+            tls_key,
+            tls_ca,
+            config_dir: tempfile::TempDir::new().unwrap().path().to_path_buf(),
+        }
+    }
+
     pub fn is_secure(&self) -> bool {
         self.cert_path().is_some() && self.key_path().is_some()
     }
@@ -151,6 +181,37 @@ impl TlsOptions {
     fn config_dir(&self) -> Option<PathBuf> {
         Some(self.config_dir.clone())
     }
+
+    pub fn count_fields(&self) -> usize {
+        self.tls_cert.is_some() as usize
+            + self.tls_key.is_some() as usize
+            + self.tls_ca.is_some() as usize
+    }
+
+    pub fn serialize_fields<S>(
+        &self,
+        state: &mut <S as serde::Serializer>::SerializeStruct,
+    ) -> Result<(), S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if let Some(tls_cert) = &self.tls_cert {
+            state.serialize_field("tls_cert", tls_cert)?;
+        }
+        if let Some(tls_key) = &self.tls_key {
+            state.serialize_field("tls_key", tls_key)?;
+        }
+        if let Some(tls_ca) = &self.tls_ca {
+            state.serialize_field("tls_ca", tls_ca)?;
+        }
+        Ok(())
+    }
+}
+
+impl Default for TlsOptions {
+    fn default() -> Self {
+        Self::new(None, None, None)
+    }
 }
 
 fn parse_certificates<P: AsRef<Path>>(path: P) -> Result<Vec<CertificateDer<'static>>> {
@@ -191,7 +252,6 @@ fn install_default_tls_provider() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
 
     fn create_test_file(source: &str, destination: &PathBuf) {
         std::fs::create_dir_all(destination.parent().unwrap()).unwrap();
@@ -200,28 +260,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_tls_options_default() {
-        let temp_dir = TempDir::new().unwrap();
-
-        let opts = TlsOptions {
-            config_dir: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
+        let opts = TlsOptions::default();
         assert!(!opts.is_secure());
 
         create_test_file(
             "../../tests/certs/cert.pem",
-            &temp_dir.path().join("cert.pem"),
+            &opts.config_dir.join("cert.pem"),
         );
         create_test_file(
             "../../tests/certs/key.pem",
-            &temp_dir.path().join("key.pem"),
+            &opts.config_dir.join("key.pem"),
         );
-        create_test_file("../../tests/certs/ca.pem", &temp_dir.path().join("ca.pem"));
+        create_test_file("../../tests/certs/ca.pem", &opts.config_dir.join("ca.pem"));
 
         // Should return temp paths in test mode
-        assert_eq!(opts.cert_path().unwrap(), temp_dir.path().join("cert.pem"));
-        assert_eq!(opts.key_path().unwrap(), temp_dir.path().join("key.pem"));
-        assert_eq!(opts.ca_path().unwrap(), temp_dir.path().join("ca.pem"));
+        assert_eq!(opts.cert_path().unwrap(), opts.config_dir.join("cert.pem"));
+        assert_eq!(opts.key_path().unwrap(), opts.config_dir.join("key.pem"));
+        assert_eq!(opts.ca_path().unwrap(), opts.config_dir.join("ca.pem"));
         assert!(opts.is_secure());
 
         let config = opts.server_config().await.unwrap();
@@ -230,14 +285,11 @@ mod tests {
 
     #[test]
     fn test_tls_options_with_paths() {
-        let temp_dir = TempDir::new().unwrap();
-
-        let opts = TlsOptions {
-            tls_cert: Some("../../tests/certs/cert.pem".into()),
-            tls_key: Some("../../tests/certs/key.pem".into()),
-            tls_ca: Some("../../tests/certs/ca.pem".into()),
-            config_dir: temp_dir.path().to_path_buf(),
-        };
+        let opts = TlsOptions::new(
+            Some("../../tests/certs/cert.pem".into()),
+            Some("../../tests/certs/key.pem".into()),
+            Some("../../tests/certs/ca.pem".into()),
+        );
 
         assert_eq!(
             opts.cert_path().unwrap(),
@@ -256,12 +308,7 @@ mod tests {
 
     #[test]
     fn test_cached_paths() {
-        let temp_dir = TempDir::new().unwrap();
-
-        let opts = TlsOptions {
-            config_dir: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
+        let opts = TlsOptions::default();
 
         assert!(opts.cached_cert_path().is_none());
         assert!(opts.cached_key_path().is_none());
@@ -269,38 +316,35 @@ mod tests {
 
         create_test_file(
             "../../tests/certs/cert.pem",
-            &temp_dir.path().join("cert.pem"),
+            &opts.config_dir.join("cert.pem"),
         );
         create_test_file(
             "../../tests/certs/key.pem",
-            &temp_dir.path().join("key.pem"),
+            &opts.config_dir.join("key.pem"),
         );
-        create_test_file("../../tests/certs/ca.pem", &temp_dir.path().join("ca.pem"));
+        create_test_file("../../tests/certs/ca.pem", &opts.config_dir.join("ca.pem"));
 
         assert_eq!(
             opts.cached_cert_path().unwrap(),
-            temp_dir.path().join("cert.pem")
+            opts.config_dir.join("cert.pem")
         );
         assert_eq!(
             opts.cached_key_path().unwrap(),
-            temp_dir.path().join("key.pem")
+            opts.config_dir.join("key.pem")
         );
         assert_eq!(
             opts.cached_ca_path().unwrap(),
-            temp_dir.path().join("ca.pem")
+            opts.config_dir.join("ca.pem")
         );
     }
 
     #[tokio::test]
     async fn test_server_config_with_valid_files_in_temp_dir() {
-        let temp_dir = TempDir::new().unwrap();
-
-        let opts = TlsOptions {
-            tls_cert: Some("../../tests/certs/cert.pem".into()),
-            tls_key: Some("../../tests/certs/key.pem".into()),
-            tls_ca: None,
-            config_dir: temp_dir.path().to_path_buf(),
-        };
+        let opts = TlsOptions::new(
+            Some("../../tests/certs/cert.pem".into()),
+            Some("../../tests/certs/key.pem".into()),
+            None,
+        );
 
         assert!(opts.is_secure());
 
@@ -310,22 +354,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_server_config_with_ca() {
-        let temp_dir = TempDir::new().unwrap();
+        let opts = TlsOptions::default();
 
         create_test_file(
             "../../tests/certs/cert.pem",
-            &temp_dir.path().join("cert.pem"),
+            &opts.config_dir.join("cert.pem"),
         );
         create_test_file(
             "../../tests/certs/key.pem",
-            &temp_dir.path().join("key.pem"),
+            &opts.config_dir.join("key.pem"),
         );
-        create_test_file("../../tests/certs/ca.pem", &temp_dir.path().join("ca.pem"));
-
-        let opts = TlsOptions {
-            config_dir: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
+        create_test_file("../../tests/certs/ca.pem", &opts.config_dir.join("ca.pem"));
 
         let config = opts.server_config().await.unwrap();
         assert!(config.is_some());
@@ -333,22 +372,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_client_config_with_ca() {
-        let temp_dir = TempDir::new().unwrap();
+        let opts = TlsOptions::default();
 
         create_test_file(
             "../../tests/certs/cert.pem",
-            &temp_dir.path().join("cert.pem"),
+            &opts.config_dir.join("cert.pem"),
         );
         create_test_file(
             "../../tests/certs/key.pem",
-            &temp_dir.path().join("key.pem"),
+            &opts.config_dir.join("key.pem"),
         );
-        create_test_file("../../tests/certs/ca.pem", &temp_dir.path().join("ca.pem"));
-
-        let opts = TlsOptions {
-            config_dir: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
+        create_test_file("../../tests/certs/ca.pem", &opts.config_dir.join("ca.pem"));
 
         let config = opts.client_config().await.unwrap();
         assert!(config.alpn_protocols.is_empty()); // Default client config has no ALPN protocols
@@ -356,21 +390,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_client_config_without_ca() {
-        let temp_dir = TempDir::new().unwrap();
+        let opts = TlsOptions::default();
 
         create_test_file(
             "../../tests/certs/cert.pem",
-            &temp_dir.path().join("cert.pem"),
+            &opts.config_dir.join("cert.pem"),
         );
         create_test_file(
             "../../tests/certs/key.pem",
-            &temp_dir.path().join("key.pem"),
+            &opts.config_dir.join("key.pem"),
         );
-
-        let opts = TlsOptions {
-            config_dir: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
 
         let config = opts.client_config().await.unwrap();
         assert!(config.alpn_protocols.is_empty());

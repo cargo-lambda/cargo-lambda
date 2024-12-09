@@ -1,0 +1,3 @@
+[build]
+output_format = "zip"
+features = ["test"]

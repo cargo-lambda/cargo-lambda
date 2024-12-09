@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 use axum::response::{IntoResponse, Response};
 use cargo_lambda_metadata::error::MetadataError;
@@ -99,10 +99,6 @@ pub enum ServerError {
     #[error(transparent)]
     #[diagnostic()]
     InvalidStatusCode(#[from] hyper::http::status::InvalidStatusCode),
-
-    #[error("invalid manifest path {0}")]
-    #[diagnostic()]
-    InvalidManifest(PathBuf),
 
     #[error(transparent)]
     #[diagnostic()]

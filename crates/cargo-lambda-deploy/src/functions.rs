@@ -3,11 +3,7 @@ use crate::roles;
 use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
 use cargo_lambda_build::BinaryArchive;
 use cargo_lambda_interactive::progress::Progress;
-use cargo_lambda_metadata::{
-    cargo::{function_deploy_metadata, DeployConfig, VpcConfig},
-    env::EnvOptions,
-    lambda::{Memory, Timeout, Tracing},
-};
+use cargo_lambda_metadata::cargo::deploy::Deploy;
 use cargo_lambda_remote::{
     aws_sdk_config::SdkConfig,
     aws_sdk_lambda::{
@@ -26,12 +22,10 @@ use cargo_lambda_remote::{
         },
         Client as LambdaClient,
     },
-    RemoteConfig,
 };
-use clap::Args;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
-use std::{path::PathBuf, str::FromStr};
+use std::{collections::HashMap, str::FromStr};
 use tokio::time::{sleep, Duration};
 use tracing::debug;
 use uuid::Uuid;
@@ -39,73 +33,6 @@ use uuid::Uuid;
 enum FunctionAction {
     Create,
     Update(Box<GetFunctionOutput>),
-}
-
-#[derive(Args, Clone, Debug, Default)]
-pub struct FunctionDeployConfig {
-    /// Enable function URL for this function
-    #[arg(long)]
-    pub enable_function_url: bool,
-
-    /// Disable function URL for this function
-    #[arg(long)]
-    pub disable_function_url: bool,
-
-    /// Memory allocated for the function
-    #[arg(long, alias = "memory-size")]
-    pub memory: Option<Memory>,
-
-    /// How long the function can be running for, in seconds
-    #[arg(long)]
-    pub timeout: Option<Timeout>,
-
-    #[command(flatten)]
-    pub env_options: Option<EnvOptions>,
-
-    /// Tracing mode with X-Ray
-    #[arg(long)]
-    pub tracing: Option<Tracing>,
-
-    /// IAM Role associated with the function
-    #[arg(long, visible_alias = "iam-role")]
-    pub role: Option<String>,
-
-    /// Lambda Layer ARN to associate the deployed function with
-    #[arg(long, visible_alias = "layer-arn")]
-    pub layer: Option<Vec<String>>,
-
-    /// Subnet IDs to associate the deployed function with a VPC
-    #[arg(long, value_delimiter = ',')]
-    pub subnet_ids: Option<Vec<String>>,
-
-    /// Security Group IDs to associate the deployed function
-    #[arg(long, value_delimiter = ',')]
-    pub security_group_ids: Option<Vec<String>>,
-
-    /// Allow outbound IPv6 traffic on VPC functions that are connected to dual-stack subnets
-    #[arg(long)]
-    pub ipv6_allowed_for_dual_stack: bool,
-
-    /// Choose a different Lambda runtime to deploy with.
-    /// The only other option that might work is `provided.al2`.
-    #[arg(long, default_value = "provided.al2023")]
-    pub runtime: String,
-}
-
-impl FunctionDeployConfig {
-    fn to_deploy_config(&self) -> DeployConfig {
-        DeployConfig {
-            iam_role: self.role.clone(),
-            tracing: self.tracing.clone().unwrap_or_default(),
-            layers: self.layer.clone(),
-            vpc: VpcConfig::build(
-                self.subnet_ids.clone(),
-                self.security_group_ids.clone(),
-                self.ipv6_allowed_for_dual_stack,
-            ),
-            ..Default::default()
-        }
-    }
 }
 
 #[derive(Serialize)]
@@ -126,15 +53,10 @@ impl std::fmt::Display for DeployOutput {
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn deploy(
+    config: &Deploy,
+    base_env: &HashMap<String, String>,
     name: &str,
-    binary_name: &str,
-    manifest_path: &PathBuf,
-    function_config: &FunctionDeployConfig,
-    remote_config: &RemoteConfig,
     sdk_config: &SdkConfig,
-    s3_bucket: &Option<String>,
-    s3_key: &Option<String>,
-    tags: &Option<Vec<String>>,
     binary_archive: &BinaryArchive,
     architecture: Architecture,
     progress: &Progress,
@@ -142,40 +64,35 @@ pub(crate) async fn deploy(
     let client = LambdaClient::new(sdk_config);
 
     let (function_arn, version) = upsert_function(
+        config,
+        base_env,
         name,
-        binary_name,
-        manifest_path,
         &client,
-        function_config,
-        remote_config,
         sdk_config,
-        s3_bucket,
-        s3_key,
-        tags,
         binary_archive,
         architecture,
         progress,
     )
     .await?;
 
-    if let Some(alias) = &remote_config.alias {
+    if let Some(alias) = &config.remote_config.alias {
         progress.set_message("updating alias version");
 
         upsert_alias(name, alias, &version, &client).await?;
     }
 
-    let function_url = if function_config.enable_function_url {
+    let function_url = if config.function_config.enable_function_url {
         progress.set_message("configuring function url");
 
-        Some(upsert_function_url_config(name, &remote_config.alias, &client).await?)
+        Some(upsert_function_url_config(name, &config.remote_config.alias, &client).await?)
     } else {
         None
     };
 
-    if function_config.disable_function_url {
+    if config.function_config.disable_function_url {
         progress.set_message("deleting function url configuration");
 
-        delete_function_url_config(name, &remote_config.alias, &client).await?;
+        delete_function_url_config(name, &config.remote_config.alias, &client).await?;
     }
 
     Ok(DeployResult::Function(DeployOutput {
@@ -186,30 +103,16 @@ pub(crate) async fn deploy(
 
 #[allow(clippy::too_many_arguments)]
 async fn upsert_function(
+    config: &Deploy,
+    base_env: &HashMap<String, String>,
     name: &str,
-    binary_name: &str,
-    manifest_path: &PathBuf,
     client: &LambdaClient,
-    function_config: &FunctionDeployConfig,
-    remote_config: &RemoteConfig,
     sdk_config: &SdkConfig,
-    s3_bucket: &Option<String>,
-    s3_key: &Option<String>,
-    tags: &Option<Vec<String>>,
     binary_archive: &BinaryArchive,
     architecture: Architecture,
     progress: &Progress,
 ) -> Result<(String, String)> {
     let current_function = client.get_function().function_name(name).send().await;
-
-    let (environment, deploy_metadata) = load_deploy_environment(
-        manifest_path,
-        binary_name,
-        function_config,
-        tags,
-        s3_bucket,
-        s3_key,
-    )?;
 
     let action = match current_function {
         Ok(fun) => FunctionAction::Update(Box::new(fun)),
@@ -221,36 +124,40 @@ async fn upsert_function(
         }
     };
 
-    if let Some(extra_files) = &deploy_metadata.include {
+    if let Some(extra_files) = &config.include {
         binary_archive.add_files(extra_files)?;
     }
 
-    let tracing = deploy_metadata.tracing.clone();
+    let tracing = config.function_config.tracing.clone().unwrap_or_default();
     let tracing_config = TracingConfig::builder()
         .mode(tracing.to_string().as_str().into())
         .build();
 
-    let lambda_tags = deploy_metadata.tags.clone();
-    let s3_tags = deploy_metadata.s3_tags();
+    let environment = config.environment(base_env)?;
+    let environment = Environment::builder()
+        .set_variables(Some(environment))
+        .build();
+    let lambda_tags = config.lambda_tags();
+    let s3_tags = config.s3_tags();
 
     let (arn, version) = match action {
         FunctionAction::Create => {
-            let (iam_role, is_new_role) = match &deploy_metadata.iam_role {
+            let (iam_role, is_new_role) = match &config.function_config.role {
                 None => (roles::create(sdk_config, progress).await?, true),
                 Some(role) => (role.clone(), false),
             };
 
-            debug!(role_arn = ?iam_role, config = ?deploy_metadata, "creating new function");
+            debug!(role_arn = ?iam_role, ?config, "creating new function");
             progress.set_message("deploying function");
 
-            let code = match &deploy_metadata.s3_bucket {
+            let code = match &config.s3_bucket {
                 None => {
                     debug!("uploading zip to Lambda");
                     let blob = Blob::new(binary_archive.read()?);
                     FunctionCode::builder().zip_file(blob).build()
                 }
                 Some(bucket) => {
-                    let key = deploy_metadata.s3_key.as_deref().unwrap_or(name);
+                    let key = config.s3_key.as_deref().unwrap_or(name);
                     debug!(bucket, key, "uploading zip to S3");
                     let client = S3Client::new(sdk_config);
                     client
@@ -270,15 +177,20 @@ async fn upsert_function(
                 }
             };
 
-            let runtime = Runtime::from_str(&deploy_metadata.runtime).unwrap();
+            let runtime = Runtime::from_str(&config.function_config.runtime()).unwrap();
 
             let mut output = None;
             for attempt in 2..5 {
-                let memory = deploy_metadata.memory.clone().map(Into::into);
-                let timeout = deploy_metadata.timeout.clone().unwrap_or_default().into();
+                let memory = config.function_config.memory.clone().map(Into::into);
+                let timeout = config
+                    .function_config
+                    .timeout
+                    .clone()
+                    .unwrap_or_default()
+                    .into();
 
                 let mut function = client.create_function();
-                if let Some(vpc) = &deploy_metadata.vpc {
+                if let Some(vpc) = &config.function_config.vpc {
                     function = function.vpc_config(
                         LambdaVpcConfig::builder()
                             .set_security_group_ids(vpc.security_group_ids.clone())
@@ -300,7 +212,7 @@ async fn upsert_function(
                     .timeout(timeout)
                     .tracing_config(tracing_config.clone())
                     .environment(environment.clone())
-                    .set_layers(deploy_metadata.layers.clone())
+                    .set_layers(config.function_config.layer.clone())
                     .set_tags(lambda_tags.clone())
                     .send()
                     .await;
@@ -353,25 +265,25 @@ async fn upsert_function(
             }
 
             if wait_for_readiness {
-                wait_for_ready_state(client, name, &remote_config.alias, progress).await?;
+                wait_for_ready_state(client, name, &config.remote_config.alias, progress).await?;
                 progress.set_message("deploying function");
             }
 
             let mut update_config = false;
             let mut builder = client.update_function_configuration().function_name(name);
 
-            if deploy_metadata.use_for_update {
-                if let Some(iam_role) = &deploy_metadata.iam_role {
+            if config.function_config.should_update() {
+                if let Some(iam_role) = &config.function_config.role {
                     builder = builder.role(iam_role);
                 }
 
-                let memory = deploy_metadata.memory.clone().map(Into::into);
+                let memory = config.function_config.memory.clone().map(Into::into);
                 if memory.is_some() && conf.memory_size != memory {
                     update_config = true;
                     builder = builder.set_memory_size(memory);
                 }
 
-                if let Some(timeout) = deploy_metadata.timeout {
+                if let Some(timeout) = &config.function_config.timeout {
                     let timeout: i32 = timeout.into();
                     if conf.timeout.unwrap_or_default() != timeout {
                         update_config = true;
@@ -379,9 +291,9 @@ async fn upsert_function(
                     }
                 }
 
-                if should_update_layers(&deploy_metadata.layers, &conf) {
+                if should_update_layers(&config.function_config.layer, &conf) {
                     update_config = true;
-                    builder = builder.set_layers(deploy_metadata.layers);
+                    builder = builder.set_layers(config.function_config.layer.clone());
                 }
 
                 if let Some(vars) = environment.variables() {
@@ -403,7 +315,7 @@ async fn upsert_function(
                     builder = builder.tracing_config(tracing_config);
                 }
 
-                if let Some(vpc) = &deploy_metadata.vpc {
+                if let Some(vpc) = &config.function_config.vpc {
                     update_config = true;
                     builder = builder.vpc_config(
                         LambdaVpcConfig::builder()
@@ -423,7 +335,7 @@ async fn upsert_function(
                     .into_diagnostic()
                     .wrap_err("failed to update function configuration")?;
 
-                wait_for_ready_state(client, name, &remote_config.alias, progress).await?;
+                wait_for_ready_state(client, name, &config.remote_config.alias, progress).await?;
                 progress.set_message("deploying function");
             }
 
@@ -442,14 +354,14 @@ async fn upsert_function(
 
             let mut builder = client.update_function_code().function_name(name);
 
-            match &s3_bucket {
+            match &config.s3_bucket {
                 None => {
                     debug!("uploading zip to Lambda");
                     let blob = Blob::new(binary_archive.read()?);
                     builder = builder.zip_file(blob)
                 }
                 Some(bucket) => {
-                    let key = deploy_metadata.s3_key.as_deref().unwrap_or(name);
+                    let key = config.s3_key.as_deref().unwrap_or(name);
 
                     debug!(bucket, key, "uploading zip to S3");
 
@@ -488,120 +400,6 @@ async fn upsert_function(
         arn.expect("missing function ARN"),
         version.expect("missing function version"),
     ))
-}
-
-pub(crate) fn load_deploy_environment(
-    manifest_path: &PathBuf,
-    binary_name: &str,
-    function_config: &FunctionDeployConfig,
-    tags: &Option<Vec<String>>,
-    s3_bucket: &Option<String>,
-    s3_key: &Option<String>,
-) -> Result<(Environment, DeployConfig)> {
-    let base = function_deploy_metadata(
-        manifest_path,
-        binary_name,
-        tags,
-        s3_bucket,
-        s3_key,
-        function_config.to_deploy_config(),
-    )
-    .into_diagnostic()?;
-    let (environment, deploy_metadata) = merge_configuration(&base, function_config)?;
-
-    debug!(env = ?environment.variables(), metadata = ?deploy_metadata, "loaded function metadata for deployment");
-    Ok((environment, deploy_metadata))
-}
-
-fn merge_configuration(
-    base: &DeployConfig,
-    function_config: &FunctionDeployConfig,
-) -> Result<(Environment, DeployConfig)> {
-    let mut deploy_metadata = base.clone();
-
-    if let Some(tracing) = &function_config.tracing {
-        if &deploy_metadata.tracing != tracing {
-            deploy_metadata.tracing = tracing.clone();
-        }
-    }
-
-    if function_config.role.is_some() {
-        deploy_metadata.use_for_update = true;
-        deploy_metadata.iam_role.clone_from(&function_config.role);
-    }
-
-    if function_config.layer.is_some() {
-        deploy_metadata.use_for_update = true;
-        deploy_metadata.layers.clone_from(&function_config.layer);
-    }
-
-    if function_config.memory.is_some() {
-        deploy_metadata.use_for_update = true;
-        deploy_metadata.memory.clone_from(&function_config.memory);
-    }
-
-    if function_config.security_group_ids.is_some()
-        || function_config.subnet_ids.is_some()
-        || function_config.ipv6_allowed_for_dual_stack
-    {
-        let mut vpc = VpcConfig::default();
-        let mut update_vpc = false;
-
-        if function_config.subnet_ids.is_some() {
-            vpc.subnet_ids.clone_from(&function_config.subnet_ids);
-            update_vpc = true;
-        }
-
-        if function_config.security_group_ids.is_some() {
-            vpc.security_group_ids
-                .clone_from(&function_config.security_group_ids);
-            update_vpc = true;
-        }
-
-        if function_config.ipv6_allowed_for_dual_stack {
-            vpc.ipv6_allowed_for_dual_stack = true;
-            update_vpc = true;
-        }
-
-        if update_vpc {
-            deploy_metadata.use_for_update = true;
-            deploy_metadata.vpc = Some(vpc);
-        }
-    }
-
-    if let Some(timeout) = &function_config.timeout {
-        if !timeout.is_zero() {
-            deploy_metadata.use_for_update = true;
-            deploy_metadata.timeout = Some(timeout.clone())
-        }
-    }
-
-    let environment = match &function_config.env_options {
-        None => deploy_metadata.lambda_environment().into_diagnostic()?,
-        Some(config) => {
-            deploy_metadata.use_for_update = true;
-
-            if config.env_file.is_some() {
-                deploy_metadata.env_file.clone_from(&config.env_file);
-            }
-
-            let flag_env = config.lambda_environment().into_diagnostic()?;
-            deploy_metadata
-                .extend_environment(&flag_env)
-                .into_diagnostic()?
-        }
-    };
-
-    if !environment.is_empty() {
-        deploy_metadata.use_for_update = true;
-    }
-
-    deploy_metadata.runtime.clone_from(&function_config.runtime);
-    let env = Environment::builder()
-        .set_variables(Some(environment))
-        .build();
-
-    Ok((env, deploy_metadata))
 }
 
 async fn wait_for_ready_state(
@@ -836,148 +634,4 @@ pub(crate) fn alias_doesnt_exist_error(err: &SdkError<GetAliasError>) -> bool {
 // we need to compare error messages and hope for the best :(
 fn is_role_cannot_be_assumed_error(err: &SdkError<CreateFunctionError>) -> bool {
     err.to_string() == "InvalidParameterValueException: The role defined for the function cannot be assumed by Lambda."
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{load_deploy_environment, *};
-    use std::{collections::HashMap, path::PathBuf};
-
-    fn fixture(name: &str) -> PathBuf {
-        format!("../../tests/fixtures/{name}/Cargo.toml").into()
-    }
-
-    #[test]
-    fn test_load_deploy_environment() {
-        let (env, config) = load_deploy_environment(
-            &fixture("single-binary-package"),
-            "basic-lambda",
-            &Default::default(),
-            &None,
-            &None,
-            &None,
-        )
-        .unwrap();
-
-        let vars = env.variables().unwrap();
-        assert_eq!("VAL1".to_string(), vars["VAR1"]);
-        assert_eq!(Some(Memory::Mb512), config.memory);
-
-        let mut tags = HashMap::new();
-        tags.insert("organization".to_string(), "aws".to_string());
-        tags.insert("team".to_string(), "lambda".to_string());
-        assert_eq!(Some(tags), config.tags);
-
-        assert_eq!(
-            Some("arn:aws:lambda:us-east-1:xxxxxxxx:iam:role1".to_string()),
-            config.iam_role
-        );
-        assert!(config.use_for_update);
-    }
-
-    #[test]
-    fn test_load_deploy_environment_appending_flags() {
-        let flags = FunctionDeployConfig {
-            memory: Some(Memory::Mb1024),
-
-            ..Default::default()
-        };
-
-        let tags = vec!["team=s3".to_string(), "subteam=storage".to_string()];
-
-        let (env, config) = load_deploy_environment(
-            &fixture("single-binary-package"),
-            "basic-lambda",
-            &flags,
-            &Some(tags),
-            &None,
-            &None,
-        )
-        .unwrap();
-
-        let vars = env.variables().unwrap();
-        assert_eq!("VAL1".to_string(), vars["VAR1"]);
-        assert_eq!(Some(Memory::Mb1024), config.memory);
-
-        let mut tags = HashMap::new();
-        tags.insert("organization".to_string(), "aws".to_string());
-        tags.insert("team".to_string(), "s3".to_string());
-        tags.insert("subteam".to_string(), "storage".to_string());
-
-        assert_eq!(Some(tags), config.tags);
-        assert!(config.use_for_update);
-    }
-
-    #[test]
-    fn test_load_deploy_environment_empty_config() {
-        let flags = FunctionDeployConfig {
-            ..Default::default()
-        };
-
-        let tags = vec!["team=s3".to_string(), "subteam=storage".to_string()];
-
-        let (_env, config) = load_deploy_environment(
-            &fixture("multi-binary-package"),
-            "basic-lambda",
-            &flags,
-            &Some(tags),
-            &None,
-            &None,
-        )
-        .unwrap();
-
-        let mut tags = HashMap::new();
-        tags.insert("team".to_string(), "s3".to_string());
-        tags.insert("subteam".to_string(), "storage".to_string());
-
-        assert_eq!(Some(tags), config.tags);
-        assert!(!config.use_for_update);
-    }
-
-    #[test]
-    fn test_load_deploy_environment_empty_config_with_env_flags() {
-        let flags = FunctionDeployConfig {
-            role: Some("role-arn".into()),
-            env_options: Some(EnvOptions {
-                env_var: Some(vec!["FOO=BAR".into()]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let (env, config) = load_deploy_environment(
-            &fixture("multi-binary-package"),
-            "basic-lambda",
-            &flags,
-            &None,
-            &None,
-            &None,
-        )
-        .unwrap();
-
-        assert_eq!(Some("role-arn".into()), config.iam_role);
-        assert_eq!("BAR", env.variables().unwrap()["FOO"]);
-        assert!(config.use_for_update);
-    }
-
-    #[test]
-    fn test_load_deploy_environment_with_memory_update() {
-        let flags = FunctionDeployConfig {
-            memory: Some(Memory::Mb1024),
-            ..Default::default()
-        };
-
-        let (_env, config) = load_deploy_environment(
-            &fixture("multi-binary-package"),
-            "basic-lambda",
-            &flags,
-            &None,
-            &None,
-            &None,
-        )
-        .unwrap();
-
-        assert_eq!(Some(Memory::Mb1024), config.memory);
-        assert!(config.use_for_update);
-    }
 }

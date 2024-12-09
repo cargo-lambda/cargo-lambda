@@ -15,12 +15,17 @@ description.workspace = true
 cargo-lambda-build.workspace = true
 cargo-lambda-deploy.workspace = true
 cargo-lambda-invoke.workspace = true
+cargo-lambda-metadata.workspace = true
 cargo-lambda-new.workspace = true
 cargo-lambda-system.workspace = true
 cargo-lambda-watch.workspace = true
+cargo_metadata.workspace = true
 clap = { workspace = true, features = ["suggestions"] }
 clap-cargo = "0.12.0"
+figment.workspace = true
 miette = { workspace = true, features = ["fancy"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

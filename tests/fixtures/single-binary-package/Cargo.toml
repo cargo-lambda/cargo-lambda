@@ -27,3 +27,4 @@ tags = { "organization" = "aws", "team" = "lambda" }
 [package.metadata.lambda.build.compiler]
 type = "cargo"
 subcommand = ["brazil", "build"]
+extra_args = ["--release"]

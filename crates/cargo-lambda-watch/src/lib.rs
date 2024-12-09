@@ -2,15 +2,14 @@ use axum::{extract::Extension, http::header::HeaderName, Router};
 use bytes::Bytes;
 use cargo_lambda_metadata::{
     cargo::{
-        filter_binary_targets_from_metadata, kind_bin_filter, load_metadata, watch_metadata,
-        CargoPackage, WatchConfig,
+        filter_binary_targets_from_metadata, kind_bin_filter, watch::Watch, CargoMetadata,
+        CargoPackage,
     },
-    env::EnvOptions,
     lambda::Timeout,
     DEFAULT_PACKAGE_FUNCTION,
 };
 use cargo_lambda_remote::tls::TlsOptions;
-use clap::{Args, ValueHint};
+use cargo_options::Run as CargoOptions;
 use http_body_util::{combinators::BoxBody, BodyExt};
 use hyper::{body::Incoming, client::conn::http1, service::service_fn, Request, Response};
 use hyper_util::{
@@ -25,9 +24,9 @@ use opentelemetry::{
 use opentelemetry_aws::trace::XrayPropagator;
 use rustls::ServerConfig;
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     net::{IpAddr, SocketAddr},
-    path::{Path, PathBuf},
+    path::Path,
     str::FromStr,
     sync::Arc,
 };
@@ -66,209 +65,123 @@ use crate::{error::ServerError, requests::Action};
 
 pub(crate) const RUNTIME_EMULATOR_PATH: &str = "/.rt";
 
-#[derive(Args, Clone, Debug)]
-#[command(
-    name = "watch",
-    visible_alias = "start",
-    after_help = "Full command documentation: https://www.cargo-lambda.info/commands/watch.html"
-)]
-pub struct Watch {
-    /// Ignore any code changes, and don't reload the function automatically
-    #[arg(long, visible_alias = "no-reload")]
-    ignore_changes: bool,
+#[tracing::instrument(target = "cargo_lambda")]
+pub async fn run(
+    config: &Watch,
+    base_env: &HashMap<String, String>,
+    metadata: &CargoMetadata,
+    color: &str,
+) -> Result<()> {
+    tracing::trace!("watching project");
 
-    /// Start the Lambda runtime APIs without starting the function.
-    /// This is useful if you start (and debug) your function in your IDE.
-    #[arg(long)]
-    only_lambda_apis: bool,
+    let manifest_path = config.manifest_path();
 
-    #[cfg_attr(
-        target_os = "windows",
-        arg(short = 'a', long, default_value = "127.0.0.1")
-    )]
-    #[cfg_attr(
-        not(target_os = "windows"),
-        arg(short = 'a', long, default_value = "::")
-    )]
-    /// Address where users send invoke requests
-    invoke_address: String,
-
-    /// Address port where users send invoke requests
-    #[arg(short = 'p', long, default_value = "9000")]
-    invoke_port: u16,
-
-    /// Print OpenTelemetry traces after each function invocation
-    #[arg(long)]
-    print_traces: bool,
-
-    /// Wait for the first invocation to compile the function
-    #[arg(long, short)]
-    wait: bool,
-
-    /// Disable the default CORS configuration
-    #[arg(long)]
-    disable_cors: bool,
-
-    /// How long the invoke request waits for a response
-    #[arg(long)]
-    timeout: Option<Timeout>,
-
-    #[command(flatten)]
-    cargo_options: CargoOptions,
-
-    #[command(flatten)]
-    env_options: EnvOptions,
-
-    #[command(flatten)]
-    tls_options: TlsOptions,
-}
-
-#[derive(Args, Clone, Debug)]
-struct CargoOptions {
-    /// Path to Cargo.toml
-    #[arg(long, value_name = "PATH", value_hint = ValueHint::FilePath)]
-    #[arg(default_value = "Cargo.toml")]
-    manifest_path: PathBuf,
-
-    /// Features to pass to `cargo run`, separated by comma
-    #[arg(long, short = 'F')]
-    features: Option<String>,
-
-    /// Enable release mode when the emulator starts
-    #[arg(long, short = 'r')]
-    release: bool,
-
-    /// Change the color options in the `cargo run` command
-    #[arg(skip)]
-    color: String,
-
-    /// Ignore all default features
-    #[arg(long)]
-    no_default_features: bool,
-
-    /// Package to build
-    #[arg(long, short)]
-    package: Option<String>,
-}
-
-impl Watch {
-    #[tracing::instrument(skip(self), target = "cargo_lambda")]
-    pub async fn run(&self, color: &str) -> Result<()> {
-        tracing::trace!(options = ?self, "watching project");
-
-        let mut cargo_options = self.cargo_options.clone();
-        cargo_options.color = color.into();
-
-        let base = dunce::canonicalize(".").into_diagnostic()?;
-        let ignore_files = watcher::ignore::discover_files(&base).await;
-
-        let env = self.env_options.lambda_environment().into_diagnostic()?;
-
-        let package_filter = cargo_options
-            .package
-            .as_ref()
-            .map(|package| move |p: &&CargoPackage| p.name == *package);
-
-        let metadata = load_metadata(&cargo_options.manifest_path)
-            .map_err(ServerError::FailedToReadMetadata)?;
-
-        let binary_packages =
-            filter_binary_targets_from_metadata(&metadata, kind_bin_filter, package_filter);
-
-        if binary_packages.is_empty() {
-            Err(ServerError::NoBinaryPackages)?;
-        }
-
-        let watcher_config = WatcherConfig {
-            base,
-            ignore_files,
-            env,
-            ignore_changes: self.ignore_changes,
-            only_lambda_apis: self.only_lambda_apis,
-            manifest_path: cargo_options.manifest_path.clone(),
-            wait: self.wait,
-            ..Default::default()
-        };
-
-        let watch_metadata =
-            watch_metadata(&metadata).map_err(ServerError::FailedToReadMetadata)?;
-
-        let runtime_state = self.build_runtime_state(
-            &cargo_options.manifest_path,
-            &watch_metadata,
-            binary_packages,
-        )?;
-
-        let disable_cors = self.disable_cors;
-        let timeout = self.timeout.clone();
-        let tls_options = self.tls_options.clone();
-
-        let _ = Toplevel::new(move |s| async move {
-            s.start(SubsystemBuilder::new("Lambda server", move |s| {
-                start_server(
-                    s,
-                    runtime_state,
-                    cargo_options,
-                    watcher_config,
-                    tls_options,
-                    disable_cors,
-                    timeout,
-                )
-            }));
-        })
-        .catch_signals()
-        .handle_shutdown_requests(Duration::from_secs(1))
-        .await;
-
-        Ok(())
+    let mut cargo_options = config.cargo_opts.clone();
+    cargo_options.color = Some(color.into());
+    if cargo_options.manifest_path.is_none() {
+        cargo_options.manifest_path = Some(manifest_path.clone());
     }
 
-    pub fn xray_layer<S>(&self) -> OpenTelemetryLayer<S, Tracer>
-    where
-        S: Subscriber + for<'span> LookupSpan<'span>,
-    {
-        global::set_text_map_propagator(XrayPropagator::default());
+    let base = dunce::canonicalize(".").into_diagnostic()?;
+    let ignore_files = watcher::ignore::discover_files(&base).await;
 
-        let builder = stdout::new_pipeline().with_trace_config(
-            trace::config()
-                .with_sampler(trace::Sampler::AlwaysOn)
-                .with_id_generator(trace::XrayIdGenerator::default()),
-        );
-        let tracer = if self.print_traces {
-            builder.install_simple()
-        } else {
-            builder.with_writer(std::io::sink()).install_simple()
-        };
-        tracing_opentelemetry::layer().with_tracer(tracer)
+    let env = config.lambda_environment(base_env).into_diagnostic()?;
+
+    let package_filter = if !cargo_options.packages.is_empty() {
+        let packages = cargo_options.packages.clone();
+        Some(move |p: &&CargoPackage| packages.contains(&p.name))
+    } else {
+        None
+    };
+
+    let binary_packages =
+        filter_binary_targets_from_metadata(metadata, kind_bin_filter, package_filter);
+
+    if binary_packages.is_empty() {
+        Err(ServerError::NoBinaryPackages)?;
     }
 
-    fn build_runtime_state(
-        &self,
-        manifest_path: &Path,
-        metadata: &WatchConfig,
-        binary_packages: HashSet<String>,
-    ) -> Result<RuntimeState> {
-        let ip = IpAddr::from_str(&self.invoke_address)
-            .into_diagnostic()
-            .wrap_err("invalid invoke address")?;
-        let (runtime_port, proxy_addr) = if self.tls_options.is_secure() {
-            (
-                self.invoke_port + 1,
-                Some(SocketAddr::from((ip, self.invoke_port))),
+    let watcher_config = WatcherConfig {
+        base,
+        ignore_files,
+        env,
+        ignore_changes: config.ignore_changes,
+        only_lambda_apis: config.only_lambda_apis,
+        manifest_path: manifest_path.clone(),
+        wait: config.wait,
+        ..Default::default()
+    };
+
+    let runtime_state = build_runtime_state(config, &manifest_path, binary_packages)?;
+
+    let disable_cors = config.disable_cors;
+    let timeout = config.timeout.clone();
+    let tls_options = config.tls_options.clone();
+
+    let _ = Toplevel::new(move |s| async move {
+        s.start(SubsystemBuilder::new("Lambda server", move |s| {
+            start_server(
+                s,
+                runtime_state,
+                cargo_options,
+                watcher_config,
+                tls_options,
+                disable_cors,
+                timeout,
             )
-        } else {
-            (self.invoke_port, None)
-        };
-        let runtime_addr = SocketAddr::from((ip, runtime_port));
+        }));
+    })
+    .catch_signals()
+    .handle_shutdown_requests(Duration::from_secs(1))
+    .await;
 
-        Ok(RuntimeState::new(
-            runtime_addr,
-            proxy_addr,
-            manifest_path.to_path_buf(),
-            binary_packages,
-            metadata.router.clone(),
-        ))
-    }
+    Ok(())
+}
+
+pub fn xray_layer<S>(config: &Watch) -> OpenTelemetryLayer<S, Tracer>
+where
+    S: Subscriber + for<'span> LookupSpan<'span>,
+{
+    global::set_text_map_propagator(XrayPropagator::default());
+
+    let builder = stdout::new_pipeline().with_trace_config(
+        trace::config()
+            .with_sampler(trace::Sampler::AlwaysOn)
+            .with_id_generator(trace::XrayIdGenerator::default()),
+    );
+    let tracer = if config.print_traces {
+        builder.install_simple()
+    } else {
+        builder.with_writer(std::io::sink()).install_simple()
+    };
+    tracing_opentelemetry::layer().with_tracer(tracer)
+}
+
+fn build_runtime_state(
+    config: &Watch,
+    manifest_path: &Path,
+    binary_packages: HashSet<String>,
+) -> Result<RuntimeState> {
+    let ip = IpAddr::from_str(&config.invoke_address)
+        .into_diagnostic()
+        .wrap_err("invalid invoke address")?;
+    let (runtime_port, proxy_addr) = if config.tls_options.is_secure() {
+        (
+            config.invoke_port + 1,
+            Some(SocketAddr::from((ip, config.invoke_port))),
+        )
+    } else {
+        (config.invoke_port, None)
+    };
+    let runtime_addr = SocketAddr::from((ip, runtime_port));
+
+    Ok(RuntimeState::new(
+        runtime_addr,
+        proxy_addr,
+        manifest_path.to_path_buf(),
+        binary_packages,
+        config.router.clone(),
+    ))
 }
 
 async fn start_server(

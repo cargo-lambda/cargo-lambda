@@ -1,10 +1,8 @@
-use std::path::PathBuf;
-
 use super::DeployResult;
 use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
 use cargo_lambda_build::BinaryArchive;
 use cargo_lambda_interactive::progress::Progress;
-use cargo_lambda_metadata::cargo::{function_deploy_metadata, DeployConfig};
+use cargo_lambda_metadata::cargo::deploy::Deploy;
 use cargo_lambda_remote::{
     aws_sdk_config::SdkConfig,
     aws_sdk_lambda::{
@@ -30,41 +28,33 @@ impl std::fmt::Display for DeployOutput {
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn deploy(
+    config: &Deploy,
     name: &str,
-    manifest_path: &PathBuf,
     sdk_config: &SdkConfig,
     binary_archive: &BinaryArchive,
     architecture: Architecture,
-    compatible_runtimes: Vec<Runtime>,
-    s3_bucket: &Option<String>,
-    s3_key: &Option<String>,
-    tags: &Option<Vec<String>>,
     progress: &Progress,
 ) -> Result<DeployResult> {
     let lambda_client = LambdaClient::new(sdk_config);
 
-    let deploy_metadata = function_deploy_metadata(
-        manifest_path,
-        name,
-        tags,
-        s3_bucket,
-        s3_key,
-        DeployConfig::default(),
-    )
-    .into_diagnostic()?;
-
-    if let Some(extra_files) = &deploy_metadata.include {
+    if let Some(extra_files) = &config.include {
         binary_archive.add_files(extra_files)?;
     }
 
-    let input = match &deploy_metadata.s3_bucket {
+    let compatible_runtimes = config
+        .compatible_runtimes()
+        .iter()
+        .map(|runtime| Runtime::from(runtime.as_str()))
+        .collect::<Vec<_>>();
+
+    let input = match &config.s3_bucket {
         None => LayerVersionContentInput::builder()
             .zip_file(Blob::new(binary_archive.read()?))
             .build(),
         Some(bucket) => {
             progress.set_message("uploading binary to S3");
 
-            let key = deploy_metadata.s3_key.as_deref().unwrap_or(name);
+            let key = config.s3_key.as_deref().unwrap_or(name);
             debug!(bucket, key, "uploading zip to S3");
 
             let s3_client = S3Client::new(sdk_config);
@@ -74,7 +64,7 @@ pub(crate) async fn deploy(
                 .key(key)
                 .body(ByteStream::from(binary_archive.read()?));
 
-            if let Some(tags) = deploy_metadata.s3_tags() {
+            if let Some(tags) = config.s3_tags() {
                 operation = operation.tagging(tags);
             }
 

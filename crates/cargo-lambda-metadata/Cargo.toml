@@ -12,11 +12,14 @@ keywords.workspace = true
 description.workspace = true
 
 [dependencies]
-cargo_metadata = "0.15.3"
+cargo-lambda-remote.workspace = true
+cargo_metadata.workspace = true
+cargo-options.workspace = true
 clap.workspace = true
 env-file-reader = "0.3.0"
+figment.workspace = true
 matchit = "0.8.5"
-miette = "4.7.1"
+miette.workspace = true
 remove_dir_all = "0.7.0"
 serde.workspace = true
 serde_json.workspace = true
@@ -26,3 +29,6 @@ thiserror.workspace = true
 toml.workspace = true
 tracing.workspace = true
 urlencoding = "2.1.3"
+
+[dev-dependencies]
+assertables.workspace = true
