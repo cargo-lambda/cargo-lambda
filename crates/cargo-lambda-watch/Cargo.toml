@@ -20,7 +20,6 @@ cargo-lambda-metadata.workspace = true
 cargo-lambda-remote.workspace = true
 cargo-options.workspace = true
 chrono = "0.4.19"
-clap.workspace = true
 dunce.workspace = true
 http = "1.0"
 http-body-util = "0.1"
