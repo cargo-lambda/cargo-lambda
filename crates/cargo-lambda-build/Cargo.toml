@@ -16,7 +16,6 @@ cargo-lambda-interactive.workspace = true
 cargo-lambda-metadata.workspace = true
 cargo-options.workspace = true
 cargo-zigbuild.workspace = true
-clap.workspace = true
 home.workspace = true
 miette.workspace = true
 object = "0.28.4"

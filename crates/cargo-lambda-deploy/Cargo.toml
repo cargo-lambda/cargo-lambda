@@ -20,7 +20,6 @@ cargo-lambda-build.workspace = true
 cargo-lambda-interactive.workspace = true
 cargo-lambda-metadata.workspace = true
 cargo-lambda-remote.workspace = true
-clap.workspace = true
 miette.workspace = true
 serde.workspace = true
 serde_json.workspace = true
