@@ -20,6 +20,18 @@ Each one of these sources overrides the values of the previous ones. For example
 
 Some configuration options, like `env`, `include`, and `router`, are arrays. By default, these arrays are merged together instead of overridden. This behavior can be changed by using the `--strict` flag in the CLI. This option is only available through the CLI, and through the `CARGO_LAMBDA_STRICT` environment variable. When this option is enabled, array values from the CLI flags will override the values from the configuration files.
 
+## Environment variables
+
+Environment variables are always loaded first, any configuration files loaded after that, or flags in the CLI will override the values from the environment variables.
+
+Environment variables start with `CARGO_LAMBDA_`, and are always in the format of `CARGO_LAMBDA_<SECTION>.<OPTION>`. The valid sections are `build`, `deploy`, and `watch`. For example, the `memory` option in the `deploy` section would be `CARGO_LAMBDA_DEPLOY.MEMORY`. The `release` option in the `build` section would be `CARGO_LAMBDA_BUILD.RELEASE`.
+
+:::warning
+
+Environment variables are not recommended for values that represent lists of options, like `features`, `layers`, or `tags`. This is because the values are not split into an array, and the values will just be pass as the first value in the array.
+
+:::
+
 ## Global configuration files
 
 The configuration file is a TOML file named `CargoLambda.toml` that is usually located in the root of your project. You can specify a different location using the `--global` option.
