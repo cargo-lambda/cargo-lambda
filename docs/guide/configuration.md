@@ -18,17 +18,17 @@ Each one of these sources overrides the values of the previous ones. For example
 
 ### Merge array behavior
 
-Some configuration options, like `env`, `include`, and `router`, are arrays. By default, these arrays are merged together instead of overridden. This behavior can be changed by using the `--strict` flag in the CLI. This option is only available through the CLI, and through the `CARGO_LAMBDA_STRICT` environment variable. When this option is enabled, array values from the CLI flags will override the values from the configuration files.
+Some configuration options, like `env`, `include`, and `router`, are arrays. By default, these arrays override the values from the previous sources. However, in some cases, you might want to merge the arrays instead of overriding them. This behavior can be changed by using the `--admerge` flag in the CLI. This option is only available through the CLI, and through the `CARGO_LAMBDA_ADMERGE` environment variable. When this option is enabled, array values from the CLI flags will merge with the values from the configuration files.
 
 ## Environment variables
 
 Environment variables are always loaded first, any configuration files loaded after that, or flags in the CLI will override the values from the environment variables.
 
-Environment variables start with `CARGO_LAMBDA_`, and are always in the format of `CARGO_LAMBDA_<SECTION>.<OPTION>`. The valid sections are `build`, `deploy`, and `watch`. For example, the `memory` option in the `deploy` section would be `CARGO_LAMBDA_DEPLOY.MEMORY`. The `release` option in the `build` section would be `CARGO_LAMBDA_BUILD.RELEASE`.
+Environment variables start with `CARGO_LAMBDA_`, and are always in the format of `CARGO_LAMBDA_<SUBCOMMAND>.<OPTION>`. The valid subcommands are `build`, `deploy`, and `watch`. For example, the `memory` option in the `deploy` section would be `CARGO_LAMBDA_DEPLOY.MEMORY`. The `release` option in the `build` section would be `CARGO_LAMBDA_BUILD.RELEASE`.
 
-:::warning
+:::tip
 
-Environment variables are not recommended for values that represent lists of options, like `features`, `layers`, or `tags`. This is because the values are not split into an array, and the values will just be pass as the first value in the array.
+Environment variables that represent lists of options, like `features`, `layers`, or `tags`, MUST be wrapped in square brackets. For example, `CARGO_LAMBDA_BUILD.FEATURES` must be `CARGO_LAMBDA_BUILD.FEATURES="[lambda, env]"`.
 
 :::
 
