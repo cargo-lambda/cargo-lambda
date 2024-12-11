@@ -53,9 +53,9 @@ struct Lambda {
     #[arg(short = 'x', long, global = true, env = "CARGO_LAMBDA_CONTEXT")]
     context: Option<String>,
 
-    /// Strict mode: override all configuration files values, without merging vector values
-    #[arg(long, global = true, env = "CARGO_LAMBDA_STRICT")]
-    strict: bool,
+    /// Admerge mode: merge arrays instead of overriding them
+    #[arg(long, global = true, env = "CARGO_LAMBDA_ADMERGE")]
+    admerge: bool,
 
     /// Print version information
     #[arg(short = 'V', long)]
@@ -119,16 +119,16 @@ impl LambdaSubcommand {
         color: &str,
         global: Option<PathBuf>,
         context: Option<String>,
-        strict: bool,
+        admerge: bool,
     ) -> Result<()> {
         match self {
-            Self::Build(b) => Self::run_build(b, global, context, strict).await,
-            Self::Deploy(d) => Self::run_deploy(d, global, context, strict).await,
+            Self::Build(b) => Self::run_build(b, global, context, admerge).await,
+            Self::Deploy(d) => Self::run_deploy(d, global, context, admerge).await,
             Self::Init(mut i) => i.run().await,
             Self::Invoke(i) => i.run().await,
             Self::New(mut n) => n.run().await,
             Self::System(s) => s.run().await,
-            Self::Watch(w) => Self::run_watch(w, color, global, context, strict).await,
+            Self::Watch(w) => Self::run_watch(w, color, global, context, admerge).await,
         }
     }
 
@@ -136,7 +136,7 @@ impl LambdaSubcommand {
         build: Build,
         global: Option<PathBuf>,
         context: Option<String>,
-        strict: bool,
+        admerge: bool,
     ) -> Result<()> {
         let metadata = load_metadata(build.manifest_path())?;
         let args_config = Config {
@@ -147,7 +147,7 @@ impl LambdaSubcommand {
         let options = ConfigOptions {
             context,
             global,
-            strict,
+            admerge,
             ..Default::default()
         };
         let mut config = load_config(&args_config, &metadata, &options)?;
@@ -159,7 +159,7 @@ impl LambdaSubcommand {
         color: &str,
         global: Option<PathBuf>,
         context: Option<String>,
-        strict: bool,
+        admerge: bool,
     ) -> Result<()> {
         let name = watch.package();
         let metadata = load_metadata(watch.manifest_path())?;
@@ -172,7 +172,7 @@ impl LambdaSubcommand {
             name,
             context,
             global,
-            strict,
+            admerge,
         };
         let config = load_config(&args_config, &metadata, &options)?;
         cargo_lambda_watch::run(&config.watch, &config.env, &metadata, color).await
@@ -182,7 +182,7 @@ impl LambdaSubcommand {
         deploy: Deploy,
         global: Option<PathBuf>,
         context: Option<String>,
-        strict: bool,
+        admerge: bool,
     ) -> Result<()> {
         let name = deploy.name.clone();
         let metadata = load_metadata(deploy.manifest_path())?;
@@ -195,7 +195,7 @@ impl LambdaSubcommand {
             name,
             context,
             global,
-            strict,
+            admerge,
         };
         let config = load_config(&args_config, &metadata, &options)?;
         cargo_lambda_deploy::run(&config.deploy, &config.env, &metadata).await
@@ -303,7 +303,7 @@ async fn run_subcommand(lambda: Lambda, color: Color) -> Result<()> {
             &color.to_lowercase(),
             lambda.global,
             lambda.context,
-            lambda.strict,
+            lambda.admerge,
         )
         .await
 }

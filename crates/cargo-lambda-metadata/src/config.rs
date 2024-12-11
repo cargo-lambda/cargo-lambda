@@ -16,7 +16,7 @@ pub struct ConfigOptions {
     pub name: Option<String>,
     pub context: Option<String>,
     pub global: Option<PathBuf>,
-    pub strict: bool,
+    pub admerge: bool,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -51,10 +51,10 @@ pub fn load_config(
         args_serialized = args_serialized.profile(context);
     }
 
-    figment = if options.strict {
-        figment.merge(args_serialized)
-    } else {
+    figment = if options.admerge {
         figment.admerge(args_serialized)
+    } else {
+        figment.merge(args_serialized)
     };
 
     figment.extract().into_diagnostic()
@@ -86,22 +86,26 @@ fn figment_from_metadata(metadata: &CargoMetadata, options: &ConfigOptions) -> R
         figment = figment.select(context)
     }
 
-    figment = figment.merge(Env::prefixed("CARGO_LAMBDA_"));
+    let mut env_serialized = Env::prefixed("CARGO_LAMBDA_");
+    if let Some(context) = &options.context {
+        env_serialized = env_serialized.profile(context);
+    }
+    figment = figment.merge(env_serialized);
 
-    figment = if options.strict {
-        figment.merge(config_file)
-    } else {
+    figment = if options.admerge {
         figment.admerge(config_file)
+    } else {
+        figment.merge(config_file)
     };
 
     let mut ws_serialized = Serialized::defaults(ws_metadata);
     if let Some(context) = &options.context {
         ws_serialized = ws_serialized.profile(context);
     }
-    if options.strict {
-        figment = figment.merge(ws_serialized);
-    } else {
+    if options.admerge {
         figment = figment.admerge(ws_serialized);
+    } else {
+        figment = figment.merge(ws_serialized);
     }
 
     if let Some(bin_metadata) = bin_metadata {
@@ -110,10 +114,10 @@ fn figment_from_metadata(metadata: &CargoMetadata, options: &ConfigOptions) -> R
             bin_serialized = bin_serialized.profile(context);
         }
 
-        if options.strict {
-            figment = figment.merge(bin_serialized);
-        } else {
+        if options.admerge {
             figment = figment.admerge(bin_serialized);
+        } else {
+            figment = figment.merge(bin_serialized);
         }
     }
 
@@ -123,10 +127,10 @@ fn figment_from_metadata(metadata: &CargoMetadata, options: &ConfigOptions) -> R
             package_serialized = package_serialized.profile(context);
         }
 
-        if options.strict {
-            figment = figment.merge(package_serialized);
-        } else {
+        if options.admerge {
             figment = figment.admerge(package_serialized);
+        } else {
+            figment = figment.merge(package_serialized);
         }
     }
 
@@ -255,9 +259,10 @@ mod tests {
     }
 
     #[test]
-    fn test_load_router_from_metadata() {
+    fn test_load_router_from_metadata_admerge() {
         let options = ConfigOptions {
             name: Some("crate-3".to_string()),
+            admerge: true,
             ..Default::default()
         };
 
@@ -273,10 +278,9 @@ mod tests {
     }
 
     #[test]
-    fn test_load_router_from_metadata_string() {
+    fn test_load_router_from_metadata_strict() {
         let options = ConfigOptions {
             name: Some("crate-3".to_string()),
-            strict: true,
             ..Default::default()
         };
 
@@ -296,6 +300,7 @@ mod tests {
     fn test_extend_env_from_workspace() {
         let options = ConfigOptions {
             name: Some("basic-lambda-1".to_string()),
+            admerge: true,
             ..Default::default()
         };
 
