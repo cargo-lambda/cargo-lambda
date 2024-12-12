@@ -29,9 +29,9 @@ install-local:
 publish-all:
 	cargo publish --package cargo-lambda-interactive
 	sleep 10
-	cargo publish --package cargo-lambda-metadata
-	sleep 10
 	cargo publish --package cargo-lambda-remote
+	sleep 10
+	cargo publish --package cargo-lambda-metadata
 	sleep 10
 	cargo publish --package cargo-lambda-build
 	sleep 10
