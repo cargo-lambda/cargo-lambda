@@ -138,7 +138,6 @@ jobs:
         working-directory: target/github-release
         run: |
           make -f ../../Makefile build-release-zip tag=${{ github.ref_name }} target=windows-x64
-          make -f ../../Makefile build-release-zip tag=${{ github.ref_name }} target=windows-x86
 
       - name: Package macOS files
         working-directory: target/github-release
@@ -150,10 +149,7 @@ jobs:
         working-directory: target/github-release
         run: |
           make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=x86_64-unknown-linux-musl
-          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=i686-unknown-linux-musl
           make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=aarch64-unknown-linux-musl
-          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=armv7-unknown-linux-musleabihf
-          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=armv7-unknown-linux-musleabi
 
       - name: Move release files to upload
         run: |
