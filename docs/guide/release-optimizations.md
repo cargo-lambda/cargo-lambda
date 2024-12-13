@@ -47,7 +47,7 @@ debug = true
 
 If you want to learn more about the possible values for these options, check out Cargo's reference about [Profile settings](https://doc.rust-lang.org/cargo/reference/profiles.html#profile-settings).
 
-## Rutime CPU optimizations
+## Runtime CPU optimizations
 
 Cargo Lambda also optimizes the resulting binaries for specific CPU instruction sets.
 
