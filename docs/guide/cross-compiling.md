@@ -36,7 +36,7 @@ cargo lambda build --compiler cargo --release
 
 ## Known cross compilation issues
 
-As mentioned earlier, AWS Lambda uses Linux sandboxes to run your functions. Those sandboxes use Amazon Linux 2 as the operating system. By default, sandboxes only include the necessary libraries for the OS to work. `*-sys` libraries are not guaranteed to work unless they are completely linked to your binary, or you provide the native dependencies in some other way.
+As mentioned earlier, AWS Lambda uses Linux sandboxes to run your functions. Those sandboxes use Amazon Linux 2023, or Amazon Linux 2, as the operating system. By default, sandboxes only include the necessary libraries for the OS to work. `*-sys` libraries are not guaranteed to work unless they are completely linked to your binary, or you provide the native dependencies in some other way.
 
 This is a list of non-exhaustive problems that you might bump into if you try to build your Rust application to work on AWS Lambda:
 
