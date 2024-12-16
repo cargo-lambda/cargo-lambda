@@ -9,56 +9,20 @@ use cargo_lambda_remote::aws_sdk_lambda::types::Architecture;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
 use serde_json::ser::to_string_pretty;
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
+mod dry;
 mod extensions;
 mod functions;
 mod roles;
 
 #[derive(Serialize)]
-struct DryOutput {
-    kind: String,
-    name: String,
-    path: PathBuf,
-    arch: String,
-    runtimes: Vec<String>,
-    tags: Option<String>,
-    bucket: Option<String>,
-    include: Option<Vec<String>>,
-}
-
-impl std::fmt::Display for DryOutput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "🔍 deployment for {} `{}`:", self.kind, self.name)?;
-        writeln!(f, "🏠 binary located at {}", self.path.display())?;
-        writeln!(f, "🔗 architecture {}", self.arch)?;
-
-        if let Some(tags) = &self.tags {
-            writeln!(f, "🏷️ tagged with {}", tags.replace(',', ", "))?;
-        }
-
-        if let Some(bucket) = &self.bucket {
-            writeln!(f, "🪣 stored on S3 bucket `{}`", bucket)?;
-        }
-
-        if let Some(paths) = &self.include {
-            writeln!(f, "🗃️ extra files included:")?;
-            for file in paths {
-                writeln!(f, "- {}", file)?;
-            }
-        }
-
-        write!(f, "👟 running on {}", self.runtimes.join(", "))?;
-        Ok(())
-    }
-}
-
-#[derive(Serialize)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 enum DeployResult {
     Extension(extensions::DeployOutput),
     Function(functions::DeployOutput),
-    Dry(DryOutput),
+    Dry(dry::DeployOutput),
 }
 
 impl std::fmt::Display for DeployResult {
@@ -101,7 +65,9 @@ pub async fn run(
     let architecture = Architecture::from(archive.architecture.as_str());
 
     let result = if config.dry {
-        dry_output(config, &name, &archive)
+        Ok(DeployResult::Dry(dry::DeployOutput::new(
+            config, &name, &archive,
+        )))
     } else if config.extension {
         extensions::deploy(
             config,
@@ -182,31 +148,7 @@ fn load_archive(config: &Deploy, metadata: &CargoMetadata) -> Result<(String, Bi
     }
 }
 
-fn dry_output(config: &Deploy, name: &str, archive: &BinaryArchive) -> Result<DeployResult> {
-    let (kind, name, runtimes) = if config.extension {
-        ("extension", name.to_owned(), config.compatible_runtimes())
-    } else {
-        let binary_name = binary_name_or_default(config, name);
-        (
-            "function",
-            binary_name,
-            vec![config.function_config.runtime()],
-        )
-    };
-
-    Ok(DeployResult::Dry(DryOutput {
-        kind: kind.to_string(),
-        path: archive.path.clone(),
-        arch: archive.architecture.clone(),
-        bucket: config.s3_bucket.clone(),
-        tags: config.s3_tags(),
-        include: config.include.clone(),
-        name,
-        runtimes,
-    }))
-}
-
-fn binary_name_or_default(config: &Deploy, name: &str) -> String {
+pub(crate) fn binary_name_or_default(config: &Deploy, name: &str) -> String {
     config
         .binary_name
         .clone()
