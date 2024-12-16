@@ -58,7 +58,15 @@ If you're updating the code in a function, you don't need to pass this flag agai
 
 ## User Profile
 
-You can run this command with a different user profile using the `-p` or `--profile` flags. The minimum policy document is below:
+You can run this command with a different user profile using the `-p` or `--profile` flags.
+
+## IAM policy configuration
+
+The minimum policy document to deploy functions is described below.
+
+::: warning
+This policy is not exhaustive, and it might not be enough for your use case. For example, if you're deploying your function on a VPC, you'll need additional permissions described in the [VPC documentation](https://docs.aws.amazon.com/lambda/latest/dg/vpc.html). If you're deploying an extension, you'll need additional permissions to upload the extension to an S3 bucket.
+:::
 
 ```json
 {
