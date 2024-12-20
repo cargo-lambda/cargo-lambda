@@ -65,9 +65,8 @@ pub async fn run(
     let architecture = Architecture::from(archive.architecture.as_str());
 
     let result = if config.dry {
-        Ok(DeployResult::Dry(dry::DeployOutput::new(
-            config, &name, &archive,
-        )))
+        let output = dry::DeployOutput::new(config, &name, &archive)?;
+        Ok(DeployResult::Dry(output))
     } else if config.extension {
         extensions::deploy(
             config,
@@ -153,4 +152,33 @@ pub(crate) fn binary_name_or_default(config: &Deploy, name: &str) -> String {
         .binary_name
         .clone()
         .unwrap_or_else(|| name.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use assertables::assert_contains;
+    use std::path::PathBuf;
+
+    use cargo_lambda_metadata::cargo::load_metadata;
+
+    use super::*;
+
+    #[test]
+    fn test_load_archive_from_binary_path() {
+        let mut config = Deploy::default();
+        config.binary_path = Some(PathBuf::from("../../tests/binaries/binary-x86-64"));
+        config.include = Some(vec!["src".into()]);
+
+        let metadata = load_metadata("../../tests/fixtures/examples-package/Cargo.toml").unwrap();
+        let (name, archive) = load_archive(&config, &metadata).unwrap();
+        assert_eq!(name, "binary-x86-64");
+
+        let files = archive.list().unwrap();
+        assert_contains!(files, &"bootstrap".to_string());
+        assert_contains!(files, &"src/dry.rs".to_string());
+        assert_contains!(files, &"src/extensions.rs".to_string());
+        assert_contains!(files, &"src/functions.rs".to_string());
+        assert_contains!(files, &"src/lib.rs".to_string());
+        assert_contains!(files, &"src/roles.rs".to_string());
+    }
 }

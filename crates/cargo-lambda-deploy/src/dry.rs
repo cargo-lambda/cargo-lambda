@@ -1,5 +1,6 @@
 use cargo_lambda_build::BinaryArchive;
 use cargo_lambda_metadata::cargo::deploy::{Deploy, FunctionDeployConfig};
+use miette::Result;
 use serde::Serialize;
 use std::{collections::HashMap, fmt::Display, path::PathBuf};
 
@@ -27,10 +28,10 @@ pub(crate) struct DeployOutput {
     name: String,
     path: PathBuf,
     arch: String,
+    files: Vec<String>,
     runtimes: Vec<String>,
     tags: Option<String>,
     bucket: Option<String>,
-    include: Option<Vec<String>>,
     config: FunctionDeployConfig,
 }
 
@@ -48,15 +49,15 @@ impl Display for DeployOutput {
             writeln!(f, "🪣 stored on S3 bucket `{}`", bucket)?;
         }
 
-        if let Some(paths) = &self.include {
-            writeln!(f, "🗃️ extra files included:")?;
-            for file in paths {
-                writeln!(f, "- {}", file)?;
-            }
-        }
-
         if !self.runtimes.is_empty() {
             write!(f, "👟 compatible with {}", self.runtimes.join(", "))?;
+        }
+
+        if !self.files.is_empty() {
+            writeln!(f, "🗃️ files included in the zip file:")?;
+            for file in &self.files {
+                writeln!(f, "  - {}", file)?;
+            }
         }
 
         if self.kind == DeployKind::Function {
@@ -91,7 +92,7 @@ impl Display for DeployOutput {
 }
 
 impl DeployOutput {
-    pub(crate) fn new(config: &Deploy, name: &str, archive: &BinaryArchive) -> Self {
+    pub(crate) fn new(config: &Deploy, name: &str, archive: &BinaryArchive) -> Result<Self> {
         let (kind, name, runtimes) = if config.extension {
             (
                 DeployKind::Extension,
@@ -103,16 +104,16 @@ impl DeployOutput {
             (DeployKind::Function, binary_name, vec![])
         };
 
-        DeployOutput {
+        Ok(DeployOutput {
             kind,
             path: archive.path.clone(),
             arch: archive.architecture.clone(),
             bucket: config.s3_bucket.clone(),
             tags: config.s3_tags(),
-            include: config.include.clone(),
             config: config.function_config.clone(),
+            files: archive.list()?,
             name,
             runtimes,
-        }
+        })
     }
 }

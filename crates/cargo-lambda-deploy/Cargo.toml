@@ -28,3 +28,6 @@ strum_macros.workspace = true
 tokio = { workspace = true, features = ["time"]}
 tracing.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+assertables.workspace = true

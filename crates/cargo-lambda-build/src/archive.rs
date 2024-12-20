@@ -6,10 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use cargo_lambda_metadata::{
-    cargo::{target_dir_from_metadata, CargoMetadata},
-    fs::copy_and_replace,
-};
+use cargo_lambda_metadata::cargo::{target_dir_from_metadata, CargoMetadata};
 use chrono::{DateTime, Utc};
 use miette::{Context, IntoDiagnostic, Result};
 use object::{read::File as ObjectFile, Architecture, Object};
@@ -104,36 +101,18 @@ impl BinaryArchive {
         Ok(sha256)
     }
 
-    /// Add files to the zip archive
-    pub fn add_files(&self, files: &Vec<String>) -> Result<()> {
-        trace!(?self.path, ?files, "adding files to zip file");
+    /// List the files inside the zip archive
+    pub fn list(&self) -> Result<Vec<String>> {
         let zipfile = File::open(&self.path).into_diagnostic()?;
-
         let mut archive = ZipArchive::new(zipfile).into_diagnostic()?;
 
-        // Open a new, empty archive for writing to
-        let tmp_dir = tempfile::tempdir().into_diagnostic()?;
-        let tmp_path = tmp_dir
-            .path()
-            .join(self.path.file_name().expect("missing zip file name"));
-        let tmp = File::create(&tmp_path).into_diagnostic()?;
-        let mut new_archive = ZipWriter::new(tmp);
-
+        let mut files = Vec::new();
         for i in 0..archive.len() {
-            let file = archive.by_index_raw(i).into_diagnostic()?;
-            new_archive.raw_copy_file(file).into_diagnostic()?;
+            let entry = archive.by_index(i).into_diagnostic()?;
+            files.push(entry.name().to_string());
         }
 
-        include_files_in_zip(&mut new_archive, files)?;
-
-        new_archive
-            .finish()
-            .into_diagnostic()
-            .wrap_err_with(|| format!("failed to finish zip file `{}`", self.path.display()))?;
-
-        drop(archive);
-        copy_and_replace(&tmp_path, &self.path).into_diagnostic()?;
-        Ok(())
+        Ok(files)
     }
 }
 
@@ -385,6 +364,7 @@ mod test {
     use cargo_lambda_metadata::{cargo::load_metadata, fs::copy_without_replace};
     use rstest::rstest;
     use tempfile::TempDir;
+    use zip::ZipArchive;
 
     use super::*;
 
@@ -531,32 +511,6 @@ mod test {
     }
 
     #[test]
-    fn test_add_files() {
-        let data = BinaryData::new("binary-x86-64", false, false);
-
-        let bp = "../../tests/binaries/binary-x86-64";
-        let dd = TempDir::with_prefix("cargo-lambda-").expect("failed to create temp dir");
-
-        let archive =
-            zip_binary(bp, dd.path(), &data, None).expect("failed to create binary archive");
-
-        let extra = vec!["Cargo.toml".into()];
-        archive.add_files(&extra).expect("failed to add files");
-
-        let arch_path = dd.path().join("bootstrap.zip");
-        assert_eq!(arch_path, archive.path);
-
-        let file = File::open(arch_path).expect("failed to open zip file");
-        let mut zip = ZipArchive::new(file).expect("failed to open zip archive");
-
-        zip.by_name("bootstrap")
-            .expect("failed to find bootstrap in zip archive");
-
-        zip.by_name("Cargo.toml")
-            .expect("failed to find Cargo.toml in zip archive");
-    }
-
-    #[test]
     fn test_create_binary_archive_with_base_path() {
         let data = BinaryData::new("binary-x86-64", false, false);
 
@@ -611,7 +565,7 @@ mod test {
     }
 
     #[test]
-    fn test_zip_funcion_with_directories() {
+    fn test_zip_funcion_with_parent_directories() {
         let data = BinaryData::new("binary-x86-64", false, false);
 
         let bp = "../../tests/binaries/binary-x86-64".to_string();

@@ -562,3 +562,40 @@ fn test_config_template() {
     assert!(!project.root().join("Apache.txt").exists());
     assert!(!project.root().join("MIT.txt").exists());
 }
+
+#[test]
+fn test_deploy_function_with_extra_files() {
+    let _guard = init_root();
+    let lp = cargo_lambda_new("test-http-function", "function-template");
+
+    lp.new_cmd().arg("--http").arg(&lp.name).assert().success();
+
+    let project = lp.test_project();
+    cargo_lambda_build(project.root()).assert().success();
+
+    let bin = project.lambda_function_bin(&lp.name);
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
+
+    #[cfg(not(windows))]
+    {
+        let output = cargo_lambda_dry_deploy(project.root())
+            .arg("--include")
+            .arg("src")
+            .arg("--output-format")
+            .arg("json")
+            .assert()
+            .success();
+
+        let output = output.get_output();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let (_log, json) = stdout.split_once("loading binary data").unwrap();
+        let json_data: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        let files = json_data["files"].as_array().unwrap();
+        let files = files
+            .iter()
+            .map(|f| f.as_str().unwrap())
+            .collect::<Vec<_>>();
+        assertables::assert_contains!(files, &"src/main.rs");
+    }
+}

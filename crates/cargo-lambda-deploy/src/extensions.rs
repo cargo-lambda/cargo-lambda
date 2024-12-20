@@ -37,10 +37,6 @@ pub(crate) async fn deploy(
 ) -> Result<DeployResult> {
     let lambda_client = LambdaClient::new(sdk_config);
 
-    if let Some(extra_files) = &config.include {
-        binary_archive.add_files(extra_files)?;
-    }
-
     let compatible_runtimes = config
         .compatible_runtimes()
         .iter()

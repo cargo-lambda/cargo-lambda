@@ -36,6 +36,7 @@ tracing-subscriber.workspace = true
 build-data = "0.1"
 
 [dev-dependencies]
+assertables.workspace = true
 dunce = "1.0.3"
 serde_json.workspace = true
 snapbox = { version = "0.4.3", features = ["cmd", "debug", "path"] }
