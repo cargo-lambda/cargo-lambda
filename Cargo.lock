@@ -1255,6 +1255,7 @@ dependencies = [
 name = "cargo-lambda"
 version = "1.6.0"
 dependencies = [
+ "assertables",
  "build-data",
  "cargo-lambda-build",
  "cargo-lambda-deploy",
@@ -1316,6 +1317,7 @@ dependencies = [
 name = "cargo-lambda-deploy"
 version = "1.6.0"
 dependencies = [
+ "assertables",
  "aws-sdk-iam",
  "aws-sdk-s3",
  "aws-sdk-sts",

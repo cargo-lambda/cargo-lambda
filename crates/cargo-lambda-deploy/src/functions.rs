@@ -124,10 +124,6 @@ async fn upsert_function(
         }
     };
 
-    if let Some(extra_files) = &config.include {
-        binary_archive.add_files(extra_files)?;
-    }
-
     let tracing = config.function_config.tracing.clone().unwrap_or_default();
     let tracing_config = TracingConfig::builder()
         .mode(tracing.to_string().as_str().into())
