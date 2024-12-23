@@ -65,8 +65,7 @@ pub async fn run(
     let architecture = Architecture::from(archive.architecture.as_str());
 
     let result = if config.dry {
-        let output = dry::DeployOutput::new(config, &name, &archive)?;
-        Ok(DeployResult::Dry(output))
+        dry::DeployOutput::new(config, &name, &archive).map(DeployResult::Dry)
     } else if config.extension {
         extensions::deploy(
             config,
@@ -77,6 +76,7 @@ pub async fn run(
             &progress,
         )
         .await
+        .map(DeployResult::Extension)
     } else {
         functions::deploy(
             config,
@@ -88,6 +88,7 @@ pub async fn run(
             &progress,
         )
         .await
+        .map(DeployResult::Function)
     };
 
     progress.finish_and_clear();

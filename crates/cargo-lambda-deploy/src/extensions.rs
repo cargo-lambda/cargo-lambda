@@ -1,6 +1,5 @@
-use super::DeployResult;
 use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
-use cargo_lambda_build::BinaryArchive;
+use cargo_lambda_build::{BinaryArchive, BinaryModifiedAt};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::deploy::Deploy;
 use cargo_lambda_remote::{
@@ -18,11 +17,21 @@ use tracing::debug;
 #[derive(Serialize)]
 pub(crate) struct DeployOutput {
     extension_arn: String,
+    binary_modified_at: BinaryModifiedAt,
 }
 
 impl std::fmt::Display for DeployOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "🔍 extension arn: {}", self.extension_arn)
+        writeln!(f, "✅ extension uploaded successfully 🎉")?;
+        writeln!(
+            f,
+            "🛠️  binary last compiled {}",
+            self.binary_modified_at.humanize()
+        )?;
+
+        write!(f, "🔍 extension arn: {}", self.extension_arn)?;
+
+        Ok(())
     }
 }
 
@@ -34,7 +43,7 @@ pub(crate) async fn deploy(
     binary_archive: &BinaryArchive,
     architecture: Architecture,
     progress: &Progress,
-) -> Result<DeployResult> {
+) -> Result<DeployOutput> {
     let lambda_client = LambdaClient::new(sdk_config);
 
     let compatible_runtimes = config
@@ -90,7 +99,8 @@ pub(crate) async fn deploy(
         .into_diagnostic()
         .wrap_err("failed to publish extension")?;
 
-    Ok(DeployResult::Extension(DeployOutput {
+    Ok(DeployOutput {
         extension_arn: output.layer_version_arn.expect("missing ARN"),
-    }))
+        binary_modified_at: binary_archive.binary_modified_at.clone(),
+    })
 }
