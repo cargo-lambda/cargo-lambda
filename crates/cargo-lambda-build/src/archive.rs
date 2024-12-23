@@ -4,18 +4,24 @@ use std::{
     fs::{read, File, Metadata},
     io::{Read, Seek, Write},
     path::{Path, PathBuf},
+    time::SystemTime,
 };
 
 use cargo_lambda_metadata::cargo::{target_dir_from_metadata, CargoMetadata};
 use chrono::{DateTime, Utc};
+use chrono_humanize::HumanTime;
 use miette::{Context, IntoDiagnostic, Result};
 use object::{read::File as ObjectFile, Architecture, Object};
+use serde::{Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use tracing::{debug, trace};
 use walkdir::WalkDir;
 use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
 
 use crate::error::BuildError;
+
+#[derive(Clone, Debug)]
+pub struct BinaryModifiedAt(Option<SystemTime>);
 
 #[derive(Debug)]
 pub enum BinaryData<'a> {
@@ -42,8 +48,7 @@ impl<'a> BinaryData<'a> {
     pub fn binary_name(&self) -> &str {
         match self {
             BinaryData::Function(_) => "bootstrap",
-            BinaryData::ExternalExtension(name) => name,
-            BinaryData::InternalExtension(name) => name,
+            BinaryData::ExternalExtension(name) | BinaryData::InternalExtension(name) => name,
         }
     }
 
@@ -56,8 +61,7 @@ impl<'a> BinaryData<'a> {
     pub fn binary_location(&self) -> &str {
         match self {
             BinaryData::Function(name) => name,
-            BinaryData::ExternalExtension(_) => "extensions",
-            BinaryData::InternalExtension(_) => "extensions",
+            BinaryData::ExternalExtension(_) | BinaryData::InternalExtension(_) => "extensions",
         }
     }
 
@@ -82,6 +86,7 @@ impl<'a> BinaryData<'a> {
 pub struct BinaryArchive {
     pub architecture: String,
     pub path: PathBuf,
+    pub binary_modified_at: BinaryModifiedAt,
 }
 
 impl BinaryArchive {
@@ -171,6 +176,16 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
         .into_diagnostic()
         .wrap_err_with(|| format!("failed to open binary file `{path:?}`"))?;
 
+    let file_metadata = file
+        .metadata()
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to get metadata from file `{path:?}`"))?;
+
+    let binary_modified_at = file_metadata
+        .modified()
+        .ok()
+        .or_else(|| file_metadata.created().ok());
+
     let mut binary_data = Vec::new();
     file.read_to_end(&mut binary_data)
         .into_diagnostic()
@@ -222,6 +237,7 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
     Ok(BinaryArchive {
         architecture: arch.into(),
         path: zipped,
+        binary_modified_at: BinaryModifiedAt(binary_modified_at),
     })
 }
 
@@ -351,6 +367,27 @@ fn convert_to_unix_path(path: &Path) -> Option<String> {
 #[cfg(not(target_os = "windows"))]
 fn convert_to_unix_path(path: &Path) -> Option<String> {
     path.to_str().map(String::from)
+}
+
+impl BinaryModifiedAt {
+    pub fn humanize(&self) -> String {
+        match self.0 {
+            Some(time) => HumanTime::from(time).to_string(),
+            None => "at unknown time".to_string(),
+        }
+    }
+}
+
+impl Serialize for BinaryModifiedAt {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self.0 {
+            Some(time) => serializer.serialize_str(&HumanTime::from(time).to_string()),
+            None => serializer.serialize_none(),
+        }
+    }
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-use cargo_lambda_build::BinaryArchive;
+use cargo_lambda_build::{BinaryArchive, BinaryModifiedAt};
 use cargo_lambda_metadata::cargo::deploy::{Deploy, FunctionDeployConfig};
 use miette::Result;
 use serde::Serialize;
@@ -33,12 +33,18 @@ pub(crate) struct DeployOutput {
     tags: Option<String>,
     bucket: Option<String>,
     config: FunctionDeployConfig,
+    binary_modified_at: BinaryModifiedAt,
 }
 
 impl Display for DeployOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "🔍 deployment for {} `{}`:", self.kind, self.name)?;
-        writeln!(f, "🏠 binary located at {}", self.path.display())?;
+        writeln!(f, "🏠 zip file located at {}", self.path.display())?;
+        writeln!(
+            f,
+            "🛠️  binary last compiled {}",
+            self.binary_modified_at.humanize()
+        )?;
         writeln!(f, "🔗 architecture {}", self.arch)?;
 
         if let Some(tags) = &self.tags {
@@ -54,7 +60,7 @@ impl Display for DeployOutput {
         }
 
         if !self.files.is_empty() {
-            writeln!(f, "🗃️ files included in the zip file:")?;
+            writeln!(f, "🗃️  files included in the zip file:")?;
             for file in &self.files {
                 writeln!(f, "  - {}", file)?;
             }
@@ -106,14 +112,15 @@ impl DeployOutput {
 
         Ok(DeployOutput {
             kind,
+            name,
+            runtimes,
             path: archive.path.clone(),
             arch: archive.architecture.clone(),
             bucket: config.s3_bucket.clone(),
             tags: config.s3_tags(),
             config: config.function_config.clone(),
             files: archive.list()?,
-            name,
-            runtimes,
+            binary_modified_at: archive.binary_modified_at.clone(),
         })
     }
 }

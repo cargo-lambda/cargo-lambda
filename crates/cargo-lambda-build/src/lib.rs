@@ -20,7 +20,7 @@ use tracing::{debug, warn};
 pub use cargo_zigbuild::Zig;
 
 mod archive;
-pub use archive::{create_binary_archive, zip_binary, BinaryArchive, BinaryData};
+pub use archive::{create_binary_archive, zip_binary, BinaryArchive, BinaryData, BinaryModifiedAt};
 
 mod compiler;
 use compiler::{build_command, build_profile};
