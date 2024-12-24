@@ -409,6 +409,16 @@ impl VpcConfig {
         )?;
         Ok(())
     }
+
+    pub fn should_update(&self) -> bool {
+        let Ok(val) = serde_json::to_value(self) else {
+            return false;
+        };
+        let Ok(default) = serde_json::to_value(VpcConfig::default()) else {
+            return false;
+        };
+        val != default
+    }
 }
 
 impl Deploy {
