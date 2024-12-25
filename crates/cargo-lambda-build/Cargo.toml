@@ -16,6 +16,8 @@ cargo-lambda-interactive.workspace = true
 cargo-lambda-metadata.workspace = true
 cargo-options.workspace = true
 cargo-zigbuild.workspace = true
+chrono.workspace = true
+chrono-humanize = "0.2.3"
 home.workspace = true
 miette.workspace = true
 object = "0.28.4"
@@ -29,10 +31,9 @@ tempfile.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 tracing.workspace = true
+walkdir = "2.4.0"
 which.workspace = true
 zip.workspace = true
-walkdir = "2.4.0"
-chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
 rstest = "0.21.0"

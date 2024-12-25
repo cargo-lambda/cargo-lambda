@@ -1,7 +1,6 @@
-use super::DeployResult;
 use crate::roles;
 use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
-use cargo_lambda_build::BinaryArchive;
+use cargo_lambda_build::{BinaryArchive, BinaryModifiedAt};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::deploy::Deploy;
 use cargo_lambda_remote::{
@@ -39,10 +38,17 @@ enum FunctionAction {
 pub(crate) struct DeployOutput {
     function_arn: String,
     function_url: Option<String>,
+    binary_modified_at: BinaryModifiedAt,
 }
 
 impl std::fmt::Display for DeployOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "✅ function deployed successfully 🎉")?;
+        writeln!(
+            f,
+            "🛠️  binary last compiled {}",
+            self.binary_modified_at.humanize()
+        )?;
         write!(f, "🔍 function arn: {}", self.function_arn)?;
         if let Some(url) = &self.function_url {
             write!(f, "🔗 function url: {url}")?;
@@ -60,7 +66,7 @@ pub(crate) async fn deploy(
     binary_archive: &BinaryArchive,
     architecture: Architecture,
     progress: &Progress,
-) -> Result<DeployResult> {
+) -> Result<DeployOutput> {
     let client = LambdaClient::new(sdk_config);
 
     let (function_arn, version) = upsert_function(
@@ -95,10 +101,11 @@ pub(crate) async fn deploy(
         delete_function_url_config(name, &config.remote_config.alias, &client).await?;
     }
 
-    Ok(DeployResult::Function(DeployOutput {
+    Ok(DeployOutput {
         function_arn,
         function_url,
-    }))
+        binary_modified_at: binary_archive.binary_modified_at.clone(),
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
