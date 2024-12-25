@@ -261,10 +261,11 @@ async fn upsert_function(
                 wait_for_readiness = true;
             }
 
-            if let Some(status) = conf.last_update_status() {
-                if status == &LastUpdateStatus::InProgress {
-                    wait_for_readiness = true;
-                }
+            if conf
+                .last_update_status()
+                .is_some_and(|s| s == &LastUpdateStatus::InProgress)
+            {
+                wait_for_readiness = true;
             }
 
             if wait_for_readiness {
@@ -319,19 +320,21 @@ async fn upsert_function(
                 }
 
                 if let Some(vpc) = &config.function_config.vpc {
-                    update_config = true;
-                    builder = builder.vpc_config(
-                        LambdaVpcConfig::builder()
-                            .set_security_group_ids(vpc.security_group_ids.clone())
-                            .set_subnet_ids(vpc.subnet_ids.clone())
-                            .ipv6_allowed_for_dual_stack(vpc.ipv6_allowed_for_dual_stack)
-                            .build(),
-                    );
+                    if vpc.should_update() {
+                        update_config = true;
+                        builder = builder.vpc_config(
+                            LambdaVpcConfig::builder()
+                                .set_security_group_ids(vpc.security_group_ids.clone())
+                                .set_subnet_ids(vpc.subnet_ids.clone())
+                                .ipv6_allowed_for_dual_stack(vpc.ipv6_allowed_for_dual_stack)
+                                .build(),
+                        );
+                    }
                 }
             }
 
             if update_config {
-                debug!(config = ?builder, "updating function's configuration");
+                debug!("updating function's configuration");
                 builder
                     .send()
                     .await
@@ -405,13 +408,13 @@ async fn upsert_function(
     ))
 }
 
+/// Wait until the function state has been completely propagated.
 async fn wait_for_ready_state(
     client: &LambdaClient,
     name: &str,
     alias: &Option<String>,
     progress: &Progress,
 ) -> Result<()> {
-    // wait until the function state has been completely propagated
     for attempt in 2..5 {
         let backoff = attempt * attempt;
         progress.set_message(&format!(
@@ -428,27 +431,32 @@ async fn wait_for_ready_state(
             .into_diagnostic()
             .wrap_err("failed to fetch the function configuration")?;
 
-        match &conf.state {
-            Some(state) => match state {
-                State::Active | State::Inactive | State::Failed => break,
-                State::Pending => {}
-                other => return Err(miette::miette!("unexpected function state: {:?}", other)),
-            },
-            None => return Err(miette::miette!("unknown function state")),
-        }
+        debug!(function_state = ?conf.state, last_update_status = ?conf.last_update_status, "function state");
 
-        match &conf.last_update_status {
-            Some(state) => match state {
-                LastUpdateStatus::Failed | LastUpdateStatus::Successful => break,
-                LastUpdateStatus::InProgress => {}
-                other => {
-                    return Err(miette::miette!(
-                        "unexpected last update status: {:?}",
-                        other
-                    ))
-                }
-            },
-            None => return Ok(()),
+        let Some(state) = &conf.state else {
+            return Err(miette::miette!("unknown function state"));
+        };
+
+        match (state, conf.last_update_status) {
+            (State::Pending, _) => {} // wait for the function to be ready
+            (
+                State::Active | State::Inactive | State::Failed,
+                Some(LastUpdateStatus::InProgress),
+            ) => {} // wait for the function to be ready
+
+            (
+                State::Active | State::Inactive | State::Failed,
+                None | Some(LastUpdateStatus::Failed | LastUpdateStatus::Successful),
+            ) => break, // function is ready
+
+            (State::Active | State::Inactive | State::Failed, other) => {
+                return Err(miette::miette!(
+                    "unexpected last update status: {:?}",
+                    other
+                ))
+            }
+
+            (other, _) => return Err(miette::miette!("unexpected function state: {:?}", other)),
         }
 
         if attempt == 5 {
