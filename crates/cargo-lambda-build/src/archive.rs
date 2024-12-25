@@ -8,6 +8,7 @@ use std::{
 };
 
 use cargo_lambda_metadata::cargo::{target_dir_from_metadata, CargoMetadata};
+use cargo_lambda_remote::aws_sdk_lambda::types::Architecture as CpuArchitecture;
 use chrono::{DateTime, Utc};
 use chrono_humanize::HumanTime;
 use miette::{Context, IntoDiagnostic, Result};
@@ -22,6 +23,12 @@ use crate::error::BuildError;
 
 #[derive(Clone, Debug)]
 pub struct BinaryModifiedAt(Option<SystemTime>);
+
+impl BinaryModifiedAt {
+    pub fn now() -> Self {
+        Self(Some(SystemTime::now()))
+    }
+}
 
 #[derive(Debug)]
 pub enum BinaryData<'a> {
@@ -90,6 +97,14 @@ pub struct BinaryArchive {
 }
 
 impl BinaryArchive {
+    pub fn new(path: PathBuf, architecture: String, binary_modified_at: BinaryModifiedAt) -> Self {
+        Self {
+            path,
+            architecture,
+            binary_modified_at,
+        }
+    }
+
     /// Read the content of the binary archive to the end
     pub fn read(&self) -> Result<Vec<u8>> {
         read(&self.path)
@@ -118,6 +133,11 @@ impl BinaryArchive {
         }
 
         Ok(files)
+    }
+
+    /// Get the architecture of the binary archive
+    pub fn architecture(&self) -> CpuArchitecture {
+        CpuArchitecture::from(self.architecture.as_str())
     }
 }
 
@@ -234,11 +254,11 @@ pub fn zip_binary<BP: AsRef<Path>, DD: AsRef<Path>>(
         .into_diagnostic()
         .wrap_err_with(|| format!("failed to finish zip file `{zip_file_name:?}`"))?;
 
-    Ok(BinaryArchive {
-        architecture: arch.into(),
-        path: zipped,
-        binary_modified_at: BinaryModifiedAt(binary_modified_at),
-    })
+    Ok(BinaryArchive::new(
+        zipped,
+        arch.to_string(),
+        BinaryModifiedAt(binary_modified_at),
+    ))
 }
 
 fn zip_file_options(file: &File, path: &Path) -> Result<SimpleFileOptions> {

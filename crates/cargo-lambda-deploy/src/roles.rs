@@ -9,7 +9,30 @@ use tokio::time::{sleep, Duration};
 const BASIC_LAMBDA_EXECUTION_POLICY: &str =
     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole";
 
-pub(crate) async fn create(config: &SdkConfig, progress: &Progress) -> Result<String> {
+#[derive(Debug)]
+pub(crate) struct FunctionRole(String, bool);
+
+impl FunctionRole {
+    /// Create a new function role.
+    pub(crate) fn new(arn: String) -> FunctionRole {
+        FunctionRole(arn, true)
+    }
+
+    /// Create a function role from an existing role.
+    pub(crate) fn from_existing(arn: String) -> FunctionRole {
+        FunctionRole(arn, false)
+    }
+
+    pub(crate) fn arn(&self) -> &str {
+        &self.0
+    }
+
+    pub(crate) fn is_new(&self) -> bool {
+        self.1
+    }
+}
+
+pub(crate) async fn create(config: &SdkConfig, progress: &Progress) -> Result<FunctionRole> {
     progress.set_message("creating execution role");
 
     let role_name = format!("cargo-lambda-role-{}", uuid::Uuid::new_v4());
@@ -89,7 +112,7 @@ pub(crate) async fn create(config: &SdkConfig, progress: &Progress) -> Result<St
 
     tracing::debug!(role = ?role, "function role created");
 
-    Ok(role_arn.to_string())
+    Ok(FunctionRole::new(role_arn.to_string()))
 }
 
 async fn try_assume_role(client: &StsClient, role_arn: &str) -> Result<()> {
