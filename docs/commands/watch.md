@@ -102,21 +102,20 @@ To access a function via its HTTP endpoint, start the watch subcommand `cargo la
 Your function MUST have the `apigw_http` feature enabled in the `lambda_http` dependency for Function URLs to work. The payload that AWS sends is only compatible with the `apigw_http` format, not with the `apigw_rest` format.
 :::
 
-### Multi-function projects
+### Multi-package projects
 
 If your project includes several functions under the same package, you can access them using the function's name as the prefix in the request path `http://localhost:9000/lambda-url/FUNCTION_NAME`. You can also add any additional path after the function name, or any query parameters.
 
-You can specify which function(s) to include by using the `--bin` flag. If you only specify one function, then you can access it directly using the root path `http://localhost:9000`.
-
-### Working with specific packages
-
-You can specify the package that you want to work with by using the `--package` flag. This way, only the function in the specified package will be available through the Function URL.
+If only one binary package in your project is a Lambda function, you can specify the package or binary that you want to work with by using the `--package` and `--bin` flags. This way, only the function in the specified package will be available through the Function URL.
 
 ```
 cargo lambda watch --package my-package
+cargo lambda watch --bin my-binary
 ```
 
-Because only one function is available through the Function URL, you can access it by using the root path `http://localhost:9000`.
+When you use these flags, only one function will be available through the Function URL, you can access it by using the root path `http://localhost:9000`.
+
+You can also use the advanced routing feature to specify the routes for the function URLs. See the [Custom HTTP routes](/commands/watch#custom-http-routes) section for more information.
 
 ## Lambda response streaming
 
