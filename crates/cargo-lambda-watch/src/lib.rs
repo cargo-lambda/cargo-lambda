@@ -2,8 +2,8 @@ use axum::{extract::Extension, http::header::HeaderName, Router};
 use bytes::Bytes;
 use cargo_lambda_metadata::{
     cargo::{
-        filter_binary_targets_from_metadata, kind_bin_filter, watch::Watch, CargoMetadata,
-        CargoPackage, CargoTarget,
+        filter_binary_targets_from_metadata, kind_bin_filter, selected_bin_filter, watch::Watch,
+        CargoMetadata, CargoPackage,
     },
     lambda::Timeout,
     DEFAULT_PACKAGE_FUNCTION,
@@ -94,9 +94,10 @@ pub async fn run(
         None
     };
 
-    let cargo_bins = config.cargo_opts.bin.clone();
-    let binary_filter = move |t: &CargoTarget| {
-        kind_bin_filter(t) && (cargo_bins.is_empty() || cargo_bins.contains(&t.name))
+    let binary_filter = if config.cargo_opts.bin.is_empty() {
+        Box::new(kind_bin_filter)
+    } else {
+        selected_bin_filter(config.cargo_opts.bin.clone())
     };
 
     let binary_packages =

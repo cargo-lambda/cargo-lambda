@@ -89,6 +89,11 @@ pub fn kind_bin_filter(target: &CargoTarget) -> bool {
     target.kind.iter().any(|k| k == "bin")
 }
 
+pub fn selected_bin_filter(selected_bins: Vec<String>) -> Box<dyn Fn(&CargoTarget) -> bool> {
+    let bins: HashSet<String> = selected_bins.into_iter().collect();
+    Box::new(move |t: &CargoTarget| kind_bin_filter(t) && bins.contains(&t.name))
+}
+
 // Several targets can have `crate_type` be `bin`, we're only
 // interested in the ones which `kind` is `bin` or `example`.
 // See https://doc.rust-lang.org/cargo/commands/cargo-metadata.html?highlight=targets%20metadata#json-format
@@ -436,6 +441,23 @@ mod tests {
             "there are more than one binary in the project, please specify a binary name with --binary-name or --binary-path. This is the list of binaries I found: delete-product, dynamodb-streams, get-product, get-products, put-product",
             err.to_string()
         );
+    }
+
+    #[test]
+    fn test_select_binary() {
+        let manifest_path = fixture_metadata("multi-binary-package");
+        let metadata = load_metadata(manifest_path).unwrap();
+
+        let package_filter: Option<fn(&&CargoPackage) -> bool> = None;
+
+        let bin = "delete-product".to_string();
+        let binary_filter = selected_bin_filter(vec![bin.clone()]);
+
+        let binaries =
+            filter_binary_targets_from_metadata(&metadata, binary_filter, package_filter);
+
+        assert_eq!(1, binaries.len());
+        assert!(binaries.contains(&bin));
     }
 
     #[test]
