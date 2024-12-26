@@ -1,4 +1,7 @@
-use cargo_lambda_remote::{aws_sdk_lambda::types::TracingConfig, RemoteConfig};
+use cargo_lambda_remote::{
+    aws_sdk_lambda::types::{Environment, TracingConfig},
+    RemoteConfig,
+};
 use clap::{ArgAction, Args, ValueHint};
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, path::PathBuf};
@@ -6,7 +9,7 @@ use strum_macros::{Display, EnumString};
 
 use crate::{
     cargo::deserialize_vec_or_map,
-    env::{EnvOptions, Environment},
+    env::EnvOptions,
     error::MetadataError,
     lambda::{Memory, Timeout, Tracing},
 };
@@ -105,6 +108,10 @@ pub struct Deploy {
     #[arg(value_name = "NAME")]
     #[serde(default)]
     pub name: Option<String>,
+
+    #[arg(skip)]
+    #[serde(skip)]
+    pub base_env: HashMap<String, String>,
 }
 
 impl Deploy {
@@ -150,14 +157,19 @@ impl Deploy {
         }
     }
 
-    pub fn environment(
-        &self,
-        base: &HashMap<String, String>,
-    ) -> Result<Environment, MetadataError> {
-        let Some(env_options) = &self.function_config.env_options else {
-            return Ok(HashMap::new());
+    pub fn lambda_environment(&self) -> Result<Option<Environment>, MetadataError> {
+        let builder = Environment::builder();
+
+        let env = match &self.function_config.env_options {
+            None => self.base_env.clone(),
+            Some(env_options) => env_options.lambda_environment(&self.base_env)?,
         };
-        env_options.lambda_environment(base)
+
+        if env.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(builder.set_variables(Some(env)).build()))
     }
 }
 
@@ -468,4 +480,104 @@ fn extract_tags(tags: &Vec<String>) -> HashMap<String, String> {
     }
 
     map
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_tags() {
+        let tags = vec!["organization=aws".to_string(), "team=lambda".to_string()];
+        let map = extract_tags(&tags);
+        assert_eq!(map.get("organization"), Some(&"aws".to_string()));
+        assert_eq!(map.get("team"), Some(&"lambda".to_string()));
+    }
+
+    #[test]
+    fn test_lambda_environment() {
+        let deploy = Deploy::default();
+        let env = deploy.lambda_environment().unwrap();
+        assert_eq!(env, None);
+
+        let deploy = Deploy {
+            base_env: HashMap::from([("FOO".to_string(), "BAR".to_string())]),
+            ..Default::default()
+        };
+        let env = deploy.lambda_environment().unwrap().unwrap();
+        assert_eq!(env.variables().unwrap().len(), 1);
+        assert_eq!(
+            env.variables().unwrap().get("FOO"),
+            Some(&"BAR".to_string())
+        );
+
+        let deploy = Deploy {
+            function_config: FunctionDeployConfig {
+                env_options: Some(EnvOptions {
+                    env_var: Some(vec!["FOO=BAR".to_string()]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let env = deploy.lambda_environment().unwrap().unwrap();
+        assert_eq!(env.variables().unwrap().len(), 1);
+        assert_eq!(
+            env.variables().unwrap().get("FOO"),
+            Some(&"BAR".to_string())
+        );
+
+        let deploy = Deploy {
+            function_config: FunctionDeployConfig {
+                env_options: Some(EnvOptions {
+                    env_var: Some(vec!["FOO=BAR".to_string()]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            base_env: HashMap::from([("BAZ".to_string(), "QUX".to_string())]),
+            ..Default::default()
+        };
+        let env = deploy.lambda_environment().unwrap().unwrap();
+        assert_eq!(env.variables().unwrap().len(), 2);
+        assert_eq!(
+            env.variables().unwrap().get("BAZ"),
+            Some(&"QUX".to_string())
+        );
+        assert_eq!(
+            env.variables().unwrap().get("FOO"),
+            Some(&"BAR".to_string())
+        );
+
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let path = temp_file.path();
+        std::fs::write(path, "FOO=BAR\nBAZ=QUX").unwrap();
+
+        let deploy = Deploy {
+            function_config: FunctionDeployConfig {
+                env_options: Some(EnvOptions {
+                    env_file: Some(path.to_path_buf()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            base_env: HashMap::from([("QUUX".to_string(), "QUUX".to_string())]),
+            ..Default::default()
+        };
+        let env = deploy.lambda_environment().unwrap().unwrap();
+        assert_eq!(env.variables().unwrap().len(), 3);
+        assert_eq!(
+            env.variables().unwrap().get("BAZ"),
+            Some(&"QUX".to_string())
+        );
+        assert_eq!(
+            env.variables().unwrap().get("FOO"),
+            Some(&"BAR".to_string())
+        );
+        assert_eq!(
+            env.variables().unwrap().get("QUUX"),
+            Some(&"QUUX".to_string())
+        );
+    }
 }

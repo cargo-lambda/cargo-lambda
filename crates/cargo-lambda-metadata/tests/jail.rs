@@ -2,8 +2,6 @@
 // where cargo runs from, and it makes other tests fail randomly because they
 // cannot find the Cargo.toml file for test fixtures.
 
-use std::collections::HashMap;
-
 use figment::Jail;
 
 use cargo_lambda_metadata::{
@@ -96,7 +94,15 @@ fn test_env_with_arrays() {
 
         assert_eq!(config.build.cargo_opts.features, vec!["lambda", "env"]);
 
-        let env = config.deploy.environment(&HashMap::new()).unwrap();
+        let env = config
+            .deploy
+            .lambda_environment()
+            .unwrap()
+            .unwrap()
+            .variables()
+            .cloned()
+            .unwrap_or_default();
+
         assert_eq!(env.get("FOO"), Some(&"BAR".to_string()));
         assert_eq!(env.get("BAZ"), Some(&"QUX".to_string()));
 

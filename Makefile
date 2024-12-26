@@ -52,3 +52,6 @@ make docs-dev:
 
 clippy:
 	cargo clippy --workspace --all-features -- -D warnings
+
+clippy-fix:
+	cargo clippy --workspace --all-features --allow-dirty --allow-staged --fix

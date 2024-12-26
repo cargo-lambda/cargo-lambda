@@ -197,8 +197,12 @@ impl LambdaSubcommand {
             global,
             admerge,
         };
+
         let config = load_config(&args_config, &metadata, &options)?;
-        cargo_lambda_deploy::run(&config.deploy, &config.env, &metadata).await
+        let mut deploy = config.deploy;
+        deploy.base_env = config.env.clone();
+
+        cargo_lambda_deploy::run(&deploy, &metadata).await
     }
 }
 

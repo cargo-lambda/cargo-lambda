@@ -8,7 +8,7 @@ use cargo_lambda_metadata::cargo::{
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
 use serde_json::ser::to_string_pretty;
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
 mod dry;
 mod extensions;
@@ -35,11 +35,7 @@ impl std::fmt::Display for DeployResult {
 }
 
 #[tracing::instrument(target = "cargo_lambda")]
-pub async fn run(
-    config: &Deploy,
-    base_env: &HashMap<String, String>,
-    metadata: &CargoMetadata,
-) -> Result<()> {
+pub async fn run(config: &Deploy, metadata: &CargoMetadata) -> Result<()> {
     tracing::trace!("deploying project");
 
     if config.function_config.enable_function_url && config.function_config.disable_function_url {
@@ -69,7 +65,7 @@ pub async fn run(
             .await
             .map(DeployResult::Extension)
     } else {
-        functions::deploy(config, base_env, &name, &sdk_config, &archive, &progress)
+        functions::deploy(config, &name, &sdk_config, &archive, &progress)
             .await
             .map(DeployResult::Function)
     };

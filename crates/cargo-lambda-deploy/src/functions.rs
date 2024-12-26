@@ -16,8 +16,8 @@ use cargo_lambda_remote::{
         },
         primitives::Blob,
         types::{
-            Environment, FunctionCode, FunctionConfiguration, FunctionUrlAuthType,
-            LastUpdateStatus, Runtime, State, VpcConfig as LambdaVpcConfig,
+            FunctionCode, FunctionConfiguration, FunctionUrlAuthType, LastUpdateStatus, Runtime,
+            State, VpcConfig as LambdaVpcConfig,
         },
         Client as LambdaClient,
     },
@@ -59,7 +59,6 @@ impl std::fmt::Display for DeployOutput {
 
 pub(crate) async fn deploy(
     config: &Deploy,
-    base_env: &HashMap<String, String>,
     name: &str,
     sdk_config: &SdkConfig,
     binary_archive: &BinaryArchive,
@@ -67,16 +66,8 @@ pub(crate) async fn deploy(
 ) -> Result<DeployOutput> {
     let client = LambdaClient::new(sdk_config);
 
-    let (function_arn, version) = upsert_function(
-        config,
-        base_env,
-        name,
-        &client,
-        sdk_config,
-        binary_archive,
-        progress,
-    )
-    .await?;
+    let (function_arn, version) =
+        upsert_function(config, name, &client, sdk_config, binary_archive, progress).await?;
 
     if let Some(alias) = &config.remote_config.alias {
         progress.set_message("updating alias version");
@@ -108,7 +99,6 @@ pub(crate) async fn deploy(
 #[allow(clippy::too_many_arguments)]
 async fn upsert_function(
     config: &Deploy,
-    base_env: &HashMap<String, String>,
     name: &str,
     client: &LambdaClient,
     sdk_config: &SdkConfig,
@@ -127,11 +117,6 @@ async fn upsert_function(
         }
     };
 
-    let environment = config.environment(base_env)?;
-    let environment = Environment::builder()
-        .set_variables(Some(environment))
-        .build();
-
     let s3_client = S3Client::new(sdk_config);
 
     let (arn, version) = match action {
@@ -148,7 +133,6 @@ async fn upsert_function(
                 &s3_client,
                 binary_archive,
                 progress,
-                &environment,
                 function_role,
             )
             .await?
@@ -160,8 +144,7 @@ async fn upsert_function(
                 .configuration
                 .ok_or_else(|| miette::miette!("missing function configuration"))?;
 
-            let function_arn =
-                update_function_config(config, name, client, progress, environment, conf).await?;
+            let function_arn = update_function_config(config, name, client, progress, conf).await?;
 
             tag_function(client, config.lambda_tags(), function_arn).await?;
 
@@ -207,7 +190,6 @@ async fn create_function(
     s3_client: &S3Client,
     binary_archive: &BinaryArchive,
     progress: &Progress,
-    environment: &Environment,
     function_role: FunctionRole,
 ) -> Result<(Option<String>, Option<String>)> {
     debug!(?function_role, ?config, "creating new function");
@@ -273,7 +255,7 @@ async fn create_function(
             .set_memory_size(memory)
             .timeout(timeout)
             .set_tracing_config(config.tracing_config())
-            .environment(environment.clone())
+            .set_environment(config.lambda_environment()?)
             .set_layers(config.function_config.layer.clone())
             .set_tags(config.lambda_tags())
             .send()
@@ -314,7 +296,6 @@ async fn update_function_config(
     name: &str,
     client: &LambdaClient,
     progress: &Progress,
-    environment: Environment,
     conf: FunctionConfiguration,
 ) -> Result<String> {
     let function_arn = conf.function_arn.as_ref().expect("missing function arn");
@@ -361,17 +342,19 @@ async fn update_function_config(
             builder = builder.set_layers(config.function_config.layer.clone());
         }
 
-        if let Some(vars) = environment.variables() {
-            if !vars.is_empty()
-                && vars
-                    != &conf
-                        .environment
-                        .clone()
-                        .and_then(|e| e.variables)
-                        .unwrap_or_default()
-            {
-                update_config = true;
-                builder = builder.environment(environment);
+        if let Some(environment) = config.lambda_environment()? {
+            if let Some(vars) = environment.variables() {
+                if !vars.is_empty()
+                    && vars
+                        != &conf
+                            .environment
+                            .clone()
+                            .and_then(|e| e.variables)
+                            .unwrap_or_default()
+                {
+                    update_config = true;
+                    builder = builder.environment(environment);
+                }
             }
         }
 
@@ -731,7 +714,6 @@ mod tests {
         let config = Deploy::default();
         let name = "test-function";
         let progress = Progress::start("deploying function");
-        let environment = Environment::builder().build();
 
         // Create a function configuration that matches an active function that was deployed successfully
         let conf = FunctionConfiguration::builder()
@@ -741,8 +723,7 @@ mod tests {
             .build();
 
         // This should not make any requests since no config changes are needed
-        let result =
-            update_function_config(&config, name, &client, &progress, environment, conf).await;
+        let result = update_function_config(&config, name, &client, &progress, conf).await;
 
         assert!(result.is_ok());
         assert_eq!(
@@ -934,7 +915,6 @@ mod tests {
                 "Role": "arn:aws:iam::123456789012:role/test-role",
                 "Runtime": "provided.al2023",
                 "Architectures": ["x86_64"],
-                "Environment": {},
                 "Publish": true,
                 "Timeout": 30
             })
@@ -975,7 +955,6 @@ mod tests {
         let deploy_config = Deploy::default();
         let name = "test-function";
         let progress = Progress::start("deploying function");
-        let environment = Environment::builder().build();
         let function_role =
             FunctionRole::from_existing("arn:aws:iam::123456789012:role/test-role".to_string());
 
@@ -992,7 +971,6 @@ mod tests {
             &s3_client,
             &binary_archive,
             &progress,
-            &environment,
             function_role,
         )
         .await;
@@ -1036,7 +1014,6 @@ mod tests {
                     "Role": "arn:aws:iam::123456789012:role/test-role",
                     "Runtime": "provided.al2023",
                     "Architectures": ["x86_64"],
-                    "Environment": {},
                     "Publish": true,
                     "Timeout": 30,
                     "Tags": {
@@ -1093,7 +1070,6 @@ mod tests {
 
         let name = "test-function";
         let progress = Progress::start("deploying function");
-        let environment = Environment::builder().build();
         let function_role =
             FunctionRole::from_existing("arn:aws:iam::123456789012:role/test-role".to_string());
 
@@ -1104,7 +1080,6 @@ mod tests {
             &s3_client,
             &binary_archive,
             &progress,
-            &environment,
             function_role,
         )
         .await;
@@ -1160,7 +1135,6 @@ mod tests {
         deploy_config.function_config.tracing = Some(Tracing::Active);
         let name = "test-function";
         let progress = Progress::start("deploying function");
-        let environment = Environment::builder().build();
 
         // Create a function configuration that matches an active function
         let conf = FunctionConfiguration::builder()
@@ -1170,9 +1144,7 @@ mod tests {
             .timeout(30)
             .build();
 
-        let result =
-            update_function_config(&deploy_config, name, &client, &progress, environment, conf)
-                .await;
+        let result = update_function_config(&deploy_config, name, &client, &progress, conf).await;
 
         assert!(result.is_ok());
         assert_eq!(
