@@ -589,7 +589,7 @@ fn test_deploy_function_with_extra_files() {
         let output = output.get_output();
         let stdout = String::from_utf8_lossy(&output.stdout);
         let (_log, json) = stdout.split_once("loading binary data").unwrap();
-        let json_data: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let json_data: serde_json::Value = serde_json::from_str(json).unwrap();
 
         let files = json_data["files"].as_array().unwrap();
         let files = files

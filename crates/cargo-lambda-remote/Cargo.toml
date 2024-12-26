@@ -25,6 +25,6 @@ serde.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-aws-credential-types = "0.57.1"
+aws-credential-types.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }

@@ -1,4 +1,4 @@
-use cargo_lambda_remote::RemoteConfig;
+use cargo_lambda_remote::{aws_sdk_lambda::types::TracingConfig, RemoteConfig};
 use clap::{ArgAction, Args, ValueHint};
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, path::PathBuf};
@@ -122,6 +122,42 @@ impl Deploy {
         self.compatible_runtimes
             .clone()
             .unwrap_or_else(default_compatible_runtimes)
+    }
+
+    pub fn tracing_config(&self) -> Option<TracingConfig> {
+        let tracing = self.function_config.tracing.clone()?;
+
+        Some(
+            TracingConfig::builder()
+                .mode(tracing.as_str().into())
+                .build(),
+        )
+    }
+
+    pub fn lambda_tags(&self) -> Option<HashMap<String, String>> {
+        match &self.tag {
+            None => None,
+            Some(tags) if tags.is_empty() => None,
+            Some(tags) => Some(extract_tags(tags)),
+        }
+    }
+
+    pub fn s3_tags(&self) -> Option<String> {
+        match &self.tag {
+            None => None,
+            Some(tags) if tags.is_empty() => None,
+            Some(tags) => Some(tags.join("&")),
+        }
+    }
+
+    pub fn environment(
+        &self,
+        base: &HashMap<String, String>,
+    ) -> Result<Environment, MetadataError> {
+        let Some(env_options) = &self.function_config.env_options else {
+            return Ok(HashMap::new());
+        };
+        env_options.lambda_environment(base)
     }
 }
 
@@ -418,34 +454,6 @@ impl VpcConfig {
             return false;
         };
         val != default
-    }
-}
-
-impl Deploy {
-    pub fn lambda_tags(&self) -> Option<HashMap<String, String>> {
-        match &self.tag {
-            None => None,
-            Some(tags) if tags.is_empty() => None,
-            Some(tags) => Some(extract_tags(tags)),
-        }
-    }
-
-    pub fn s3_tags(&self) -> Option<String> {
-        match &self.tag {
-            None => None,
-            Some(tags) if tags.is_empty() => None,
-            Some(tags) => Some(tags.join("&")),
-        }
-    }
-
-    pub fn environment(
-        &self,
-        base: &HashMap<String, String>,
-    ) -> Result<Environment, MetadataError> {
-        let Some(env_options) = &self.function_config.env_options else {
-            return Ok(HashMap::new());
-        };
-        env_options.lambda_environment(base)
     }
 }
 

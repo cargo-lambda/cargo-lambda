@@ -194,6 +194,15 @@ pub enum Tracing {
     PassThrough,
 }
 
+impl Tracing {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Tracing::Active => "Active",
+            Tracing::PassThrough => "PassThrough",
+        }
+    }
+}
+
 impl TryFrom<String> for Tracing {
     type Error = MetadataError;
 

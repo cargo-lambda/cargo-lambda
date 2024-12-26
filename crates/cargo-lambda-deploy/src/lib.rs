@@ -5,7 +5,6 @@ use cargo_lambda_metadata::cargo::{
     deploy::{Deploy, OutputFormat},
     main_binary_from_metadata, CargoMetadata,
 };
-use cargo_lambda_remote::aws_sdk_lambda::types::Architecture;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
 use serde_json::ser::to_string_pretty;
@@ -62,33 +61,17 @@ pub async fn run(
         .with_initial_backoff(Duration::from_secs(5));
 
     let sdk_config = config.remote_config.sdk_config(Some(retry)).await;
-    let architecture = Architecture::from(archive.architecture.as_str());
 
     let result = if config.dry {
         dry::DeployOutput::new(config, &name, &archive).map(DeployResult::Dry)
     } else if config.extension {
-        extensions::deploy(
-            config,
-            &name,
-            &sdk_config,
-            &archive,
-            architecture,
-            &progress,
-        )
-        .await
-        .map(DeployResult::Extension)
+        extensions::deploy(config, &name, &sdk_config, &archive, &progress)
+            .await
+            .map(DeployResult::Extension)
     } else {
-        functions::deploy(
-            config,
-            base_env,
-            &name,
-            &sdk_config,
-            &archive,
-            architecture,
-            &progress,
-        )
-        .await
-        .map(DeployResult::Function)
+        functions::deploy(config, base_env, &name, &sdk_config, &archive, &progress)
+            .await
+            .map(DeployResult::Function)
     };
 
     progress.finish_and_clear();

@@ -42,13 +42,15 @@ rust-version = "1.80.0"
 
 [workspace.dependencies]
 assertables = "9.0.0"
-aws-config = "1.1.8"
-aws-sdk-iam = "1.17.0"
-aws-sdk-lambda = "1.17.0"
-aws-sdk-s3 = "1.17.0"
-aws-sdk-sts = "1.17.0"
-aws-smithy-types = "1.1.8"
-aws-types = "1.1.8"
+aws-config = "1.5.11"
+aws-credential-types = "1.2.1"
+aws-sdk-iam = { version ="1.54.0", features = ["behavior-version-latest"] }
+aws-sdk-lambda = { version ="1.61.0", features = ["behavior-version-latest"] }
+aws-sdk-s3 = { version ="1.61.0", features = ["behavior-version-latest"] }
+aws-sdk-sts = { version ="1.52.0", features = ["behavior-version-latest"] }
+aws-smithy-runtime = { version = "1.7.5", features = ["test-util"] }
+aws-smithy-types = "1.2.10"
+aws-types = "1.3.3"
 base64 = "0.21.2"
 cargo-lambda-build = { version = "1.6.1", path = "crates/cargo-lambda-build" }
 cargo-lambda-deploy = { version = "1.6.1", path = "crates/cargo-lambda-deploy" }

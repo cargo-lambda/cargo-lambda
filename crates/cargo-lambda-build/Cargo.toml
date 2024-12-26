@@ -14,6 +14,7 @@ description.workspace = true
 [dependencies]
 cargo-lambda-interactive.workspace = true
 cargo-lambda-metadata.workspace = true
+cargo-lambda-remote.workspace = true
 cargo-options.workspace = true
 cargo-zigbuild.workspace = true
 chrono.workspace = true

@@ -6,7 +6,7 @@ use cargo_lambda_remote::{
     aws_sdk_config::SdkConfig,
     aws_sdk_lambda::{
         primitives::Blob,
-        types::{Architecture, LayerVersionContentInput, Runtime},
+        types::{LayerVersionContentInput, Runtime},
         Client as LambdaClient,
     },
 };
@@ -41,7 +41,6 @@ pub(crate) async fn deploy(
     name: &str,
     sdk_config: &SdkConfig,
     binary_archive: &BinaryArchive,
-    architecture: Architecture,
     progress: &Progress,
 ) -> Result<DeployOutput> {
     let lambda_client = LambdaClient::new(sdk_config);
@@ -91,7 +90,7 @@ pub(crate) async fn deploy(
     let output = lambda_client
         .publish_layer_version()
         .layer_name(name)
-        .compatible_architectures(architecture)
+        .compatible_architectures(binary_archive.architecture())
         .set_compatible_runtimes(Some(compatible_runtimes))
         .content(input)
         .send()
