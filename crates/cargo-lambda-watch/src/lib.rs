@@ -3,7 +3,7 @@ use bytes::Bytes;
 use cargo_lambda_metadata::{
     cargo::{
         filter_binary_targets_from_metadata, kind_bin_filter, watch::Watch, CargoMetadata,
-        CargoPackage,
+        CargoPackage, CargoTarget,
     },
     lambda::Timeout,
     DEFAULT_PACKAGE_FUNCTION,
@@ -94,17 +94,13 @@ pub async fn run(
         None
     };
 
-    let mut binary_packages =
-        filter_binary_targets_from_metadata(metadata, kind_bin_filter, package_filter);
+    let cargo_bins = config.cargo_opts.bin.clone();
+    let binary_filter = move |t: &CargoTarget| {
+        kind_bin_filter(t) && (cargo_bins.is_empty() || cargo_bins.contains(&t.name))
+    };
 
-    if let Some(func) = config.cargo_opts.bin.first() {
-        if !binary_packages.contains(func) {
-            Err(ServerError::NoBinaryPackages)?;
-        }
-
-        binary_packages.clear();
-        binary_packages.insert(func.clone());
-    }
+    let binary_packages =
+        filter_binary_targets_from_metadata(metadata, binary_filter, package_filter);
 
     if binary_packages.is_empty() {
         Err(ServerError::NoBinaryPackages)?;
