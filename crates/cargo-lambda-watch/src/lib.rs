@@ -94,8 +94,17 @@ pub async fn run(
         None
     };
 
-    let binary_packages =
+    let mut binary_packages =
         filter_binary_targets_from_metadata(metadata, kind_bin_filter, package_filter);
+
+    if let Some(func) = config.cargo_opts.bin.first() {
+        if !binary_packages.contains(func) {
+            Err(ServerError::NoBinaryPackages)?;
+        }
+
+        binary_packages.clear();
+        binary_packages.insert(func.clone());
+    }
 
     if binary_packages.is_empty() {
         Err(ServerError::NoBinaryPackages)?;
