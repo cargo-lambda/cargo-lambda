@@ -106,6 +106,8 @@ Your function MUST have the `apigw_http` feature enabled in the `lambda_http` de
 
 If your project includes several functions under the same package, you can access them using the function's name as the prefix in the request path `http://localhost:9000/lambda-url/FUNCTION_NAME`. You can also add any additional path after the function name, or any query parameters.
 
+You can specify which function(s) to include by using the `--bin` flag. If you only specify one function, then you can access it directly using the root path `http://localhost:9000`.
+
 ### Working with specific packages
 
 You can specify the package that you want to work with by using the `--package` flag. This way, only the function in the specified package will be available through the Function URL.
