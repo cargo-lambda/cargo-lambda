@@ -13,7 +13,7 @@ use crate::error::ServerError;
 
 /// we discover ignore files from the `CARGO_LAMBDA_IGNORE_FILES` environment variable,
 /// the current directory, and any parent directories that represent project roots
-pub(crate) async fn discover_files(base: &Path) -> Vec<ignore_files::IgnoreFile> {
+pub(crate) async fn discover_files(base: &Path) -> Vec<IgnoreFile> {
     let mut ignore_files = HashSet::new();
 
     let (env_ignore, env_ignore_errs) = ignore_files::from_environment(Some("CARGO_LAMBDA")).await;
@@ -112,7 +112,7 @@ impl Filterer for IgnoreFilterer {
 
         for (path, file_type) in event.paths() {
             let _span = trace_span!("checking_against_compiled", ?path, ?file_type).entered();
-            let is_dir = file_type.map_or(false, |t| matches!(t, FileType::Dir));
+            let is_dir = file_type.is_some_and(|t| matches!(t, FileType::Dir));
 
             for filter in &self.0 {
                 let mut pass = true;

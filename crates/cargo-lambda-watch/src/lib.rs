@@ -211,8 +211,7 @@ async fn start_server(
         runtime_state.clone(),
         cargo_options,
         watcher_config,
-    )
-    .await;
+    );
 
     let state_ref = Arc::new(runtime_state);
     let mut app = Router::new()
@@ -265,7 +264,7 @@ async fn start_server(
         }
     }
 
-    let tls_config = tls_options.server_config().await?;
+    let tls_config = tls_options.server_config()?;
     let tls_tracker = TaskTracker::new();
 
     if let (Some(tls_config), Some(proxy_addr)) = (tls_config, proxy_addr) {
@@ -362,7 +361,7 @@ async fn start_tls_proxy(
 
 async fn proxy(
     connection_tracker: TaskTracker,
-    req: Request<hyper::body::Incoming>,
+    req: Request<Incoming>,
     addr: Arc<SocketAddr>,
 ) -> Result<Response<BoxBody<Bytes, hyper::Error>>, hyper::Error> {
     let stream = TcpStream::connect(&*addr).await.unwrap();

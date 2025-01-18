@@ -85,7 +85,7 @@ impl TlsOptions {
         self.cert_path().is_some() && self.key_path().is_some()
     }
 
-    pub async fn server_config(&self) -> Result<Option<ServerConfig>> {
+    pub fn server_config(&self) -> Result<Option<ServerConfig>> {
         if !self.is_secure() {
             return Ok(None);
         }
@@ -112,7 +112,7 @@ impl TlsOptions {
         Ok(Some(config))
     }
 
-    pub async fn client_config(&self) -> Result<ClientConfig> {
+    pub fn client_config(&self) -> Result<ClientConfig> {
         CELL.get_or_init(install_default_tls_provider);
 
         let builder = if let Some(path) = self.ca_path() {
@@ -279,7 +279,7 @@ mod tests {
         assert_eq!(opts.ca_path().unwrap(), opts.config_dir.join("ca.pem"));
         assert!(opts.is_secure());
 
-        let config = opts.server_config().await.unwrap();
+        let config = opts.server_config().unwrap();
         assert!(config.is_some());
     }
 
@@ -348,7 +348,7 @@ mod tests {
 
         assert!(opts.is_secure());
 
-        let config = opts.server_config().await.unwrap();
+        let config = opts.server_config().unwrap();
         assert!(config.is_some());
     }
 
@@ -366,7 +366,7 @@ mod tests {
         );
         create_test_file("../../tests/certs/ca.pem", &opts.config_dir.join("ca.pem"));
 
-        let config = opts.server_config().await.unwrap();
+        let config = opts.server_config().unwrap();
         assert!(config.is_some());
     }
 
@@ -384,7 +384,7 @@ mod tests {
         );
         create_test_file("../../tests/certs/ca.pem", &opts.config_dir.join("ca.pem"));
 
-        let config = opts.client_config().await.unwrap();
+        let config = opts.client_config().unwrap();
         assert!(config.alpn_protocols.is_empty()); // Default client config has no ALPN protocols
     }
 
@@ -401,7 +401,7 @@ mod tests {
             &opts.config_dir.join("key.pem"),
         );
 
-        let config = opts.client_config().await.unwrap();
+        let config = opts.client_config().unwrap();
         assert!(config.alpn_protocols.is_empty());
     }
 }
