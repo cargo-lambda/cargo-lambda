@@ -47,7 +47,7 @@ pub async fn check_target_component_with_rustc_meta(target_arch: &TargetArch) ->
 
     if !target_component_exists {
         // install target component using `rustup`
-        let pb = Progress::start(format_args!("Installing target component `{component}`..."));
+        let pb = Progress::start(format!("Installing target component `{component}`..."));
 
         let result = install_target_component(component, toolchain).await;
         let finish = if result.is_ok() {

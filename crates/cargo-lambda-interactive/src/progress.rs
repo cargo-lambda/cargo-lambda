@@ -1,17 +1,17 @@
 use crate::is_stdout_tty;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 
 pub struct Progress {
     bar: Option<ProgressBar>,
 }
 
 impl Progress {
-    pub fn start(msg: impl ToString) -> Progress {
+    pub fn start(msg: impl Into<Cow<'static, str>>) -> Progress {
         let bar = if is_stdout_tty() {
             Some(show_progress(msg))
         } else {
-            println!("▹▹▹▹▹ {}", msg.to_string());
+            println!("▹▹▹▹▹ {}", msg.into());
             None
         };
         Progress { bar }
@@ -40,7 +40,7 @@ impl Progress {
     }
 }
 
-fn show_progress(msg: impl ToString) -> ProgressBar {
+fn show_progress(msg: impl Into<Cow<'static, str>>) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
     pb.enable_steady_tick(Duration::from_millis(120));
     pb.set_style(ProgressStyle::default_spinner().tick_strings(&[
@@ -52,6 +52,6 @@ fn show_progress(msg: impl ToString) -> ProgressBar {
         "▹▹▹▹▸",
         "▪▪▪▪▪",
     ]));
-    pb.set_message(msg.to_string());
+    pb.set_message(msg);
     pb
 }

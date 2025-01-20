@@ -11,7 +11,7 @@ use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle};
 use tracing::{error, info};
 use watchexec::command::Command;
 
-pub(crate) async fn init_scheduler(
+pub(crate) fn init_scheduler(
     subsys: &SubsystemHandle,
     state: RuntimeState,
     cargo_options: CargoOptions,
@@ -67,7 +67,7 @@ async fn start_scheduler(
                 info!("terminating lambda scheduler");
                 return Ok(());
             }
-        };
+        }
     }
 }
 

@@ -218,7 +218,7 @@ impl Invoke {
         let host = parse_invoke_ip_address(&self.invoke_address)?;
 
         let (protocol, client) = if self.tls_options.is_secure() {
-            let tls = self.tls_options.client_config().await?;
+            let tls = self.tls_options.client_config()?;
             let client = Client::builder()
                 .use_preconfigured_tls(tls)
                 .build()
