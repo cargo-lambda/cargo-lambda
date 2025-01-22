@@ -57,7 +57,8 @@ async fn furls_handler(
     let (parts, body) = req.into_parts();
     let uri = &parts.uri;
 
-    let (function_name, mut path) = extract_path_parameters(uri.path(), &parts.method, &state);
+    let (function_name, mut path, path_parameters) =
+        extract_path_parameters(uri.path(), &parts.method, &state);
     tracing::trace!(%function_name, %path, "received request in furls handler");
 
     if function_name == DEFAULT_PACKAGE_FUNCTION && !state.is_default_function_enabled() {
@@ -154,6 +155,7 @@ async fn furls_handler(
         cookies,
         query_string_parameters,
         is_base64_encoded,
+        path_parameters,
         ..Default::default()
     };
     let event = serde_json::to_string(&event).map_err(ServerError::SerializationError)?;
@@ -280,7 +282,7 @@ fn extract_path_parameters(
     path: &str,
     method: &Method,
     state: &RefRuntimeState,
-) -> (String, String) {
+) -> (String, String, HashMap<String, String>) {
     let mut comp = path.split('/');
 
     comp.next();
@@ -297,17 +299,21 @@ fn extract_path_parameters(
             } else {
                 fun_name.to_string()
             };
-            return (f, new_path);
+            return (f, new_path, HashMap::new());
         }
     }
 
     if let Some(router) = &state.function_router {
-        if let Ok(route) = router.at(path, method.to_string().as_str()) {
-            return (route.to_string(), path.to_string());
+        if let Ok((route, params)) = router.at(path, method.to_string().as_str()) {
+            return (route.to_string(), path.to_string(), params);
         }
     }
 
-    (DEFAULT_PACKAGE_FUNCTION.to_string(), path.to_string())
+    (
+        DEFAULT_PACKAGE_FUNCTION.to_string(),
+        path.to_string(),
+        HashMap::new(),
+    )
 }
 
 async fn create_streaming_response(
@@ -477,36 +483,38 @@ mod test {
             None,
         ));
 
-        let (func, path) = extract_path_parameters("", &Method::GET, &state);
+        let (func, path, _) = extract_path_parameters("", &Method::GET, &state);
         assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
         assert_eq!("", path);
 
-        let (func, path) = extract_path_parameters("/", &Method::GET, &state);
+        let (func, path, _) = extract_path_parameters("/", &Method::GET, &state);
         assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
         assert_eq!("/", path);
 
-        let (func, path) = extract_path_parameters("/foo", &Method::GET, &state);
+        let (func, path, _) = extract_path_parameters("/foo", &Method::GET, &state);
         assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
         assert_eq!("/foo", path);
 
-        let (func, path) = extract_path_parameters("/foo/", &Method::GET, &state);
+        let (func, path, _) = extract_path_parameters("/foo/", &Method::GET, &state);
         assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
         assert_eq!("/foo/", path);
 
-        let (func, path) = extract_path_parameters("/lambda-url/func-name", &Method::GET, &state);
+        let (func, path, _) =
+            extract_path_parameters("/lambda-url/func-name", &Method::GET, &state);
         assert_eq!("func-name", func);
         assert_eq!("/", path);
 
-        let (func, path) = extract_path_parameters("/lambda-url/func-name/", &Method::GET, &state);
+        let (func, path, _) =
+            extract_path_parameters("/lambda-url/func-name/", &Method::GET, &state);
         assert_eq!("func-name", func);
         assert_eq!("/", path);
 
-        let (func, path) =
+        let (func, path, _) =
             extract_path_parameters("/lambda-url/func-name/foo", &Method::GET, &state);
         assert_eq!("func-name", func);
         assert_eq!("/foo", path);
 
-        let (func, path) =
+        let (func, path, _) =
             extract_path_parameters("/lambda-url/func-name/foo/", &Method::GET, &state);
         assert_eq!("func-name", func);
         assert_eq!("/foo/", path);
@@ -523,7 +531,7 @@ mod test {
             Some(new_router),
         ));
 
-        let (func, path) = extract_path_parameters("/foo", &Method::GET, &state);
+        let (func, path, _) = extract_path_parameters("/foo", &Method::GET, &state);
         assert_eq!("bar", func);
         assert_eq!("/foo", path);
     }

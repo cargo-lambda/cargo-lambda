@@ -232,9 +232,21 @@ pub struct FunctionRouter {
 }
 
 impl FunctionRouter {
-    pub fn at(&self, path: &str, method: &str) -> Result<&str, MatchError> {
+    pub fn at(
+        &self,
+        path: &str,
+        method: &str,
+    ) -> Result<(String, HashMap<String, String>), MatchError> {
         let matched = self.inner.at(path)?;
-        matched.value.at(method).ok_or(MatchError::NotFound)
+        let function = matched.value.at(method).ok_or(MatchError::NotFound)?;
+
+        let params = matched
+            .params
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+
+        Ok((function.to_string(), params))
     }
 
     pub fn insert(&mut self, path: &str, routes: FunctionRoutes) -> Result<(), InsertError> {
@@ -429,8 +441,14 @@ mod tests {
             inner,
             ..Default::default()
         };
-        assert_eq!(router.at("/api/v1/users", "GET"), Ok("user_handler"));
-        assert_eq!(router.at("/api/v1/users", "POST"), Ok("user_handler"));
+        assert_eq!(
+            router.at("/api/v1/users", "GET"),
+            Ok(("user_handler".to_string(), HashMap::new()))
+        );
+        assert_eq!(
+            router.at("/api/v1/users", "POST"),
+            Ok(("user_handler".to_string(), HashMap::new()))
+        );
 
         let mut inner = Router::new();
         inner
@@ -446,9 +464,31 @@ mod tests {
             inner,
             ..Default::default()
         };
-        assert_eq!(router.at("/api/v1/users", "GET"), Ok("get_user"));
-        assert_eq!(router.at("/api/v1/users", "POST"), Ok("create_user"));
+        assert_eq!(
+            router.at("/api/v1/users", "GET"),
+            Ok(("get_user".to_string(), HashMap::new()))
+        );
+        assert_eq!(
+            router.at("/api/v1/users", "POST"),
+            Ok(("create_user".to_string(), HashMap::new()))
+        );
         assert_eq!(router.at("/api/v1/users", "PUT"), Err(MatchError::NotFound));
+
+        let mut inner = Router::new();
+        inner
+            .insert(
+                "/api/v1/users/{id}",
+                FunctionRoutes::Single("user_handler".to_string()),
+            )
+            .unwrap();
+        let router = FunctionRouter {
+            inner,
+            ..Default::default()
+        };
+
+        let (function, params) = router.at("/api/v1/users/1", "GET").unwrap();
+        assert_eq!(function, "user_handler");
+        assert_eq!(params, HashMap::from([("id".to_string(), "1".to_string())]));
     }
 
     #[test]
