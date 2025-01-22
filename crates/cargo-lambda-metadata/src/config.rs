@@ -270,11 +270,23 @@ mod tests {
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
 
         let router = config.watch.router.unwrap();
-        assert_eq!(router.at("/foo", "GET"), Ok("crate-1"));
-        assert_eq!(router.at("/bar", "GET"), Ok("crate-1"));
-        assert_eq!(router.at("/bar", "POST"), Ok("crate-2"));
+        assert_eq!(
+            router.at("/foo", "GET"),
+            Ok(("crate-1".to_string(), HashMap::new()))
+        );
+        assert_eq!(
+            router.at("/bar", "GET"),
+            Ok(("crate-1".to_string(), HashMap::new()))
+        );
+        assert_eq!(
+            router.at("/bar", "POST"),
+            Ok(("crate-2".to_string(), HashMap::new()))
+        );
         assert_eq!(router.at("/baz", "GET"), Err(MatchError::NotFound));
-        assert_eq!(router.at("/qux", "GET"), Ok("crate-3"));
+        assert_eq!(
+            router.at("/qux", "GET"),
+            Ok(("crate-3".to_string(), HashMap::new()))
+        );
     }
 
     #[test]
@@ -293,7 +305,10 @@ mod tests {
         assert_eq!(router.at("/bar", "GET"), Err(MatchError::NotFound));
         assert_eq!(router.at("/bar", "POST"), Err(MatchError::NotFound));
         assert_eq!(router.at("/baz", "GET"), Err(MatchError::NotFound));
-        assert_eq!(router.at("/qux", "GET"), Ok("crate-3"));
+        assert_eq!(
+            router.at("/qux", "GET"),
+            Ok(("crate-3".to_string(), HashMap::new()))
+        );
     }
 
     #[test]

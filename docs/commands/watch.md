@@ -324,7 +324,7 @@ This configuration is applied to all functions in your workspace.
 
 ```toml
 [package.metadata.lambda.watch.router]
-"/get-product/:id" = "get-product"
+"/get-product/{id}" = "get-product"
 "/add-product" = "add-product"
 "/users" = [
     { method = "GET", function = "get-users" },
