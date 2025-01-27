@@ -171,6 +171,10 @@ impl Deploy {
 
         Ok(Some(builder.set_variables(Some(env)).build()))
     }
+
+    pub fn publish_code_without_description(&self) -> bool {
+        self.function_config.description.is_none()
+    }
 }
 
 impl Serialize for Deploy {
@@ -323,6 +327,11 @@ pub struct FunctionDeployConfig {
     #[arg(long, default_value = DEFAULT_RUNTIME)]
     #[serde(default)]
     pub runtime: Option<String>,
+
+    /// A description for the new function version.
+    #[arg(long)]
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 fn default_runtime() -> String {
@@ -353,6 +362,7 @@ impl FunctionDeployConfig {
             + self.memory.is_some() as usize
             + self.timeout.is_some() as usize
             + self.runtime.is_some() as usize
+            + self.description.is_some() as usize
             + self.vpc.as_ref().map_or(0, |vpc| vpc.count_fields())
             + self
                 .env_options
@@ -399,6 +409,10 @@ impl FunctionDeployConfig {
             if !layer.is_empty() {
                 state.serialize_field("layer", &layer)?;
             }
+        }
+
+        if let Some(description) = &self.description {
+            state.serialize_field("description", &description)?;
         }
 
         if let Some(vpc) = &self.vpc {

@@ -39,6 +39,8 @@ pub(crate) struct DeployOutput {
     function_arn: String,
     function_url: Option<String>,
     binary_modified_at: BinaryModifiedAt,
+    version: String,
+    alias: Option<String>,
 }
 
 impl std::fmt::Display for DeployOutput {
@@ -49,9 +51,13 @@ impl std::fmt::Display for DeployOutput {
             "🛠️  binary last compiled {}",
             self.binary_modified_at.humanize()
         )?;
-        write!(f, "🔍 function arn: {}", self.function_arn)?;
+        writeln!(f, "🔍 arn: {}", self.function_arn)?;
+        write!(f, "🎭 version: {}", self.version)?;
+        if let Some(alias) = &self.alias {
+            write!(f, "\n🪢 alias: {alias}")?;
+        }
         if let Some(url) = &self.function_url {
-            write!(f, "🔗 function url: {url}")?;
+            write!(f, "\n🔗 url: {url}")?;
         }
         Ok(())
     }
@@ -92,6 +98,8 @@ pub(crate) async fn deploy(
     Ok(DeployOutput {
         function_arn,
         function_url,
+        version,
+        alias: config.remote_config.alias.clone(),
         binary_modified_at: binary_archive.binary_modified_at.clone(),
     })
 }
@@ -148,7 +156,7 @@ async fn upsert_function(
 
             tag_function(client, config.lambda_tags(), function_arn).await?;
 
-            update_function_code(config, name, client, &s3_client, binary_archive).await?
+            update_function_code(config, name, client, &s3_client, binary_archive, progress).await?
         }
     };
 
@@ -251,7 +259,7 @@ async fn create_function(
             .role(function_role.arn())
             .architectures(binary_archive.architecture())
             .code(code.clone())
-            .publish(true)
+            .publish(config.publish_code_without_description())
             .set_memory_size(memory)
             .timeout(timeout)
             .set_tracing_config(config.tracing_config())
@@ -281,14 +289,32 @@ async fn create_function(
             Err(err) => {
                 return Err(err)
                     .into_diagnostic()
-                    .wrap_err("failed to create new lambda function");
+                    .wrap_err("failed to create the new lambda function");
             }
         };
     }
 
-    output
-        .map(|o| (o.function_arn, o.version))
-        .ok_or_else(|| miette::miette!("failed to create new lambda function"))
+    if let Some(description) = &config.function_config.description {
+        wait_for_ready_state(lambda_client, name, &config.remote_config.alias, progress).await?;
+
+        let result = lambda_client
+            .publish_version()
+            .function_name(name)
+            .description(description)
+            .send()
+            .await;
+
+        match result {
+            Ok(o) => Ok((o.function_arn, o.version)),
+            Err(err) => Err(err)
+                .into_diagnostic()
+                .wrap_err("failed to publish the new lambda version"),
+        }
+    } else {
+        output
+            .map(|o| (o.function_arn, o.version))
+            .ok_or_else(|| miette::miette!("failed to create new lambda function"))
+    }
 }
 
 async fn update_function_config(
@@ -404,6 +430,7 @@ async fn update_function_code(
     lambda_client: &LambdaClient,
     s3_client: &S3Client,
     binary_archive: &BinaryArchive,
+    progress: &Progress,
 ) -> Result<(Option<String>, Option<String>)> {
     let mut builder = lambda_client.update_function_code().function_name(name);
 
@@ -439,12 +466,30 @@ async fn update_function_code(
     }
 
     let output = builder
-        .publish(true)
+        .publish(config.publish_code_without_description())
         .send()
         .await
         .into_diagnostic()
         .wrap_err("failed to update function code")?;
-    Ok((output.function_arn, output.version))
+
+    if let Some(description) = &config.function_config.description {
+        wait_for_ready_state(lambda_client, name, &config.remote_config.alias, progress).await?;
+        let result = lambda_client
+            .publish_version()
+            .function_name(name)
+            .description(description)
+            .send()
+            .await;
+
+        match result {
+            Ok(o) => Ok((o.function_arn, o.version)),
+            Err(err) => Err(err)
+                .into_diagnostic()
+                .wrap_err("failed to publish the new lambda version"),
+        }
+    } else {
+        Ok((output.function_arn, output.version))
+    }
 }
 
 /// Wait until the function state has been completely propagated.
@@ -787,12 +832,15 @@ mod tests {
             BinaryModifiedAt::now(),
         );
 
+        let progress = Progress::start("deploying function");
+
         let result = update_function_code(
             &deploy_config,
             name,
             &lambda_client,
             &s3_client,
             &binary_archive,
+            &progress,
         )
         .await;
 
@@ -876,12 +924,15 @@ mod tests {
         deploy_config.s3_key = Some("test-key".to_string());
         deploy_config.tag = Some(vec!["env=test".to_string()]);
 
+        let progress = Progress::start("deploying function");
+
         let result = update_function_code(
             &deploy_config,
             "test-function",
             &lambda_client,
             &s3_client,
             &binary_archive,
+            &progress,
         )
         .await;
 

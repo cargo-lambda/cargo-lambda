@@ -25,7 +25,7 @@ pub struct RemoteConfig {
     pub region: Option<String>,
 
     /// AWS Lambda alias to associate the function to
-    #[arg(short, long)]
+    #[arg(short, long, alias = "qualifier")]
     #[serde(default)]
     pub alias: Option<String>,
 

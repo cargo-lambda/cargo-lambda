@@ -75,6 +75,14 @@ The `--remote` flag allows you to send requests to a remote function deployed on
 cargo lambda invoke --remote --data-example apigw-request http-lambda
 ```
 
+### Versioning
+
+You can invoke different remote versions of the function by providing the version number or alias. Use the flag `--qualifier` to specify this version number or alias. For example, if you want to invoke a previous version of the function, you can use the following command:
+
+```
+cargo lambda invoke --remote --data-example apigw-request --qualifier 1 http-lambda
+```
+
 ## Output format
 
 The `--output-format` flag allows you to change the output formatting between plain text and pretty-printed JSON formatting. By default, all function outputs are printed as text.
