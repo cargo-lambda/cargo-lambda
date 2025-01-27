@@ -16,6 +16,16 @@ The following video shows you how to use this subcommand:
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/ICUSfTorBnI" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
+## Versioning
+
+By default, Cargo Lambda will create a new version of the function when you deploy it. This allows you to keep old versions of the function alive, and you can roll back to a previous version if you need to. Versions are named with a version number by AWS Lambda, this version number cannot be changed. However, you can provide a description for the new version of the function using the `--description` flag. This description will be used as the description for the new version of the function. It's a good idea to provide a description for the new version of the function, so you can easily identify it when you have multiple versions of the function.
+
+For example, you can use the description to associate the deployment with a specific git commit hash:
+
+```
+cargo lambda deploy --description $(git rev-parse HEAD)
+```
+
 ## Working with multiple packages
 
 By default, Cargo Lambda tries to detect the binary that you built before deploying it. This can be challenging if you're working in a workspace with multiple Rust packages. There are multiple ways to provide the information about the package you want to deploy more explicitly in this subcommand.
