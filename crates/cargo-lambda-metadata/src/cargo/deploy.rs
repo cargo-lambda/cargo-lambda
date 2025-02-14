@@ -286,7 +286,7 @@ pub struct FunctionDeployConfig {
     pub disable_function_url: bool,
 
     /// Memory allocated for the function
-    #[arg(long, alias = "memory-size")]
+    #[arg(long, alias = "memory-size", value_parser = clap::value_parser!(i32).range(128..=10240))]
     #[serde(default)]
     pub memory: Option<Memory>,
 
