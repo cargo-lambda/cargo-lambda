@@ -58,39 +58,8 @@ impl From<i32> for Timeout {
     }
 }
 
-#[derive(Clone, Debug, Display, EnumString, Eq, PartialEq)]
-pub enum Memory {
-    #[strum(to_string = "128")]
-    Mb128,
-    #[strum(to_string = "256")]
-    Mb256,
-    #[strum(to_string = "512")]
-    Mb512,
-    #[strum(to_string = "640")]
-    Mb640,
-    #[strum(to_string = "1024")]
-    Mb1024,
-    #[strum(to_string = "1536")]
-    Mb1536,
-    #[strum(to_string = "2048")]
-    Mb2048,
-    #[strum(to_string = "3072")]
-    Mb3072,
-    #[strum(to_string = "4096")]
-    Mb4096,
-    #[strum(to_string = "5120")]
-    Mb5120,
-    #[strum(to_string = "6144")]
-    Mb6144,
-    #[strum(to_string = "7168")]
-    Mb7168,
-    #[strum(to_string = "8192")]
-    Mb8192,
-    #[strum(to_string = "9216")]
-    Mb9216,
-    #[strum(to_string = "10240")]
-    Mb10240,
-}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Memory(pub i32);
 
 impl From<Memory> for i32 {
     fn from(m: Memory) -> i32 {
@@ -100,23 +69,7 @@ impl From<Memory> for i32 {
 
 impl From<&Memory> for i32 {
     fn from(m: &Memory) -> i32 {
-        match m {
-            Memory::Mb128 => 128,
-            Memory::Mb256 => 256,
-            Memory::Mb512 => 512,
-            Memory::Mb640 => 640,
-            Memory::Mb1024 => 1024,
-            Memory::Mb1536 => 1536,
-            Memory::Mb2048 => 2048,
-            Memory::Mb3072 => 3072,
-            Memory::Mb4096 => 4096,
-            Memory::Mb5120 => 5120,
-            Memory::Mb6144 => 6144,
-            Memory::Mb7168 => 7168,
-            Memory::Mb8192 => 8192,
-            Memory::Mb9216 => 9216,
-            Memory::Mb10240 => 10240,
-        }
+        m.0
     }
 }
 
@@ -124,24 +77,10 @@ impl TryFrom<i32> for Memory {
     type Error = MetadataError;
 
     fn try_from(m: i32) -> Result<Memory, Self::Error> {
-        match m {
-            128 => Ok(Memory::Mb128),
-            256 => Ok(Memory::Mb256),
-            512 => Ok(Memory::Mb512),
-            640 => Ok(Memory::Mb640),
-            1024 => Ok(Memory::Mb1024),
-            1536 => Ok(Memory::Mb1536),
-            2048 => Ok(Memory::Mb2048),
-            3072 => Ok(Memory::Mb3072),
-            4096 => Ok(Memory::Mb4096),
-            5120 => Ok(Memory::Mb5120),
-            6144 => Ok(Memory::Mb6144),
-            7168 => Ok(Memory::Mb7168),
-            8192 => Ok(Memory::Mb8192),
-            9216 => Ok(Memory::Mb9216),
-            10240 => Ok(Memory::Mb10240),
-            other => Err(MetadataError::InvalidMemory(other)),
+        if !(128..=10240).contains(&m) {
+            return Err(MetadataError::InvalidMemory(m));
         }
+        Ok(Memory(m))
     }
 }
 
