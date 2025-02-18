@@ -498,6 +498,13 @@ fn extract_tags(tags: &Vec<String>) -> HashMap<String, String> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        cargo::load_metadata,
+        config::{load_config_without_cli_flags, ConfigOptions},
+        lambda::{Memory, Timeout},
+        tests::fixture_metadata,
+    };
+
     use super::*;
 
     #[test]
@@ -592,6 +599,38 @@ mod tests {
         assert_eq!(
             env.variables().unwrap().get("QUUX"),
             Some(&"QUUX".to_string())
+        );
+    }
+
+    #[test]
+    fn test_load_config_from_workspace() {
+        let options = ConfigOptions {
+            name: Some("crate-3".to_string()),
+            admerge: true,
+            ..Default::default()
+        };
+
+        let metadata = load_metadata(fixture_metadata("workspace-package")).unwrap();
+        let config = load_config_without_cli_flags(&metadata, &options).unwrap();
+        assert_eq!(
+            config.deploy.function_config.timeout,
+            Some(Timeout::new(120))
+        );
+        assert_eq!(config.deploy.function_config.memory, Some(Memory(10240)));
+
+        let tags = config.deploy.lambda_tags().unwrap();
+        assert_eq!(tags.len(), 2);
+        assert_eq!(tags.get("organization"), Some(&"aws".to_string()));
+        assert_eq!(tags.get("team"), Some(&"lambda".to_string()));
+
+        assert_eq!(
+            config.deploy.include,
+            Some(vec!["src/bin/main.rs".to_string()])
+        );
+
+        assert_eq!(
+            config.deploy.function_config.env_options.unwrap().env_var,
+            Some(vec!["APP_ENV=production".to_string()])
         );
     }
 }

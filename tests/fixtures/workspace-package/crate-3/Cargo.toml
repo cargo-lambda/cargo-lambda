@@ -22,3 +22,10 @@ FOO = "BAR"
 
 [package.metadata.lambda.watch.router]
 "/qux" = "crate-3"
+
+[package.metadata.lambda.deploy]
+timeout = 120
+memory = 10240
+tags = { "organization" = "aws", "team" = "lambda" }
+env = { "APP_ENV" = "production" }
+include = [ "src/bin/main.rs" ]
