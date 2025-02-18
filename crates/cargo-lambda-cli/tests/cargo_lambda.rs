@@ -2,6 +2,7 @@ use std::{
     fs::{create_dir_all, read_to_string, File},
     io::Write,
 };
+use toml_edit::{value, Array, DocumentMut};
 use zip::ZipArchive;
 
 mod harness;
@@ -581,15 +582,10 @@ fn test_deploy_function_with_extra_files() {
         let output = cargo_lambda_dry_deploy(project.root())
             .arg("--include")
             .arg("src")
-            .arg("--output-format")
-            .arg("json")
             .assert()
             .success();
 
-        let output = output.get_output();
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let (_log, json) = stdout.split_once("loading binary data").unwrap();
-        let json_data: serde_json::Value = serde_json::from_str(json).unwrap();
+        let json_data = deploy_output_json(&output).unwrap();
 
         let files = json_data["files"].as_array().unwrap();
         let files = files
@@ -597,5 +593,62 @@ fn test_deploy_function_with_extra_files() {
             .map(|f| f.as_str().unwrap())
             .collect::<Vec<_>>();
         assertables::assert_contains!(files, &"src/main.rs");
+    }
+}
+
+#[test]
+fn test_deploy_workspace_with_config() {
+    let _guard = init_root();
+    let workspace = project().build();
+    let crates = workspace.root().join("crates");
+    crates.mkdir_p();
+
+    let lp_1 = cargo_lambda_new_in_root("p1", "function-template", &crates);
+    lp_1.new_cmd()
+        .arg("--no-interactive")
+        .arg(&lp_1.name)
+        .assert()
+        .success();
+
+    let mut manifest = File::create(workspace.root().join("Cargo.toml"))
+        .expect("failed to create Cargo.toml file");
+    let content = format!(
+        r#"[workspace]
+resolver = "2"
+members = ["crates/{}"]
+"#,
+        &lp_1.name
+    );
+    manifest
+        .write_all(content.as_bytes())
+        .expect("failed to create manifest content");
+    manifest.flush().unwrap();
+
+    let package_manifest = read_to_string(lp_1.root().join("Cargo.toml")).unwrap();
+    let mut package_manifest: DocumentMut = package_manifest.parse::<DocumentMut>().unwrap();
+    let mut files = Array::default();
+    files.push("Cargo.toml".to_string());
+    package_manifest["package"]["metadata"]["lambda"]["deploy"]["include"] = value(files);
+    std::fs::write(lp_1.root().join("Cargo.toml"), package_manifest.to_string()).unwrap();
+
+    cargo_lambda_build(workspace.root())
+        .arg("--package")
+        .arg(&lp_1.name)
+        .assert()
+        .success();
+
+    #[cfg(not(windows))]
+    {
+        let output = cargo_lambda_dry_deploy(workspace.root())
+            .arg(&lp_1.name)
+            .assert()
+            .success();
+
+        let json_data = deploy_output_json(&output).unwrap();
+        assert_eq!(json_data["files"].as_array().unwrap().len(), 2);
+        assertables::assert_contains!(
+            json_data["files"].as_array().unwrap(),
+            &serde_json::to_value("Cargo.toml").unwrap()
+        );
     }
 }

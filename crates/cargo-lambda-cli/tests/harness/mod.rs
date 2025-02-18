@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use snapbox::cmd::Command;
+use snapbox::cmd::{Command, OutputAssert};
 
 mod project;
 use project::Project;
@@ -129,6 +129,8 @@ pub fn cargo_lambda_dry_deploy<P: AsRef<Path>>(path: P) -> Command {
         .arg("lambda")
         .arg("deploy")
         .arg("--dry")
+        .arg("--output-format")
+        .arg("json")
         .current_dir(path)
 }
 
@@ -164,4 +166,11 @@ impl LambdaProjectExt for Project {
     fn lambda_extension_bin(&self, name: &str) -> PathBuf {
         self.lambda_dir().join("extensions").join(name)
     }
+}
+
+pub fn deploy_output_json(output: &OutputAssert) -> Result<serde_json::Value, serde_json::Error> {
+    let output = output.get_output();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let (_log, json) = stdout.split_once("loading binary data").unwrap();
+    serde_json::from_str(json)
 }
