@@ -50,7 +50,7 @@ pub struct Watch {
     pub invoke_address: String,
 
     /// Address port where users send invoke requests
-    #[arg(short = 'p', long, default_value_t = DEFAULT_INVOKE_PORT)]
+    #[arg(short = 'P', long, default_value_t = DEFAULT_INVOKE_PORT)]
     #[serde(default = "default_invoke_port")]
     pub invoke_port: u16,
 
