@@ -48,7 +48,7 @@ impl Display for DeployOutput {
         writeln!(f, "🔗 architecture {}", self.arch)?;
 
         if let Some(tags) = &self.tags {
-            writeln!(f, "🏷️ tagged with {}", tags.replace(',', ", "))?;
+            writeln!(f, "🏷️  tagged with {}", tags.replace(',', ", "))?;
         }
 
         if let Some(bucket) = &self.bucket {
