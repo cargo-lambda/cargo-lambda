@@ -603,46 +603,72 @@ fn test_deploy_workspace_with_config() {
     let crates = workspace.root().join("crates");
     crates.mkdir_p();
 
-    let lp_1 = cargo_lambda_new_in_root("p1", "function-template", &crates);
-    lp_1.new_cmd()
+    let lambda_package = cargo_lambda_new_in_root("p1", "function-template", &crates);
+    lambda_package
+        .new_cmd()
         .arg("--no-interactive")
-        .arg(&lp_1.name)
+        .arg(&lambda_package.name)
         .assert()
         .success();
+
+    let lib_package = cargo_lambda_new_in_root("p2", "", &crates);
+    lib_package.root().mkdir_p();
+    let mut package_manifest = File::create(lib_package.root().join("Cargo.toml"))
+        .expect("failed to create Cargo.toml file");
+    package_manifest
+        .write_all(
+            r#"
+[package]
+name = "lib1"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[lib]
+name = "lib"
+path = "src/lib.rs"
+            "#
+            .as_bytes(),
+        )
+        .unwrap();
 
     let mut manifest = File::create(workspace.root().join("Cargo.toml"))
         .expect("failed to create Cargo.toml file");
     let content = format!(
         r#"[workspace]
 resolver = "2"
-members = ["crates/{}"]
+members = ["crates/{}", "crates/{}"]
 "#,
-        &lp_1.name
+        &lambda_package.name, &lib_package.name
     );
     manifest
         .write_all(content.as_bytes())
         .expect("failed to create manifest content");
     manifest.flush().unwrap();
 
-    let package_manifest = read_to_string(lp_1.root().join("Cargo.toml")).unwrap();
+    let package_manifest = read_to_string(lambda_package.root().join("Cargo.toml")).unwrap();
     let mut package_manifest: DocumentMut = package_manifest.parse::<DocumentMut>().unwrap();
     let mut files = Array::default();
     files.push("Cargo.toml".to_string());
     package_manifest["package"]["metadata"]["lambda"]["deploy"]["include"] = value(files);
-    std::fs::write(lp_1.root().join("Cargo.toml"), package_manifest.to_string()).unwrap();
+    std::fs::write(
+        lambda_package.root().join("Cargo.toml"),
+        package_manifest.to_string(),
+    )
+    .unwrap();
 
     cargo_lambda_build(workspace.root())
         .arg("--package")
-        .arg(&lp_1.name)
+        .arg(&lambda_package.name)
         .assert()
         .success();
 
     #[cfg(not(windows))]
     {
-        let output = cargo_lambda_dry_deploy(workspace.root())
-            .arg(&lp_1.name)
-            .assert()
-            .success();
+        // Deploy lambda package without specifying the package name.
+        // This should autodetect the binary and metadata configuration.
+        let output = cargo_lambda_dry_deploy(workspace.root()).assert().success();
 
         let json_data = deploy_output_json(&output).unwrap();
         assert_eq!(json_data["files"].as_array().unwrap().len(), 2);

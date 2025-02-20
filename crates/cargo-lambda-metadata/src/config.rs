@@ -1,7 +1,11 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::cargo::{
-    build::Build, deploy::Deploy, watch::Watch, CargoMetadata, Metadata, PackageMetadata,
+use crate::{
+    cargo::{
+        binary_targets_from_metadata, build::Build, deploy::Deploy, watch::Watch, CargoMetadata,
+        Metadata, PackageMetadata,
+    },
+    error::MetadataError,
 };
 use cargo_metadata::{Package, Target};
 use figment::{
@@ -10,6 +14,7 @@ use figment::{
 };
 use miette::{IntoDiagnostic, Result};
 use serde::{Deserialize, Serialize};
+use tracing::trace;
 
 #[derive(Debug, Default)]
 pub struct ConfigOptions {
@@ -159,23 +164,39 @@ fn workspace_metadata(
 }
 
 fn package_metadata(metadata: &CargoMetadata, name: Option<&str>) -> Result<Option<Config>> {
-    let Some(name) = name else {
-        let Some(root) = metadata.root_package() else {
-            return Ok(None);
-        };
-
-        if root.metadata.is_null() || !root.metadata.is_object() {
-            return Ok(None);
-        }
-
-        let meta: Metadata = serde_json::from_value(root.metadata.clone()).into_diagnostic()?;
-        return Ok(Some(meta.lambda.package.into()));
-    };
-
     let kind_condition = |pkg: &Package, target: &Target| {
         target.kind.iter().any(|kind| kind == "bin") && pkg.metadata.is_object()
     };
 
+    let Some(name) = name else {
+        if metadata.packages.len() == 1 {
+            return get_config_from_root(metadata);
+        }
+
+        let targets = binary_targets_from_metadata(metadata, false);
+        trace!(
+            ?targets,
+            "inspecting targets for a command without package name"
+        );
+        if targets.len() == 1 {
+            let name = targets
+                .into_iter()
+                .next()
+                .ok_or(MetadataError::MissingBinaryInProject)?;
+            return get_config_from_packages(metadata, kind_condition, &name);
+        }
+
+        return Ok(None);
+    };
+
+    get_config_from_packages(metadata, kind_condition, name)
+}
+
+fn get_config_from_packages(
+    metadata: &CargoMetadata,
+    kind_condition: impl Fn(&Package, &Target) -> bool,
+    name: &str,
+) -> Result<Option<Config>> {
     for pkg in &metadata.packages {
         for target in &pkg.targets {
             if kind_condition(pkg, target) && target.name == name {
@@ -192,6 +213,19 @@ fn package_metadata(metadata: &CargoMetadata, name: Option<&str>) -> Result<Opti
     }
 
     Ok(None)
+}
+
+fn get_config_from_root(metadata: &CargoMetadata) -> Result<Option<Config>> {
+    let Some(root) = metadata.root_package() else {
+        return Ok(None);
+    };
+
+    if root.metadata.is_null() || !root.metadata.is_object() {
+        return Ok(None);
+    }
+
+    let meta: Metadata = serde_json::from_value(root.metadata.clone()).into_diagnostic()?;
+    Ok(Some(meta.lambda.package.into()))
 }
 
 #[cfg(test)]
