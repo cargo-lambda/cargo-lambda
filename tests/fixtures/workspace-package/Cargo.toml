@@ -13,3 +13,6 @@ EXTRA = "TRUE"
     { method = "GET", function = "crate-1" },
     { method = "POST", function = "crate-2" },
 ]
+
+[profile.release]
+lto = true
