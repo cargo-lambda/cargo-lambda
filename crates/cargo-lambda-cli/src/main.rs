@@ -4,14 +4,14 @@ use cargo_lambda_build::Zig;
 use cargo_lambda_invoke::Invoke;
 use cargo_lambda_metadata::{
     cargo::{build::Build, deploy::Deploy, load_metadata, watch::Watch},
-    config::{load_config, Config, ConfigOptions},
+    config::{Config, ConfigOptions, load_config},
 };
 use cargo_lambda_new::{Init, New};
 use cargo_lambda_system::System;
 use cargo_lambda_watch::xray_layer;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_cargo::style::CLAP_STYLING;
-use miette::{miette, ErrorHook, IntoDiagnostic, Result};
+use miette::{ErrorHook, IntoDiagnostic, Result, miette};
 use std::{boxed::Box, env, io::IsTerminal, path::PathBuf, str::FromStr};
 use strum_macros::EnumString;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -80,7 +80,9 @@ impl Color {
     }
 
     fn write_env_var(&self) {
-        std::env::set_var("CARGO_LAMBDA_COLOR", self.to_lowercase());
+        unsafe {
+            std::env::set_var("CARGO_LAMBDA_COLOR", self.to_lowercase());
+        }
     }
 
     fn to_lowercase(&self) -> String {

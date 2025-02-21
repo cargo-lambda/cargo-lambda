@@ -1,18 +1,18 @@
 use crate::{
+    RUNTIME_EMULATOR_PATH,
     error::ServerError,
     requests::{InvokeRequest, LambdaResponse, NextEvent},
-    RUNTIME_EMULATOR_PATH,
 };
 use cargo_lambda_metadata::cargo::{binary_targets, watch::FunctionRouter};
 use miette::Result;
-use mpsc::{channel, Receiver, Sender};
+use mpsc::{Receiver, Sender, channel};
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
+    collections::{HashMap, HashSet, hash_map::Entry},
     net::SocketAddr,
     path::PathBuf,
     sync::Arc,
 };
-use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, mpsc, oneshot};
 use tracing::debug;
 use uuid::Uuid;
 

@@ -1,7 +1,7 @@
 use crate::RefRuntimeState;
 use axum::{
-    routing::{get, post, put},
     Router,
+    routing::{get, post, put},
 };
 
 pub(crate) mod extensions_router;

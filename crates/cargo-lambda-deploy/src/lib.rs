@@ -1,9 +1,10 @@
 use aws_smithy_types::retry::{RetryConfig, RetryMode};
-use cargo_lambda_build::{create_binary_archive, zip_binary, BinaryArchive, BinaryData};
+use cargo_lambda_build::{BinaryArchive, BinaryData, create_binary_archive, zip_binary};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::{
+    CargoMetadata,
     deploy::{Deploy, OutputFormat},
-    main_binary_from_metadata, CargoMetadata,
+    main_binary_from_metadata,
 };
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
@@ -39,7 +40,9 @@ pub async fn run(config: &Deploy, metadata: &CargoMetadata) -> Result<()> {
     tracing::trace!("deploying project");
 
     if config.function_config.enable_function_url && config.function_config.disable_function_url {
-        return Err(miette::miette!("invalid options: --enable-function-url and --disable-function-url cannot be set together"));
+        return Err(miette::miette!(
+            "invalid options: --enable-function-url and --disable-function-url cannot be set together"
+        ));
     }
 
     let progress = Progress::start("loading binary data");

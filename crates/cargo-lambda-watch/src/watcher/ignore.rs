@@ -123,7 +123,7 @@ impl Filterer for IgnoreFilterer {
                         pass &= true;
                     }
                     Match::Ignore(glob) => {
-                        if glob.from().map_or(true, |f| path.strip_prefix(f).is_ok()) {
+                        if glob.from().is_none_or(|f| path.strip_prefix(f).is_ok()) {
                             trace!(?glob, "positive match (fail)");
                             pass &= false;
                         } else {

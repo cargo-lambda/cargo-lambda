@@ -2,11 +2,11 @@ use cargo_options::Run;
 use clap::Args;
 use matchit::{InsertError, MatchError, Router};
 use serde::{
+    Deserialize, Serialize,
     de::{Error, Visitor},
     ser::SerializeSeq,
-    Deserialize, Serialize,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
@@ -393,7 +393,7 @@ impl Serialize for FunctionRoutes {
 mod tests {
 
     use cargo_options::CommonOptions;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
     use std::path::PathBuf;
 
     use super::*;

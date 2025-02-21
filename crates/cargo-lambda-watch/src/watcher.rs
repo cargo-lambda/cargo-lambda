@@ -1,7 +1,7 @@
 use crate::{error::ServerError, requests::NextEvent, state::ExtensionCache};
 use cargo_lambda_metadata::{
     cargo::load_metadata,
-    config::{load_config_without_cli_flags, ConfigOptions},
+    config::{ConfigOptions, load_config_without_cli_flags},
 };
 // use cargo_lambda_metadata::cargo::function_environment_metadata;
 use ignore::create_filter;
@@ -9,6 +9,7 @@ use ignore_files::IgnoreFile;
 use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
 use tracing::{debug, error, trace};
 use watchexec::{
+    ErrorHook, Watchexec,
     action::{Action, Outcome, PreSpawn},
     command::Command,
     config::{InitConfig, RuntimeConfig},
@@ -16,7 +17,6 @@ use watchexec::{
     event::{Event, Priority, ProcessEnd},
     handler::SyncFnHandler,
     signal::source::MainSignal,
-    ErrorHook, Watchexec,
 };
 
 pub(crate) mod ignore;

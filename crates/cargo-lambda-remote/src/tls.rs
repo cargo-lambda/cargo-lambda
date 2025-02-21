@@ -1,8 +1,8 @@
 use clap::Args;
 use miette::{Diagnostic, Result};
 use rustls::{ClientConfig, RootCertStore, ServerConfig};
-use rustls_pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
-use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use rustls_pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use std::{
     path::{Path, PathBuf},
     sync::OnceLock,

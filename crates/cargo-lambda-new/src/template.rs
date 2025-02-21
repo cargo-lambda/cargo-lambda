@@ -1,13 +1,13 @@
 use std::{
     fmt,
-    fs::{remove_dir_all, remove_file, File},
-    io::{copy, Cursor},
+    fs::{File, remove_dir_all, remove_file},
+    io::{Cursor, copy},
     path::{Path, PathBuf},
 };
 
 use gix::refs::PartialName;
 use miette::{Context, IntoDiagnostic, Result};
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 use zip::ZipArchive;
 
 pub(crate) const PROMPT_WITH_OPTIONS_HELP_MESSAGE: &str =
@@ -540,13 +540,22 @@ mod test {
             .expect_err("failed to return an error looking for a missing directory");
 
         #[cfg(not(windows))]
-        assert_contains!(source.to_string(), "invalid template option ../../tests/templates/MISSING-template: No such file or directory");
+        assert_contains!(
+            source.to_string(),
+            "invalid template option ../../tests/templates/MISSING-template: No such file or directory"
+        );
         #[cfg(windows)]
-        assert_contains!(source.to_string(), "invalid template option ../../tests/templates/MISSING-template: The system cannot find the file specified.");
+        assert_contains!(
+            source.to_string(),
+            "invalid template option ../../tests/templates/MISSING-template: The system cannot find the file specified."
+        );
 
         let source = TemplateSource::try_from("../../tests/templates/function-template/Cargo.toml")
             .expect_err("failed to return an error looking for a missing directory");
-        assert_contains!(source.to_string(), "invalid template option ../../tests/templates/function-template/Cargo.toml: No such directory");
+        assert_contains!(
+            source.to_string(),
+            "invalid template option ../../tests/templates/function-template/Cargo.toml: No such directory"
+        );
     }
 
     #[test]

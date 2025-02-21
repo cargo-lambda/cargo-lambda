@@ -1,7 +1,7 @@
 use clap::{ArgAction, Args, ValueHint};
 use env_file_reader::read_file;
 use miette::Result;
-use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{cargo::deserialize_vec_or_map, error::MetadataError};

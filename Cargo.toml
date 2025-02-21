@@ -32,13 +32,13 @@ resolver = "2"
 [workspace.package]
 version = "1.6.3"
 authors = ["David Calavera"]
-edition = "2021"
+edition = "2024"
 license = "MIT"
 homepage = "https://github.com/cargo-lambda/cargo-lambda"
 repository = "https://github.com/cargo-lambda/cargo-lambda"
 keywords = ["cargo", "subcommand", "aws", "lambda"]
 description = "Cargo subcommand to work with AWS Lambda"
-rust-version = "1.80.0"
+rust-version = "1.85.0"
 
 [workspace.dependencies]
 assertables = "9.0.0"

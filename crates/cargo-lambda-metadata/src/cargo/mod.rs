@@ -3,7 +3,7 @@ pub use cargo_metadata::{
 };
 use cargo_options::CommonOptions;
 use miette::Result;
-use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet},
@@ -11,7 +11,7 @@ use std::{
     fs::{metadata, read_to_string},
     path::{Path, PathBuf},
 };
-use tracing::{enabled, trace, Level};
+use tracing::{Level, enabled, trace};
 
 use crate::error::MetadataError;
 
@@ -411,9 +411,10 @@ mod tests {
     #[test]
     fn test_binary_packages_with_missing_binary_info() {
         let err = binary_targets(fixture_metadata("missing-binary-package"), false).unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("a [lib] section, or [[bin]] section must be present"));
+        assert!(
+            err.to_string()
+                .contains("a [lib] section, or [[bin]] section must be present")
+        );
     }
 
     #[test]

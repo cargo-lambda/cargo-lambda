@@ -1,5 +1,5 @@
 use clap::Args;
-use liquid::{model::Value, Object};
+use liquid::{Object, model::Value};
 use miette::Result;
 
 pub(crate) const DEFAULT_TEMPLATE_URL: &str =

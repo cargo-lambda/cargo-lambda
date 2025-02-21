@@ -1,23 +1,23 @@
 use std::{
     collections::HashMap,
     fmt::Debug,
-    fs::{read, File, Metadata},
+    fs::{File, Metadata, read},
     io::{Read, Seek, Write},
     path::{Path, PathBuf},
     time::SystemTime,
 };
 
-use cargo_lambda_metadata::cargo::{target_dir_from_metadata, CargoMetadata};
+use cargo_lambda_metadata::cargo::{CargoMetadata, target_dir_from_metadata};
 use cargo_lambda_remote::aws_sdk_lambda::types::Architecture as CpuArchitecture;
 use chrono::{DateTime, Utc};
 use chrono_humanize::HumanTime;
 use miette::{Context, IntoDiagnostic, Result};
-use object::{read::File as ObjectFile, Architecture, Object};
+use object::{Architecture, Object, read::File as ObjectFile};
 use serde::{Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use tracing::{debug, trace};
 use walkdir::WalkDir;
-use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
+use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 use crate::error::BuildError;
 

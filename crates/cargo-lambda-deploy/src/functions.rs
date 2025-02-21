@@ -1,11 +1,12 @@
 use crate::roles::{self, FunctionRole};
-use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
+use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 use cargo_lambda_build::{BinaryArchive, BinaryModifiedAt};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::deploy::Deploy;
 use cargo_lambda_remote::{
     aws_sdk_config::SdkConfig,
     aws_sdk_lambda::{
+        Client as LambdaClient,
         error::SdkError,
         operation::{
             create_function::CreateFunctionError,
@@ -19,13 +20,12 @@ use cargo_lambda_remote::{
             FunctionCode, FunctionConfiguration, FunctionUrlAuthType, LastUpdateStatus, Runtime,
             State, VpcConfig as LambdaVpcConfig,
         },
-        Client as LambdaClient,
     },
 };
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Serialize;
 use std::{collections::HashMap, str::FromStr};
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tracing::debug;
 use uuid::Uuid;
 
@@ -121,7 +121,7 @@ async fn upsert_function(
         Err(no_fun) => {
             return Err(no_fun)
                 .into_diagnostic()
-                .wrap_err("failed to fetch lambda function")
+                .wrap_err("failed to fetch lambda function");
         }
     };
 
@@ -537,7 +537,7 @@ async fn wait_for_ready_state(
                 return Err(miette::miette!(
                     "unexpected last update status: {:?}",
                     other
-                ))
+                ));
             }
 
             (other, _) => return Err(miette::miette!("unexpected function state: {:?}", other)),
@@ -615,7 +615,7 @@ pub(crate) async fn upsert_alias(
         Err(no_fun) => {
             return Err(no_fun)
                 .into_diagnostic()
-                .wrap_err("failed to fetch alias")
+                .wrap_err("failed to fetch alias");
         }
     };
 
@@ -728,7 +728,8 @@ pub(crate) fn alias_doesnt_exist_error(err: &SdkError<GetAliasError>) -> bool {
 // There is no specific error type for this failure case, so
 // we need to compare error messages and hope for the best :(
 fn is_role_cannot_be_assumed_error(err: &SdkError<CreateFunctionError>) -> bool {
-    err.to_string() == "InvalidParameterValueException: The role defined for the function cannot be assumed by Lambda."
+    err.to_string()
+        == "InvalidParameterValueException: The role defined for the function cannot be assumed by Lambda."
 }
 
 #[cfg(test)]

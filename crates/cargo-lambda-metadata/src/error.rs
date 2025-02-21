@@ -18,7 +18,9 @@ pub enum MetadataError {
     #[error("invalid tracing option `{0}`")]
     #[diagnostic()]
     InvalidTracing(String),
-    #[error("there are more than one binary in the project, please specify a binary name with --binary-name or --binary-path. This is the list of binaries I found: {0}")]
+    #[error(
+        "there are more than one binary in the project, please specify a binary name with --binary-name or --binary-path. This is the list of binaries I found: {0}"
+    )]
     #[diagnostic()]
     MultipleBinariesInProject(String),
     #[error("there are no binaries in this project")]

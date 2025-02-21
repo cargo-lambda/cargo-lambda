@@ -11,7 +11,9 @@ pub enum InvokeError {
         "invalid function name, it must match the name you used to create the function remotely"
     )]
     InvalidFunctionName,
-    #[error("no data payload provided, use one of the data flags: `--data-file`, `--data-ascii`, `--data-example`")]
+    #[error(
+        "no data payload provided, use one of the data flags: `--data-file`, `--data-ascii`, `--data-example`"
+    )]
     MissingPayload,
     #[error("invalid error payload {0}")]
     InvalidErrorPayload(#[from] serde_json::Error),

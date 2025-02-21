@@ -80,7 +80,9 @@ pub enum ServerError {
     #[diagnostic()]
     NoExtensionEvent,
 
-    #[error("client context cannot be longer than 3583 bytes after base64 encoding, the current size is {0}")]
+    #[error(
+        "client context cannot be longer than 3583 bytes after base64 encoding, the current size is {0}"
+    )]
     #[diagnostic()]
     InvalidClientContext(usize),
 

@@ -1,8 +1,8 @@
 use crate::{
+    RefRuntimeState,
     error::ServerError,
     requests::*,
     runtime::{LAMBDA_RUNTIME_AWS_REQUEST_ID, LAMBDA_RUNTIME_XRAY_TRACE_HEADER},
-    RefRuntimeState,
 };
 use aws_lambda_events::{
     apigw::{
@@ -12,24 +12,23 @@ use aws_lambda_events::{
     encodings::Body as LambdaBody,
 };
 use axum::{
+    Router,
     body::Body,
     extract::{Extension, Path, State},
-    http::{response::Builder, HeaderValue, Request},
+    http::{HeaderValue, Request, response::Builder},
     response::Response,
     routing::{any, post},
-    Router,
 };
-use base64::{engine::general_purpose as b64, Engine as _};
+use base64::{Engine as _, engine::general_purpose as b64};
 use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
 use chrono::Utc;
 use http::Method;
 use http_body_util::BodyExt;
-use hyper::{header, HeaderMap, StatusCode};
+use hyper::{HeaderMap, StatusCode, header};
 use miette::Result;
 use opentelemetry::{
-    global,
+    Context, KeyValue, global,
     trace::{TraceContextExt, Tracer},
-    Context, KeyValue,
 };
 use query_map::QueryMap;
 use std::collections::{HashMap, HashSet};
@@ -468,8 +467,8 @@ mod test {
 
     use super::extract_path_parameters;
     use cargo_lambda_metadata::{
-        cargo::watch::{FunctionRouter, FunctionRoutes},
         DEFAULT_PACKAGE_FUNCTION,
+        cargo::watch::{FunctionRouter, FunctionRoutes},
     };
     use http::Method;
 

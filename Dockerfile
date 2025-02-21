@@ -1,4 +1,4 @@
-ARG RUST_VERSION=1.81.0
+ARG RUST_VERSION=1.85.0
 FROM rust:${RUST_VERSION}
 
 RUN set -eux; \
@@ -25,7 +25,7 @@ RUN set -eux; \
 
 ENV PATH=$PATH:/zig
 
-ARG CARGO_LAMBDA_VERSION=v1.2.2
+ARG CARGO_LAMBDA_VERSION=v1.6.3
 RUN set -eux; \
     mkdir cargo-lambda; \
     cd cargo-lambda; \

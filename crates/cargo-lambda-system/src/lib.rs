@@ -1,7 +1,7 @@
 use clap::Args;
 use miette::Result;
 
-use cargo_lambda_build::{install_options, install_zig, print_install_options, Zig};
+use cargo_lambda_build::{Zig, install_options, install_zig, print_install_options};
 use cargo_lambda_interactive::is_stdin_tty;
 use tracing::trace;
 
