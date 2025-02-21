@@ -43,8 +43,6 @@ pub use zig::{
 pub async fn run(build: &mut Build, metadata: &CargoMetadata) -> Result<()> {
     tracing::trace!(options = ?build, "building project");
 
-    let manifest_path = build.manifest_path();
-
     if (build.arm64 || build.x86_64) && !build.cargo_opts.target.is_empty() {
         Err(BuildError::InvalidTargetOptions)?;
     }
@@ -95,9 +93,9 @@ pub async fn run(build: &mut Build, metadata: &CargoMetadata) -> Result<()> {
         }
     }
 
-    if build.cargo_opts.release && !build.disable_optimizations {
+    if is_release_profile(build) && !build.disable_optimizations {
         let release_optimizations =
-            cargo_release_profile_config(manifest_path).map_err(BuildError::MetadataError)?;
+            cargo_release_profile_config(metadata).map_err(BuildError::MetadataError)?;
         build.cargo_opts.config.extend(
             release_optimizations
                 .into_iter()
@@ -202,4 +200,13 @@ fn downcasted_user_cancellation(err: &Report) -> bool {
         Some(err) => is_user_cancellation_error(err),
         None => false,
     }
+}
+
+fn is_release_profile(build: &Build) -> bool {
+    build.cargo_opts.release
+        || build
+            .cargo_opts
+            .profile
+            .as_deref()
+            .is_some_and(|p| p == "release")
 }
