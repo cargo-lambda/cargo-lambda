@@ -180,8 +180,8 @@ pub mod paths {
         cell::RefCell,
         path::PathBuf,
         sync::{
-            atomic::{AtomicUsize, Ordering},
             Mutex, OnceLock,
+            atomic::{AtomicUsize, Ordering},
         },
     };
 

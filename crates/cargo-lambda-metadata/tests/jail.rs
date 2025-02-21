@@ -6,7 +6,7 @@ use figment::Jail;
 
 use cargo_lambda_metadata::{
     cargo::load_metadata,
-    config::{load_config_without_cli_flags, ConfigOptions},
+    config::{ConfigOptions, load_config_without_cli_flags},
     lambda::Memory,
 };
 

@@ -2,15 +2,15 @@ use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
     cargo::{
-        binary_targets_from_metadata, build::Build, deploy::Deploy, watch::Watch, CargoMetadata,
-        Metadata, PackageMetadata,
+        CargoMetadata, Metadata, PackageMetadata, binary_targets_from_metadata, build::Build,
+        deploy::Deploy, watch::Watch,
     },
     error::MetadataError,
 };
 use cargo_metadata::{Package, Target};
 use figment::{
-    providers::{Env, Format, Serialized, Toml},
     Figment,
+    providers::{Env, Format, Serialized, Toml},
 };
 use miette::{IntoDiagnostic, Result};
 use serde::{Deserialize, Serialize};

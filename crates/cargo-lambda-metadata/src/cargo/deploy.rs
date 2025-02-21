@@ -1,9 +1,9 @@
 use cargo_lambda_remote::{
-    aws_sdk_lambda::types::{Environment, TracingConfig},
     RemoteConfig,
+    aws_sdk_lambda::types::{Environment, TracingConfig},
 };
 use clap::{ArgAction, Args, ValueHint};
-use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use std::{collections::HashMap, fmt::Debug, path::PathBuf};
 use strum_macros::{Display, EnumString};
 
@@ -500,7 +500,7 @@ fn extract_tags(tags: &Vec<String>) -> HashMap<String, String> {
 mod tests {
     use crate::{
         cargo::load_metadata,
-        config::{load_config_without_cli_flags, ConfigOptions},
+        config::{ConfigOptions, load_config_without_cli_flags},
         lambda::{Memory, Timeout},
         tests::fixture_metadata,
     };

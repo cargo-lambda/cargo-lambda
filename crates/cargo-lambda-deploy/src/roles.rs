@@ -4,7 +4,7 @@ use aws_smithy_types::error::metadata::ProvideErrorMetadata;
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_remote::aws_sdk_config::SdkConfig;
 use miette::{IntoDiagnostic, Result, WrapErr};
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 const BASIC_LAMBDA_EXECUTION_POLICY: &str =
     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole";
@@ -144,13 +144,13 @@ async fn try_assume_role(client: &StsClient, role_arn: &str) -> Result<()> {
                 _ => {
                     return Err(err)
                         .into_diagnostic()
-                        .wrap_err("failed to assume new lambda role")
+                        .wrap_err("failed to assume new lambda role");
                 }
             },
             Err(err) => {
                 return Err(err)
                     .into_diagnostic()
-                    .wrap_err("failed to assume new lambda role")
+                    .wrap_err("failed to assume new lambda role");
             }
         }
     }

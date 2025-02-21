@@ -1,17 +1,17 @@
-use axum::{extract::Extension, http::header::HeaderName, Router};
+use axum::{Router, extract::Extension, http::header::HeaderName};
 use bytes::Bytes;
 use cargo_lambda_metadata::{
+    DEFAULT_PACKAGE_FUNCTION,
     cargo::{
-        filter_binary_targets_from_metadata, kind_bin_filter, selected_bin_filter, watch::Watch,
-        CargoMetadata, CargoPackage,
+        CargoMetadata, CargoPackage, filter_binary_targets_from_metadata, kind_bin_filter,
+        selected_bin_filter, watch::Watch,
     },
     lambda::Timeout,
-    DEFAULT_PACKAGE_FUNCTION,
 };
 use cargo_lambda_remote::tls::TlsOptions;
 use cargo_options::Run as CargoOptions;
-use http_body_util::{combinators::BoxBody, BodyExt};
-use hyper::{body::Incoming, client::conn::http1, service::service_fn, Request, Response};
+use http_body_util::{BodyExt, combinators::BoxBody};
+use hyper::{Request, Response, body::Incoming, client::conn::http1, service::service_fn};
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server::conn::auto::Builder,
@@ -45,7 +45,7 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use tracing::{error, info, Subscriber};
+use tracing::{Subscriber, error, info};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::registry::LookupSpan;
 
@@ -238,7 +238,9 @@ async fn start_server(
 
     if only_lambda_apis {
         info!("");
-        info!("the flag --only_lambda_apis is active, the lambda function will not be started by Cargo Lambda");
+        info!(
+            "the flag --only_lambda_apis is active, the lambda function will not be started by Cargo Lambda"
+        );
         info!("the lambda function will depend on the following environment variables");
         info!(
             "you MUST set these variables in the environment where you're running your function:"

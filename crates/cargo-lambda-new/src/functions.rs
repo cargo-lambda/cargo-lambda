@@ -1,11 +1,11 @@
 use cargo_lambda_interactive::{
+    Confirm, Text,
     error::{CustomUserError, InquireError},
     is_stdin_tty,
     validator::{ErrorMessage, Validation},
-    Confirm, Text,
 };
 use clap::Args;
-use liquid::{model::Value, Object};
+use liquid::{Object, model::Value};
 use miette::Result;
 
 use crate::{error::CreateError, template::PROMPT_WITH_OPTIONS_HELP_MESSAGE};
@@ -76,7 +76,9 @@ impl Options {
         }
 
         if !self.http {
-            let help = format!("{PROMPT_WITH_OPTIONS_HELP_MESSAGE}.\nLeave this input empty if you want to use a predefined example");
+            let help = format!(
+                "{PROMPT_WITH_OPTIONS_HELP_MESSAGE}.\nLeave this input empty if you want to use a predefined example"
+            );
             let event_type = Text::new("Event type that this function receives")
                 .with_autocomplete(suggest_event_type)
                 .with_validator(validate_event_type)
@@ -239,7 +241,9 @@ mod test {
 
         let (imp, module, kind) = opt.event_type_triple().unwrap();
         assert_eq!(
-            Value::scalar("aws_lambda_events::event::cloudformation::provider::CloudFormationCustomResourceRequest"),
+            Value::scalar(
+                "aws_lambda_events::event::cloudformation::provider::CloudFormationCustomResourceRequest"
+            ),
             imp
         );
         assert_eq!(Value::scalar("cloudformation::provider"), module);

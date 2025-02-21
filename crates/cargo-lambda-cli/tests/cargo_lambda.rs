@@ -1,8 +1,8 @@
 use std::{
-    fs::{create_dir_all, read_to_string, File},
+    fs::{File, create_dir_all, read_to_string},
     io::Write,
 };
-use toml_edit::{value, Array, DocumentMut};
+use toml_edit::{Array, DocumentMut, value};
 use zip::ZipArchive;
 
 mod harness;
@@ -553,12 +553,14 @@ fn test_config_template() {
     assert_eq!(json_data["github_actions"], "false");
     assert_eq!(json_data["license"], "Ignore license");
 
-    assert!(project
-        .root()
-        .join(".github")
-        .join("actions")
-        .join("build.yml")
-        .exists());
+    assert!(
+        project
+            .root()
+            .join(".github")
+            .join("actions")
+            .join("build.yml")
+            .exists()
+    );
 
     assert!(!project.root().join("Apache.txt").exists());
     assert!(!project.root().join("MIT.txt").exists());

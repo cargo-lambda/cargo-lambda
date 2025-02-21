@@ -1,9 +1,9 @@
 use crate::{
+    RefRuntimeState,
     error::ServerError,
     requests::*,
     runtime::LAMBDA_RUNTIME_XRAY_TRACE_HEADER,
     state::{RequestCache, ResponseCache},
-    RefRuntimeState,
 };
 use axum::{
     body::Body,
@@ -11,7 +11,7 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
-use base64::{engine::general_purpose as b64, Engine as _};
+use base64::{Engine as _, engine::general_purpose as b64};
 use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
 use http::request::Parts;
 use tracing::debug;

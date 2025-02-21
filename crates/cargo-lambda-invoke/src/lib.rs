@@ -1,9 +1,9 @@
-use base64::{engine::general_purpose as b64, Engine as _};
+use base64::{Engine as _, engine::general_purpose as b64};
 use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
 use cargo_lambda_remote::{
-    aws_sdk_lambda::{primitives::Blob, Client as LambdaClient},
-    tls::TlsOptions,
     RemoteConfig,
+    aws_sdk_lambda::{Client as LambdaClient, primitives::Blob},
+    tls::TlsOptions,
 };
 use clap::{Args, ValueHint};
 use miette::{IntoDiagnostic, Result, WrapErr};
@@ -12,11 +12,11 @@ use serde::Serialize;
 use serde_json::{from_str, to_string_pretty, value::Value};
 use std::{
     convert::TryFrom,
-    fs::{create_dir_all, read_to_string, File},
+    fs::{File, create_dir_all, read_to_string},
     io::copy,
     net::IpAddr,
     path::PathBuf,
-    str::{from_utf8, FromStr},
+    str::{FromStr, from_utf8},
 };
 use strum_macros::{Display, EnumString};
 use tracing::debug;

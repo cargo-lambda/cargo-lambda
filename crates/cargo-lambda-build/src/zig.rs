@@ -18,7 +18,9 @@ pub fn print_install_options(options: &[InstallOption]) {
             println!("\t* {}: `{}`", option, option.usage());
         }
     }
-    println!("\t* Download Zig 0.9.1 or newer from https://ziglang.org/download/ and add it to your PATH");
+    println!(
+        "\t* Download Zig 0.9.1 or newer from https://ziglang.org/download/ and add it to your PATH"
+    );
 }
 
 /// Install Zig using a choice prompt.

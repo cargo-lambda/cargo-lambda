@@ -1,13 +1,13 @@
 use aws_config::{
+    BehaviorVersion,
     meta::region::RegionProviderChain,
     profile::{ProfileFileCredentialsProvider, ProfileFileRegionProvider},
     provider_config::ProviderConfig,
     retry::RetryConfig,
-    BehaviorVersion,
 };
-use aws_types::{region::Region, SdkConfig};
+use aws_types::{SdkConfig, region::Region};
 use clap::Args;
-use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
 pub mod tls;
 
 const DEFAULT_REGION: &str = "us-east-1";
@@ -137,14 +137,16 @@ mod tests {
 
     fn setup() {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        std::env::set_var(
-            "AWS_CONFIG_FILE",
-            format!("{manifest_dir}/test-data/aws_config"),
-        );
-        std::env::set_var(
-            "AWS_SHARED_CREDENTIALS_FILE",
-            format!("{manifest_dir}/test-data/aws_credentials"),
-        );
+        unsafe {
+            std::env::set_var(
+                "AWS_CONFIG_FILE",
+                format!("{manifest_dir}/test-data/aws_config"),
+            );
+            std::env::set_var(
+                "AWS_SHARED_CREDENTIALS_FILE",
+                format!("{manifest_dir}/test-data/aws_credentials"),
+            );
+        }
     }
 
     /// Specify a profile which does not exist

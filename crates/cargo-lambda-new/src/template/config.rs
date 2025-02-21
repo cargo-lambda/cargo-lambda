@@ -1,9 +1,9 @@
 use cargo_lambda_interactive::{
-    validator::{ErrorMessage, Validation},
     Confirm, CustomUserError, Text,
+    validator::{ErrorMessage, Validation},
 };
 use indexmap::IndexMap;
-use liquid::{model::Value, Object};
+use liquid::{Object, model::Value};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use serde::Deserialize;
 use std::{

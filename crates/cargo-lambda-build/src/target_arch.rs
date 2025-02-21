@@ -173,47 +173,65 @@ mod test {
 
     #[test]
     fn test_compatible_host_linker() {
-        assert!(TargetArch::from_str("x86_64-unknown-linux-gnu")
-            .unwrap()
-            .compatible_host_linker());
-        assert!(TargetArch::from_str("aarch64-unknown-linux-gnu")
-            .unwrap()
-            .compatible_host_linker());
-        assert!(!TargetArch::from_str("x86_64-pc-windows-gnu")
-            .unwrap()
-            .compatible_host_linker());
+        assert!(
+            TargetArch::from_str("x86_64-unknown-linux-gnu")
+                .unwrap()
+                .compatible_host_linker()
+        );
+        assert!(
+            TargetArch::from_str("aarch64-unknown-linux-gnu")
+                .unwrap()
+                .compatible_host_linker()
+        );
+        assert!(
+            !TargetArch::from_str("x86_64-pc-windows-gnu")
+                .unwrap()
+                .compatible_host_linker()
+        );
     }
 
     #[test]
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     fn test_is_static_linking() {
-        assert!(TargetArch::from_str("x86_64-unknown-linux-musl")
-            .unwrap()
-            .is_static_linking());
-        assert!(TargetArch::from_str("aarch64-unknown-linux-musl")
-            .unwrap()
-            .is_static_linking());
+        assert!(
+            TargetArch::from_str("x86_64-unknown-linux-musl")
+                .unwrap()
+                .is_static_linking()
+        );
+        assert!(
+            TargetArch::from_str("aarch64-unknown-linux-musl")
+                .unwrap()
+                .is_static_linking()
+        );
     }
 
     #[test]
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
     fn test_is_static_linking() {
-        assert!(TargetArch::from_str("aarch64-unknown-linux-musl")
-            .unwrap()
-            .is_static_linking());
-        assert!(TargetArch::from_str("x86_64-unknown-linux-musl")
-            .unwrap()
-            .is_static_linking());
+        assert!(
+            TargetArch::from_str("aarch64-unknown-linux-musl")
+                .unwrap()
+                .is_static_linking()
+        );
+        assert!(
+            TargetArch::from_str("x86_64-unknown-linux-musl")
+                .unwrap()
+                .is_static_linking()
+        );
     }
 
     #[test]
     #[cfg(not(target_os = "linux"))]
     fn test_is_static_linking() {
-        assert!(!TargetArch::from_str("aarch64-unknown-linux-musl")
-            .unwrap()
-            .is_static_linking());
-        assert!(!TargetArch::from_str("x86_64-unknown-linux-musl")
-            .unwrap()
-            .is_static_linking());
+        assert!(
+            !TargetArch::from_str("aarch64-unknown-linux-musl")
+                .unwrap()
+                .is_static_linking()
+        );
+        assert!(
+            !TargetArch::from_str("x86_64-unknown-linux-musl")
+                .unwrap()
+                .is_static_linking()
+        );
     }
 }

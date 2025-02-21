@@ -4,7 +4,7 @@ use snapbox::cmd::{Command, OutputAssert};
 
 mod project;
 use project::Project;
-pub use project::{paths::init_root, project, CargoPathExt};
+pub use project::{CargoPathExt, paths::init_root, project};
 
 pub struct LambdaProject {
     pub name: String,

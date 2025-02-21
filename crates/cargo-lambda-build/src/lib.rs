@@ -1,9 +1,9 @@
 use cargo_lambda_interactive::{error::InquireError, is_user_cancellation_error};
 use cargo_lambda_metadata::{
     cargo::{
-        binary_targets_from_metadata,
+        CargoMetadata, binary_targets_from_metadata,
         build::{Build, OutputFormat},
-        cargo_release_profile_config, target_dir_from_metadata, CargoMetadata,
+        cargo_release_profile_config, target_dir_from_metadata,
     },
     fs::copy_and_replace,
 };
@@ -20,7 +20,7 @@ use tracing::{debug, warn};
 pub use cargo_zigbuild::Zig;
 
 mod archive;
-pub use archive::{create_binary_archive, zip_binary, BinaryArchive, BinaryData, BinaryModifiedAt};
+pub use archive::{BinaryArchive, BinaryData, BinaryModifiedAt, create_binary_archive, zip_binary};
 
 mod compiler;
 use compiler::{build_command, build_profile};
@@ -36,7 +36,7 @@ use toolchain::rustup_cmd;
 
 mod zig;
 pub use zig::{
-    check_installation, install_options, install_zig, print_install_options, InstallOption,
+    InstallOption, check_installation, install_options, install_zig, print_install_options,
 };
 
 #[tracing::instrument(skip(build, metadata), target = "cargo_lambda")]
@@ -191,7 +191,10 @@ pub async fn run(build: &mut Build, metadata: &CargoMetadata) -> Result<()> {
         }
     }
     if !found_binaries {
-        warn!(?base, "no binaries found in target directory after build, try using the --bin, --example, or --package options to build specific binaries");
+        warn!(
+            ?base,
+            "no binaries found in target directory after build, try using the --bin, --example, or --package options to build specific binaries"
+        );
     }
 
     Ok(())

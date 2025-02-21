@@ -3,17 +3,17 @@ use cargo_lambda_interactive::{
 };
 use cargo_lambda_metadata::fs::{copy_and_replace, copy_without_replace};
 use clap::Args;
-use liquid::{model::Value, Object, Parser, ParserBuilder};
+use liquid::{Object, Parser, ParserBuilder, model::Value};
 use miette::{IntoDiagnostic, Result, WrapErr};
 use regex::Regex;
 use std::{
     collections::HashMap,
     env,
     fmt::Debug,
-    fs::{copy as copy_file, create_dir_all, File},
+    fs::{File, copy as copy_file, create_dir_all},
     path::{Path, PathBuf},
 };
-use template::{config::TemplateConfig, TemplateRoot};
+use template::{TemplateRoot, config::TemplateConfig};
 use walkdir::WalkDir;
 
 use crate::template::TemplateSource;
@@ -159,7 +159,7 @@ async fn new_project<T: AsRef<Path> + Debug>(
             .validate_options(ignore_default_prompts)
         {
             Err(CreateError::UnexpectedInput(err)) if is_user_cancellation_error(&err) => {
-                return Ok(())
+                return Ok(());
             }
             Err(err) => return Err(err.into()),
             Ok(()) => {}
@@ -532,7 +532,7 @@ fn convert_to_unix_path(path: &Path) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use liquid::{model::Value, Object};
+    use liquid::{Object, model::Value};
     use template::config::{PromptValue, RenderCondition};
 
     use super::*;

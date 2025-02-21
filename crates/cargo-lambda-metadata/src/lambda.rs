@@ -1,6 +1,6 @@
 use serde::{
-    de::{Deserializer, Error, Visitor},
     Deserialize, Serialize, Serializer,
+    de::{Deserializer, Error, Visitor},
 };
 use std::{fmt, str::FromStr, time::Duration};
 use strum_macros::{Display, EnumString};

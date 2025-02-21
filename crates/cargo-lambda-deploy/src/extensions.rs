@@ -1,13 +1,13 @@
-use aws_sdk_s3::{primitives::ByteStream, Client as S3Client};
+use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 use cargo_lambda_build::{BinaryArchive, BinaryModifiedAt};
 use cargo_lambda_interactive::progress::Progress;
 use cargo_lambda_metadata::cargo::deploy::Deploy;
 use cargo_lambda_remote::{
     aws_sdk_config::SdkConfig,
     aws_sdk_lambda::{
+        Client as LambdaClient,
         primitives::Blob,
         types::{LayerVersionContentInput, Runtime},
-        Client as LambdaClient,
     },
 };
 use miette::{IntoDiagnostic, Result, WrapErr};
