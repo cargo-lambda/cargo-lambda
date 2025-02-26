@@ -38,12 +38,12 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --strip -m crates/cargo-lambda-cli/Cargo.toml
       - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform.target }}-${{ github.ref_name }}-bin
           path: target/${{ matrix.platform.target }}/release/cargo-lambda
@@ -72,12 +72,12 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --strip -m crates/cargo-lambda-cli/Cargo.toml
       - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.platform.arch }}-${{ github.ref_name }}-bin
           path: target/${{ matrix.platform.target }}/release/cargo-lambda.exe
@@ -110,12 +110,12 @@ jobs:
           container: off
           args: --release -o dist --strip -m crates/cargo-lambda-cli/Cargo.toml
       - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform.target }}-${{ github.ref_name }}-bin
           path: target/${{ matrix.platform.target }}/release/cargo-lambda
@@ -127,9 +127,10 @@ jobs:
     needs: [ release-macos, release-windows, release-linux ]
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           path: target/github-release
+          merge-multiple: true
       - name: Create upload directory
         run: |
           mkdir -p target/upload
