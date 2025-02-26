@@ -158,12 +158,12 @@ pub fn target_dir_from_metadata(metadata: &CargoMetadata) -> Result<PathBuf> {
 /// Attempt to read the release profile section in the Cargo manifest.
 /// Cargo metadata doesn't expose profile information, so we try
 /// to read it from the Cargo.toml file directly.
-pub fn cargo_release_profile_config<'a, P: AsRef<Path> + Debug>(
-    manifest_path: P,
+pub fn cargo_release_profile_config<'a>(
+    metadata: &CargoMetadata,
 ) -> Result<HashSet<&'a str>, MetadataError> {
-    let path = manifest_path.as_ref();
-    let file = read_to_string(path)
-        .map_err(|e| MetadataError::InvalidManifestFile(path.to_path_buf(), e))?;
+    let path = metadata.workspace_root.join("Cargo.toml");
+    let file =
+        read_to_string(&path).map_err(|e| MetadataError::InvalidManifestFile(path.into(), e))?;
 
     let metadata: Metadata = toml::from_str(&file).map_err(MetadataError::InvalidTomlManifest)?;
 
@@ -475,5 +475,13 @@ mod tests {
         assert!(config.contains(LTO_CONFIG));
         assert!(config.contains(CODEGEN_CONFIG));
         assert!(config.contains(PANIC_CONFIG));
+    }
+
+    #[test]
+    fn test_release_config_with_workspace() {
+        let metadata = load_metadata(fixture_metadata("workspace-package")).unwrap();
+        let config = cargo_release_profile_config(&metadata).unwrap();
+        assert!(config.contains(STRIP_CONFIG));
+        assert!(!config.contains(LTO_CONFIG));
     }
 }
