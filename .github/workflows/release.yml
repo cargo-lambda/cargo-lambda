@@ -5,7 +5,7 @@ on:
     tags: [ 'v*' ]
 
 env:
-  MATURIN_VERSION: 0.13.6
+  MATURIN_VERSION: 1.8.2
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
   CARGO_INCREMENTAL: 0
