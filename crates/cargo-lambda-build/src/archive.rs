@@ -7,7 +7,10 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use cargo_lambda_metadata::cargo::{CargoMetadata, target_dir_from_metadata};
+use cargo_lambda_metadata::{
+    cargo::{CargoMetadata, target_dir_from_metadata},
+    fs::copy_and_replace,
+};
 use cargo_lambda_remote::aws_sdk_lambda::types::Architecture as CpuArchitecture;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use chrono_humanize::HumanTime;
@@ -192,24 +195,59 @@ where
         return zip_binary(binary_path, bootstrap_dir, data, include);
     } else {
         let zip_path = bootstrap_dir.join(data.zip_name());
-        if zip_path.exists() {
-            let binary_path_in_zip = data.binary_path_in_zip()?;
-            let (arch, binary_modified_at) =
-                extract_data_from_zipped_binary(&zip_path, &binary_path_in_zip)?;
-            if let Some(files) = include {
-                let mut zip = ZipWriter::new(File::open(&zip_path).into_diagnostic()?);
-                include_files_in_zip(&mut zip, &files)?;
-            }
 
-            return Ok(BinaryArchive::new(
-                zip_path.clone(),
-                arch.to_string(),
-                binary_modified_at,
-            ));
+        if zip_path.exists() {
+            return use_zip_in_place(zip_path, data, include);
         }
     }
 
     Err(BuildError::BinaryMissing(data.binary_name().into(), data.build_help().into()).into())
+}
+
+fn use_zip_in_place(
+    zip_path: PathBuf,
+    data: &BinaryData<'_>,
+    include: Option<Vec<String>>,
+) -> Result<BinaryArchive> {
+    let binary_path_in_zip = data.binary_path_in_zip()?;
+    let (arch, binary_modified_at) =
+        extract_data_from_zipped_binary(&zip_path, &binary_path_in_zip)?;
+
+    if let Some(files) = include {
+        let file = File::open(&zip_path)
+            .into_diagnostic()
+            .wrap_err_with(|| format!("failed to open zip file `{zip_path:?}`"))?;
+
+        // Zip2 doesn't support updating zip files in place, so we need to create a new zip file
+        // if we want to include files in the zip archive.
+        // Before we do that, we need to read the existing zip file and copy its contents to a new zip file.
+        let mut archive = ZipArchive::new(file).into_diagnostic()?;
+
+        let tmp_dir = tempfile::tempdir().into_diagnostic()?;
+        let tmp_path = tmp_dir.path().join(data.zip_name());
+        let tmp = File::create(&tmp_path).into_diagnostic()?;
+        let mut zip = ZipWriter::new(tmp);
+
+        for i in 0..archive.len() {
+            let file = archive.by_index_raw(i).into_diagnostic()?;
+            zip.raw_copy_file(file).into_diagnostic()?;
+        }
+
+        include_files_in_zip(&mut zip, &files)?;
+
+        zip.finish()
+            .into_diagnostic()
+            .wrap_err_with(|| format!("failed to finish zip file `{}`", tmp_path.display()))?;
+
+        drop(archive);
+        copy_and_replace(&tmp_path, &zip_path).into_diagnostic()?;
+    }
+
+    Ok(BinaryArchive::new(
+        zip_path.clone(),
+        arch.to_string(),
+        binary_modified_at,
+    ))
 }
 
 /// Create a zip file from a function binary.
@@ -341,10 +379,10 @@ fn zip_file_options(file: &File, path: &Path) -> Result<SimpleFileOptions> {
     Ok(options)
 }
 
-fn include_files_in_zip<W>(zip: &mut ZipWriter<W>, files: &Vec<String>) -> Result<()>
-where
-    W: Write + Seek,
-{
+fn include_files_in_zip<W: Write + Seek>(
+    zip: &mut ZipWriter<W>,
+    files: &Vec<String>,
+) -> Result<()> {
     let mut file_map = HashMap::with_capacity(files.len());
     for file in files {
         match file.split_once(':') {
