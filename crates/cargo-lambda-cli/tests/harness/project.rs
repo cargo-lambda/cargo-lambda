@@ -78,6 +78,22 @@ impl Project {
         fs::read_to_string(&full)
             .unwrap_or_else(|e| panic!("could not read file {}: {}", full.display(), e))
     }
+
+    pub fn lambda_dir(&self) -> PathBuf {
+        self.build_dir().join("lambda")
+    }
+
+    pub fn lambda_function_bin(&self, name: &str) -> PathBuf {
+        self.lambda_dir().join(name).join("bootstrap")
+    }
+
+    pub fn lambda_function_zip(&self, name: &str) -> PathBuf {
+        self.lambda_dir().join(name).join("bootstrap.zip")
+    }
+
+    pub fn lambda_extension_bin(&self, name: &str) -> PathBuf {
+        self.lambda_dir().join("extensions").join(name)
+    }
 }
 
 // Generates a project layout

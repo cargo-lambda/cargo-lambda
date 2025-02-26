@@ -53,7 +53,7 @@ fn test_build_basic_zip_function() {
         .assert()
         .success();
 
-    let bin = project.lambda_dir().join(&lp.name).join("bootstrap.zip");
+    let bin = project.lambda_function_zip(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
     let file = File::open(bin).expect("failed to open zip file");
     let mut zip = ZipArchive::new(file).expect("failed to initialize the zip archive");
@@ -81,7 +81,7 @@ fn test_build_basic_zip_function_with_include() {
         .assert()
         .success();
 
-    let bin = project.lambda_dir().join(&lp.name).join("bootstrap.zip");
+    let bin = project.lambda_function_zip(&lp.name);
     assert!(bin.exists(), "{:?} doesn't exist", bin);
     let file = File::open(bin).expect("failed to open zip file");
     let mut zip = ZipArchive::new(file).expect("failed to initialize the zip archive");
@@ -507,15 +507,9 @@ members = ["crates/{}", "crates/{}"]
 
     // Build all binaries first. The second build should zip only one of them.
     cargo_lambda_build(workspace.root()).assert().success();
-    let lp_1_bin = workspace
-        .lambda_dir()
-        .join(&lp_1.name)
-        .join("bootstrap.zip");
+    let lp_1_bin = workspace.lambda_function_zip(&lp_1.name);
     assert!(!lp_1_bin.exists(), "{:?} exist", lp_1_bin);
-    let lp_2_bin = workspace
-        .lambda_dir()
-        .join(&lp_2.name)
-        .join("bootstrap.zip");
+    let lp_2_bin = workspace.lambda_function_zip(&lp_2.name);
     assert!(!lp_2_bin.exists(), "{:?} exist", lp_2_bin);
 
     cargo_lambda_build(workspace.root())
@@ -677,6 +671,39 @@ members = ["crates/{}", "crates/{}"]
         assertables::assert_contains!(
             json_data["files"].as_array().unwrap(),
             &serde_json::to_value("Cargo.toml").unwrap()
+        );
+    }
+}
+
+#[test]
+fn test_deploy_pre_existing_zip_file() {
+    let _guard = init_root();
+    let lp = cargo_lambda_new("test-http-function", "function-template");
+
+    lp.new_cmd().arg("--http").arg(&lp.name).assert().success();
+    let project = lp.test_project();
+    cargo_lambda_build(project.root())
+        .args(["--output-format", "zip"])
+        .assert()
+        .success();
+
+    let bin = project.lambda_function_bin(&lp.name);
+    assert!(!bin.exists(), "{:?} exist", bin);
+
+    let zip_path = project.lambda_function_zip(&lp.name);
+    assert!(zip_path.exists(), "{:?} doesn't exist", zip_path);
+
+    #[cfg(not(windows))]
+    {
+        let output = cargo_lambda_dry_deploy(project.root()).assert().success();
+        let json_data = deploy_output_json(&output).unwrap();
+        assert_eq!(json_data["arch"].as_str().unwrap(), "x86_64");
+        assert_eq!(json_data["name"].as_str().unwrap(), &lp.name);
+        assert_eq!(json_data["kind"].as_str().unwrap(), "function");
+        assert_eq!(json_data["files"].as_array().unwrap().len(), 1);
+        assertables::assert_contains!(
+            json_data["files"].as_array().unwrap(),
+            &serde_json::to_value("bootstrap").unwrap()
         );
     }
 }

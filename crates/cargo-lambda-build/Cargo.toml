@@ -37,5 +37,6 @@ which.workspace = true
 zip.workspace = true
 
 [dev-dependencies]
+assertables.workspace = true
 rstest = "0.21.0"
 tokio = { workspace = true, features = ["macros", "rt"] }
