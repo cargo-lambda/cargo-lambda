@@ -148,26 +148,6 @@ impl LambdaCommandExt for Command {
     }
 }
 
-pub trait LambdaProjectExt {
-    fn lambda_dir(&self) -> PathBuf;
-    fn lambda_function_bin(&self, name: &str) -> PathBuf;
-    fn lambda_extension_bin(&self, name: &str) -> PathBuf;
-}
-
-impl LambdaProjectExt for Project {
-    fn lambda_dir(&self) -> PathBuf {
-        self.build_dir().join("lambda")
-    }
-
-    fn lambda_function_bin(&self, name: &str) -> PathBuf {
-        self.lambda_dir().join(name).join("bootstrap")
-    }
-
-    fn lambda_extension_bin(&self, name: &str) -> PathBuf {
-        self.lambda_dir().join("extensions").join(name)
-    }
-}
-
 pub fn deploy_output_json(output: &OutputAssert) -> Result<serde_json::Value, serde_json::Error> {
     let output = output.get_output();
     let stdout = String::from_utf8_lossy(&output.stdout);

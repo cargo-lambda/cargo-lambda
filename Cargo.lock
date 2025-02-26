@@ -1274,6 +1274,7 @@ dependencies = [
 name = "cargo-lambda-build"
 version = "1.6.3"
 dependencies = [
+ "assertables",
  "cargo-lambda-interactive",
  "cargo-lambda-metadata",
  "cargo-lambda-remote",
