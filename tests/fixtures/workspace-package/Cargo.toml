@@ -13,6 +13,7 @@ EXTRA = "TRUE"
     { method = "GET", function = "crate-1" },
     { method = "POST", function = "crate-2" },
 ]
+"/users/{user_id}/posts/{post_id}" = "crate-3"
 
 [profile.release]
 lto = true

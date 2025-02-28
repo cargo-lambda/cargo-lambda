@@ -283,8 +283,8 @@ fn extract_path_parameters(
     state: &RefRuntimeState,
 ) -> (String, String, HashMap<String, String>) {
     let mut comp = path.split('/');
+    comp.next(); // skip the first empty string
 
-    comp.next();
     if let (Some(prefix), Some(fun_name)) = (comp.next(), comp.next()) {
         if prefix == LAMBDA_URL_PREFIX {
             let l = format!("/{prefix}/{fun_name}");
@@ -302,6 +302,7 @@ fn extract_path_parameters(
         }
     }
 
+    tracing::trace!(?state.function_router, "checking function router");
     if let Some(router) = &state.function_router {
         if let Ok((route, params)) = router.at(path, method.to_string().as_str()) {
             return (route.to_string(), path.to_string(), params);
@@ -468,7 +469,11 @@ mod test {
     use super::extract_path_parameters;
     use cargo_lambda_metadata::{
         DEFAULT_PACKAGE_FUNCTION,
-        cargo::watch::{FunctionRouter, FunctionRoutes},
+        cargo::{
+            load_metadata,
+            watch::{FunctionRouter, FunctionRoutes},
+        },
+        config::{ConfigOptions, load_config_without_cli_flags},
     };
     use http::Method;
 
@@ -533,5 +538,67 @@ mod test {
         let (func, path, _) = extract_path_parameters("/foo", &Method::GET, &state);
         assert_eq!("bar", func);
         assert_eq!("/foo", path);
+    }
+
+    #[test]
+    fn test_extract_path_parameters_with_router_params() {
+        let mut new_router = FunctionRouter::default();
+        new_router
+            .insert(
+                "/users/{user_id}/posts/{post_id}",
+                FunctionRoutes::Single("user-posts".to_string()),
+            )
+            .unwrap();
+
+        let state = Arc::new(RuntimeState::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
+            None,
+            PathBuf::new(),
+            HashSet::new(),
+            Some(new_router),
+        ));
+
+        // Test with path parameters
+        let (func, path, params) =
+            extract_path_parameters("/users/123/posts/456", &Method::GET, &state);
+        assert_eq!("user-posts", func);
+        assert_eq!("/users/123/posts/456", path);
+        assert_eq!(params.get("user_id").unwrap(), "123");
+        assert_eq!(params.get("post_id").unwrap(), "456");
+
+        // Test with non-matching path
+        let (func, path, params) = extract_path_parameters("/invalid/path", &Method::GET, &state);
+        assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
+        assert_eq!("/invalid/path", path);
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_extract_path_parameters_with_router_params_and_method() {
+        let metadata = load_metadata("../../tests/fixtures/workspace-package/Cargo.toml").unwrap();
+        let config = load_config_without_cli_flags(&metadata, &ConfigOptions::default()).unwrap();
+
+        let state = Arc::new(RuntimeState::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
+            None,
+            PathBuf::new(),
+            HashSet::new(),
+            config.watch.router,
+        ));
+
+        // Test with path parameters and method
+        let (func, path, params) =
+            extract_path_parameters("/users/123/posts/456", &Method::GET, &state);
+        assert_eq!("crate-3", func);
+        assert_eq!("/users/123/posts/456", path);
+        assert_eq!(params.get("user_id").unwrap(), "123");
+        assert_eq!(params.get("post_id").unwrap(), "456");
+
+        // Test with non-matching path and method
+        let (func, path, params) =
+            extract_path_parameters("/orgs/123/posts/456", &Method::POST, &state);
+        assert_eq!(DEFAULT_PACKAGE_FUNCTION, func);
+        assert_eq!("/orgs/123/posts/456", path);
+        assert!(params.is_empty());
     }
 }
