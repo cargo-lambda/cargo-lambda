@@ -257,6 +257,14 @@ Archive:  bootstrap.zip
   3037232                     4 files
 ```
 
+## CloudWatch Log Retention
+
+You can set the CloudWatch Log Retention for your function using the `--log-retention` flag. This flag takes an integer value that represents the number of days to keep the logs. If the log group does not exist, it will be created. If the log group already exists, the retention policy will be updated.
+
+```
+cargo lambda deploy --log-retention 30 http-lambda
+```
+
 ## Other options
 
 Use the `--help` flag to see other options to configure the function's deployment.

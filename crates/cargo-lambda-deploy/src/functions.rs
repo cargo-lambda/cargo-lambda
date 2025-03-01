@@ -1,4 +1,5 @@
 use crate::roles::{self, FunctionRole};
+use aws_sdk_cloudwatchlogs::operation::create_log_group::CreateLogGroupError;
 use aws_sdk_s3::{Client as S3Client, primitives::ByteStream};
 use cargo_lambda_build::{BinaryArchive, BinaryModifiedAt};
 use cargo_lambda_interactive::progress::Progress;
@@ -93,6 +94,11 @@ pub(crate) async fn deploy(
         progress.set_message("deleting function url configuration");
 
         delete_function_url_config(name, &config.remote_config.alias, &client).await?;
+    }
+
+    if let Some(retention) = config.function_config.log_retention {
+        progress.set_message("setting log retention");
+        set_log_retention(sdk_config, retention, name).await?;
     }
 
     Ok(DeployOutput {
@@ -693,6 +699,43 @@ pub(crate) async fn delete_function_url_config(
     }
 }
 
+async fn set_log_retention(sdk_config: &SdkConfig, retention: i32, name: &str) -> Result<()> {
+    let cw_client = aws_sdk_cloudwatchlogs::Client::new(sdk_config);
+    let log_group_name = format!("/aws/lambda/{name}");
+
+    match cw_client
+        .create_log_group()
+        .log_group_name(&log_group_name)
+        .send()
+        .await
+    {
+        Ok(_) => (),
+        Err(err) if log_group_already_exists_error(&err) => (),
+        Err(err) => {
+            return Err(err)
+                .into_diagnostic()
+                .wrap_err("failed to create log group");
+        }
+    }
+
+    cw_client
+        .put_retention_policy()
+        .log_group_name(log_group_name)
+        .retention_in_days(retention)
+        .send()
+        .await
+        .into_diagnostic()
+        .wrap_err("failed to set log retention")?;
+    Ok(())
+}
+
+fn log_group_already_exists_error(err: &SdkError<CreateLogGroupError>) -> bool {
+    match err {
+        SdkError::ServiceError(e) => e.err().is_resource_already_exists_exception(),
+        _ => false,
+    }
+}
+
 pub(crate) fn function_doesnt_exist_error(err: &SdkError<GetFunctionError>) -> bool {
     match err {
         SdkError::ServiceError(e) => e.err().is_resource_not_found_exception(),
@@ -736,7 +779,7 @@ fn is_role_cannot_be_assumed_error(err: &SdkError<CreateFunctionError>) -> bool 
 mod tests {
     use super::*;
     use aws_credential_types::Credentials;
-    use aws_sdk_s3::config::{Config as S3Config, Region};
+    use aws_sdk_s3::config::{Config as S3Config, Region, SharedCredentialsProvider};
     use aws_smithy_runtime::client::http::test_util::{ReplayEvent, StaticReplayClient};
     use aws_smithy_types::body::SdkBody;
     use base64::prelude::*;
@@ -1203,6 +1246,124 @@ mod tests {
             result.unwrap(),
             "arn:aws:lambda:us-east-1:123456789012:function:test-function"
         );
+        http_client.assert_requests_match(&[]);
+    }
+
+    #[tokio::test]
+    async fn test_set_log_retention() {
+        // Setup mock responses for creating log group and setting retention
+        let create_log_group_request = Request::builder()
+            .uri("https://logs.us-east-1.amazonaws.com/")
+            .method("POST")
+            .header("x-amz-target", "Logs_20140328.CreateLogGroup")
+            .body(SdkBody::from(
+                serde_json::json!({
+                    "logGroupName": "/aws/lambda/test-function"
+                })
+                .to_string(),
+            ))
+            .unwrap();
+
+        let create_log_group_response = Response::builder()
+            .status(200)
+            .body(SdkBody::from("{}"))
+            .unwrap();
+
+        let put_retention_request = Request::builder()
+            .uri("https://logs.us-east-1.amazonaws.com/")
+            .method("POST")
+            .header("x-amz-target", "Logs_20140328.PutRetentionPolicy")
+            .body(SdkBody::from(
+                serde_json::json!({
+                    "logGroupName": "/aws/lambda/test-function",
+                    "retentionInDays": 14
+                })
+                .to_string(),
+            ))
+            .unwrap();
+
+        let put_retention_response = Response::builder()
+            .status(200)
+            .body(SdkBody::from("{}"))
+            .unwrap();
+
+        let http_client = StaticReplayClient::new(vec![
+            ReplayEvent::new(create_log_group_request, create_log_group_response),
+            ReplayEvent::new(put_retention_request, put_retention_response),
+        ]);
+
+        // Setup SDK config with mock client
+        let sdk_config = SdkConfig::builder()
+            .credentials_provider(SharedCredentialsProvider::new(Credentials::for_tests()))
+            .region(Region::new("us-east-1"))
+            .http_client(http_client.clone())
+            .build();
+
+        let result = set_log_retention(&sdk_config, 14, "test-function").await;
+
+        assert!(result.is_ok());
+        http_client.assert_requests_match(&[]);
+    }
+
+    #[tokio::test]
+    async fn test_set_log_retention_existing_group() {
+        // Setup mock response for when log group already exists
+        let create_log_group_request = Request::builder()
+            .uri("https://logs.us-east-1.amazonaws.com/")
+            .method("POST")
+            .header("x-amz-target", "Logs_20140328.CreateLogGroup")
+            .body(SdkBody::from(
+                serde_json::json!({
+                    "logGroupName": "/aws/lambda/test-function"
+                })
+                .to_string(),
+            ))
+            .unwrap();
+
+        let create_log_group_response = Response::builder()
+            .status(400)
+            .body(SdkBody::from(
+                serde_json::json!({
+                    "__type": "ResourceAlreadyExistsException",
+                    "message": "The specified log group already exists"
+                })
+                .to_string(),
+            ))
+            .unwrap();
+
+        let put_retention_request = Request::builder()
+            .uri("https://logs.us-east-1.amazonaws.com/")
+            .method("POST")
+            .header("x-amz-target", "Logs_20140328.PutRetentionPolicy")
+            .body(SdkBody::from(
+                serde_json::json!({
+                    "logGroupName": "/aws/lambda/test-function",
+                    "retentionInDays": 14
+                })
+                .to_string(),
+            ))
+            .unwrap();
+
+        let put_retention_response = Response::builder()
+            .status(200)
+            .body(SdkBody::from("{}"))
+            .unwrap();
+
+        let http_client = StaticReplayClient::new(vec![
+            ReplayEvent::new(create_log_group_request, create_log_group_response),
+            ReplayEvent::new(put_retention_request, put_retention_response),
+        ]);
+
+        // Setup SDK config with mock client
+        let sdk_config = SdkConfig::builder()
+            .credentials_provider(SharedCredentialsProvider::new(Credentials::for_tests()))
+            .region(Region::new("us-east-1"))
+            .http_client(http_client.clone())
+            .build();
+
+        let result = set_log_retention(&sdk_config, 14, "test-function").await;
+
+        assert!(result.is_ok());
         http_client.assert_requests_match(&[]);
     }
 }
