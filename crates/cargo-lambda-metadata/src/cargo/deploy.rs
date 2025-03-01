@@ -332,6 +332,12 @@ pub struct FunctionDeployConfig {
     #[arg(long)]
     #[serde(default)]
     pub description: Option<String>,
+
+    /// Retention policy for the function's log group.
+    /// The value is the number of days to keep the logs.
+    #[arg(long)]
+    #[serde(default)]
+    pub log_retention: Option<i32>,
 }
 
 fn default_runtime() -> String {

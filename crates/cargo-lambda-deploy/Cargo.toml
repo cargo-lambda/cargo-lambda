@@ -12,6 +12,7 @@ keywords.workspace = true
 description.workspace = true
 
 [dependencies]
+aws-sdk-cloudwatchlogs.workspace = true
 aws-sdk-iam.workspace = true
 aws-sdk-s3.workspace = true
 aws-sdk-sts.workspace = true

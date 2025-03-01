@@ -44,6 +44,7 @@ rust-version = "1.85.0"
 assertables = "9.0.0"
 aws-config = "1.5.11"
 aws-credential-types = "1.2.1"
+aws-sdk-cloudwatchlogs = { version ="1.54.0", features = ["behavior-version-latest"] }
 aws-sdk-iam = { version ="1.54.0", features = ["behavior-version-latest"] }
 aws-sdk-lambda = { version ="1.61.0", features = ["behavior-version-latest"] }
 aws-sdk-s3 = { version ="1.61.0", features = ["behavior-version-latest"] }
