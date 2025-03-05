@@ -8,7 +8,7 @@ use thiserror::Error;
 pub enum MetadataError {
     #[error("invalid memory value `{0}`")]
     #[diagnostic()]
-    InvalidMemory(i32),
+    InvalidMemory(String),
     #[error("invalid lambda metadata in Cargo.toml file: {0}")]
     #[diagnostic()]
     InvalidCargoMetadata(#[from] serde_json::Error),
