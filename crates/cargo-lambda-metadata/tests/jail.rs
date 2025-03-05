@@ -33,7 +33,7 @@ fn test_env() {
         let config = load_config_without_cli_flags(&metadata, &ConfigOptions::default()).unwrap();
 
         assert!(config.build.cargo_opts.release);
-        assert_eq!(config.deploy.function_config.memory, Some(Memory(1024)));
+        assert_eq!(config.deploy.function_config.memory, Some(1024.into()));
         assert_eq!(config.deploy.function_config.timeout, Some(60.into()));
 
         Ok(())
@@ -65,7 +65,7 @@ fn test_env_with_context() {
         let metadata = load_metadata("Cargo.toml").unwrap();
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
 
-        assert_eq!(config.deploy.function_config.memory, Some(Memory(1024)));
+        assert_eq!(config.deploy.function_config.memory, Some(1024.into()));
 
         Ok(())
     });

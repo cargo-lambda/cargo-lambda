@@ -707,3 +707,27 @@ fn test_deploy_pre_existing_zip_file() {
         );
     }
 }
+
+#[test]
+fn test_deploy_with_memory_and_timeout_cli_flags() {
+    let _guard = init_root();
+    let lp = cargo_lambda_new("test-http-function", "function-template");
+
+    lp.new_cmd().arg("--http").arg(&lp.name).assert().success();
+    let project = lp.test_project();
+
+    cargo_lambda_build(project.root()).assert().success();
+
+    #[cfg(not(windows))]
+    {
+        let output = cargo_lambda_dry_deploy(project.root())
+            .args(["--memory", "512"])
+            .args(["--timeout", "60"])
+            .assert()
+            .success();
+
+        let json_data = deploy_output_json(&output).unwrap();
+        assert_eq!(json_data["config"]["memory"].as_i64().unwrap(), 512);
+        assert_eq!(json_data["config"]["timeout"].as_i64().unwrap(), 60);
+    }
+}
