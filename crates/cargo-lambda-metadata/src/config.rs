@@ -254,7 +254,7 @@ mod tests {
         );
 
         assert_eq!(config.env.get("FOO"), Some(&"BAR".to_string()));
-        assert_eq!(config.deploy.function_config.memory, Some(Memory(512)));
+        assert_eq!(config.deploy.function_config.memory, Some(512.into()));
         assert_eq!(config.deploy.function_config.timeout, Some(60.into()));
 
         assert_eq!(
@@ -374,7 +374,7 @@ mod tests {
 
         let metadata = load_metadata(manifest).unwrap();
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
-        assert_eq!(config.deploy.function_config.memory, Some(Memory(1024)));
+        assert_eq!(config.deploy.function_config.memory, Some(1024.into()));
 
         let options = ConfigOptions {
             context: Some("development".to_string()),
@@ -383,7 +383,7 @@ mod tests {
         };
 
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
-        assert_eq!(config.deploy.function_config.memory, Some(Memory(512)));
+        assert_eq!(config.deploy.function_config.memory, Some(512.into()));
 
         let options = ConfigOptions {
             global: Some(global),
@@ -391,7 +391,7 @@ mod tests {
         };
 
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
-        assert_eq!(config.deploy.function_config.memory, Some(Memory(256)));
+        assert_eq!(config.deploy.function_config.memory, Some(256.into()));
     }
 
     #[test]
@@ -406,7 +406,7 @@ mod tests {
         };
 
         let mut deploy = Deploy::default();
-        deploy.function_config.memory = Some(Memory(2048));
+        deploy.function_config.memory = Some(2048.into());
 
         let args_config = Config {
             deploy,
@@ -415,6 +415,6 @@ mod tests {
 
         let metadata = load_metadata(manifest).unwrap();
         let config = load_config(&args_config, &metadata, &options).unwrap();
-        assert_eq!(config.deploy.function_config.memory, Some(Memory(2048)));
+        assert_eq!(config.deploy.function_config.memory, Some(2048.into()));
     }
 }

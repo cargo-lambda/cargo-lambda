@@ -11,7 +11,7 @@ use crate::{
     cargo::deserialize_vec_or_map,
     env::EnvOptions,
     error::MetadataError,
-    lambda::{Memory, Timeout, Tracing},
+    lambda::{Memory, MemoryValueParser, Timeout, Tracing},
 };
 
 const DEFAULT_MANIFEST_PATH: &str = "Cargo.toml";
@@ -285,8 +285,8 @@ pub struct FunctionDeployConfig {
     #[serde(default)]
     pub disable_function_url: bool,
 
-    /// Memory allocated for the function
-    #[arg(long, alias = "memory-size", value_parser = clap::value_parser!(i32).range(128..=10240))]
+    /// Memory allocated for the function. Value must be between 128 and 10240.
+    #[arg(long, alias = "memory-size", value_parser = MemoryValueParser)]
     #[serde(default)]
     pub memory: Option<Memory>,
 
@@ -627,7 +627,7 @@ mod tests {
             config.deploy.function_config.timeout,
             Some(Timeout::new(120))
         );
-        assert_eq!(config.deploy.function_config.memory, Some(Memory(10240)));
+        assert_eq!(config.deploy.function_config.memory, Some(10240.into()));
 
         let tags = config.deploy.lambda_tags().unwrap();
         assert_eq!(tags.len(), 2);

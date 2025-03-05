@@ -1,8 +1,13 @@
+use clap::{
+    Arg, Command,
+    builder::TypedValueParser,
+    error::{ContextKind, ContextValue},
+};
 use serde::{
     Deserialize, Serialize, Serializer,
     de::{Deserializer, Error, Visitor},
 };
-use std::{fmt, str::FromStr, time::Duration};
+use std::{ffi::OsStr, fmt, str::FromStr, time::Duration};
 use strum_macros::{Display, EnumString};
 
 use crate::error::MetadataError;
@@ -59,7 +64,7 @@ impl From<i32> for Timeout {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Memory(pub i32);
+pub struct Memory(u32);
 
 impl From<Memory> for i32 {
     fn from(m: Memory) -> i32 {
@@ -69,18 +74,34 @@ impl From<Memory> for i32 {
 
 impl From<&Memory> for i32 {
     fn from(m: &Memory) -> i32 {
-        m.0
+        m.0 as i32
     }
 }
 
-impl TryFrom<i32> for Memory {
+impl From<i32> for Memory {
+    fn from(t: i32) -> Memory {
+        Memory(t as u32)
+    }
+}
+
+impl TryFrom<i64> for Memory {
     type Error = MetadataError;
 
-    fn try_from(m: i32) -> Result<Memory, Self::Error> {
+    fn try_from(m: i64) -> Result<Memory, Self::Error> {
         if !(128..=10240).contains(&m) {
-            return Err(MetadataError::InvalidMemory(m));
+            return Err(MetadataError::InvalidMemory(format!("{m}")));
         }
-        Ok(Memory(m))
+        Ok(Memory(m as u32))
+    }
+}
+
+impl FromStr for Memory {
+    type Err = MetadataError;
+
+    fn from_str(t: &str) -> Result<Memory, Self::Err> {
+        let t = i64::from_str(t).map_err(|_| MetadataError::InvalidMemory(t.into()))?;
+
+        t.try_into()
     }
 }
 
@@ -101,7 +122,7 @@ impl<'de> Deserialize<'de> for Memory {
             where
                 E: Error,
             {
-                Memory::try_from(value as i32).map_err(|e| Error::custom(e.to_string()))
+                Memory::try_from(value).map_err(|e| Error::custom(e.to_string()))
             }
 
             fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
@@ -122,6 +143,39 @@ impl Serialize for Memory {
         S: Serializer,
     {
         serializer.serialize_i32(self.into())
+    }
+}
+
+#[derive(Clone)]
+pub struct MemoryValueParser;
+impl TypedValueParser for MemoryValueParser {
+    type Value = Memory;
+
+    fn parse_ref(
+        &self,
+        cmd: &Command,
+        arg: Option<&Arg>,
+        value: &OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        let val = value
+            .to_str()
+            .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8).with_cmd(cmd))?;
+
+        Memory::from_str(val).map_err(|_| {
+            let mut err = clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+
+            if let Some(arg) = arg {
+                err.insert(
+                    ContextKind::InvalidArg,
+                    ContextValue::String(arg.to_string()),
+                );
+            }
+
+            let context = ContextValue::String(val.to_string());
+            err.insert(ContextKind::InvalidValue, context);
+
+            err
+        })
     }
 }
 
