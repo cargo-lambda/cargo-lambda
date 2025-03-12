@@ -185,6 +185,7 @@ fn build_runtime_state(
         runtime_addr,
         proxy_addr,
         manifest_path.to_path_buf(),
+        config.only_lambda_apis,
         binary_packages,
         config.router.clone(),
     ))

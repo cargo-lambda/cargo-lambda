@@ -483,6 +483,7 @@ mod test {
             SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
             None,
             PathBuf::new(),
+            false,
             HashSet::new(),
             None,
         ));
@@ -531,6 +532,7 @@ mod test {
             SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
             None,
             PathBuf::new(),
+            false,
             HashSet::new(),
             Some(new_router),
         ));
@@ -554,6 +556,7 @@ mod test {
             SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
             None,
             PathBuf::new(),
+            false,
             HashSet::new(),
             Some(new_router),
         ));
@@ -582,6 +585,7 @@ mod test {
             SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
             None,
             PathBuf::new(),
+            false,
             HashSet::new(),
             config.watch.router,
         ));

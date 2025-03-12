@@ -22,6 +22,7 @@ pub(crate) struct RuntimeState {
     proxy_addr: Option<SocketAddr>,
     runtime_url: String,
     manifest_path: PathBuf,
+    only_lambda_apis: bool,
     pub initial_functions: HashSet<String>,
     pub function_router: Option<FunctionRouter>,
     pub req_cache: RequestCache,
@@ -36,6 +37,7 @@ impl RuntimeState {
         runtime_addr: SocketAddr,
         proxy_addr: Option<SocketAddr>,
         manifest_path: PathBuf,
+        only_lambda_apis: bool,
         initial_functions: HashSet<String>,
         function_router: Option<FunctionRouter>,
     ) -> RuntimeState {
@@ -43,6 +45,7 @@ impl RuntimeState {
             runtime_addr,
             proxy_addr,
             manifest_path,
+            only_lambda_apis,
             initial_functions,
             function_router,
             runtime_url: format!("http://{runtime_addr}{RUNTIME_EMULATOR_PATH}"),
@@ -61,7 +64,7 @@ impl RuntimeState {
     }
 
     pub(crate) fn is_default_function_enabled(&self) -> bool {
-        self.initial_functions.len() == 1
+        self.initial_functions.len() == 1 || self.only_lambda_apis
     }
 
     pub(crate) fn is_function_available(&self, name: &str) -> Result<(), HashSet<String>> {
