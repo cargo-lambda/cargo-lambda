@@ -29,6 +29,12 @@ impl Timeout {
     }
 }
 
+impl std::fmt::Display for Timeout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl Default for Timeout {
     fn default() -> Self {
         Timeout(30)
@@ -65,6 +71,12 @@ impl From<i32> for Timeout {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Memory(u32);
+
+impl std::fmt::Display for Memory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl From<Memory> for i32 {
     fn from(m: Memory) -> i32 {

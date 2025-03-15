@@ -74,44 +74,7 @@ pub fn load_config_without_cli_flags(
 }
 
 fn figment_from_metadata(metadata: &CargoMetadata, options: &ConfigOptions) -> Result<Figment> {
-    let (ws_metadata, bin_metadata) = workspace_metadata(metadata, options.name.as_deref())?;
-    let package_metadata = package_metadata(metadata, options.name.as_deref())?;
-
-    let mut config_file = options
-        .global
-        .as_ref()
-        .map(Toml::file)
-        .unwrap_or_else(|| Toml::file("CargoLambda.toml"));
-    if options.context.is_some() {
-        config_file = config_file.nested()
-    }
-
-    let mut figment = Figment::new();
-    if let Some(context) = &options.context {
-        figment = figment.select(context)
-    }
-
-    let mut env_serialized = Env::prefixed("CARGO_LAMBDA_");
-    if let Some(context) = &options.context {
-        env_serialized = env_serialized.profile(context);
-    }
-    figment = figment.merge(env_serialized);
-
-    figment = if options.admerge {
-        figment.admerge(config_file)
-    } else {
-        figment.merge(config_file)
-    };
-
-    let mut ws_serialized = Serialized::defaults(ws_metadata);
-    if let Some(context) = &options.context {
-        ws_serialized = ws_serialized.profile(context);
-    }
-    if options.admerge {
-        figment = figment.admerge(ws_serialized);
-    } else {
-        figment = figment.merge(ws_serialized);
-    }
+    let (bin_metadata, package_metadata, mut figment) = general_config_figment(metadata, options)?;
 
     if let Some(bin_metadata) = bin_metadata {
         let mut bin_serialized = Serialized::defaults(bin_metadata);
@@ -140,6 +103,54 @@ fn figment_from_metadata(metadata: &CargoMetadata, options: &ConfigOptions) -> R
     }
 
     Ok(figment)
+}
+
+pub fn general_config_figment(
+    metadata: &CargoMetadata,
+    options: &ConfigOptions,
+) -> Result<(Option<Config>, Option<Config>, Figment)> {
+    let (ws_metadata, bin_metadata) = workspace_metadata(metadata, options.name.as_deref())?;
+    let package_metadata = package_metadata(metadata, options.name.as_deref())?;
+
+    let mut config_file = options
+        .global
+        .as_ref()
+        .map(Toml::file)
+        .unwrap_or_else(|| Toml::file("CargoLambda.toml"));
+
+    if options.context.is_some() {
+        config_file = config_file.nested()
+    }
+
+    let mut figment = Figment::new();
+    if let Some(context) = &options.context {
+        figment = figment.select(context)
+    }
+
+    let mut env_serialized = Env::prefixed("CARGO_LAMBDA_");
+    if let Some(context) = &options.context {
+        env_serialized = env_serialized.profile(context);
+    }
+
+    figment = figment.merge(env_serialized);
+    figment = if options.admerge {
+        figment.admerge(config_file)
+    } else {
+        figment.merge(config_file)
+    };
+
+    let mut ws_serialized = Serialized::defaults(ws_metadata);
+    if let Some(context) = &options.context {
+        ws_serialized = ws_serialized.profile(context);
+    }
+
+    if options.admerge {
+        figment = figment.admerge(ws_serialized);
+    } else {
+        figment = figment.merge(ws_serialized);
+    }
+
+    Ok((bin_metadata, package_metadata, figment))
 }
 
 fn workspace_metadata(
@@ -213,6 +224,26 @@ fn get_config_from_packages(
     }
 
     Ok(None)
+}
+
+pub fn get_config_from_all_packages(metadata: &CargoMetadata) -> Result<HashMap<String, Config>> {
+    let kind_condition = |pkg: &Package, target: &Target| {
+        target.kind.iter().any(|kind| kind == "bin") && pkg.metadata.is_object()
+    };
+
+    let mut configs = HashMap::new();
+    for pkg in &metadata.packages {
+        for target in &pkg.targets {
+            if kind_condition(pkg, target) {
+                let meta: Metadata =
+                    serde_json::from_value(pkg.metadata.clone()).into_diagnostic()?;
+
+                configs.insert(pkg.name.clone(), meta.lambda.package.into());
+            }
+        }
+    }
+
+    Ok(configs)
 }
 
 fn get_config_from_root(metadata: &CargoMetadata) -> Result<Option<Config>> {
