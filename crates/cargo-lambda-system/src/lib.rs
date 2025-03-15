@@ -134,7 +134,7 @@ pub async fn run(config: &System, metadata: &CargoMetadata, options: &ConfigOpti
 
     match config.output_format {
         Some(OutputFormat::Json) => {
-            println!("{}", serde_json::to_string(&info).into_diagnostic()?);
+            println!("{}", serde_json::to_string_pretty(&info).into_diagnostic()?);
         }
         _ => {
             let data = serde_yml::to_string(&info).unwrap();
