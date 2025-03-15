@@ -129,7 +129,7 @@ impl LambdaSubcommand {
             Self::Init(mut i) => i.run().await,
             Self::Invoke(i) => i.run().await,
             Self::New(mut n) => n.run().await,
-            Self::System(s) => s.run().await,
+            Self::System(s) => Self::run_system(s, global, context, admerge).await,
             Self::Watch(w) => Self::run_watch(w, color, global, context, admerge).await,
         }
     }
@@ -205,6 +205,23 @@ impl LambdaSubcommand {
         deploy.base_env = config.env.clone();
 
         cargo_lambda_deploy::run(&deploy, &metadata).await
+    }
+
+    async fn run_system(
+        system: System,
+        global: Option<PathBuf>,
+        context: Option<String>,
+        admerge: bool,
+    ) -> Result<()> {
+        let metadata = load_metadata(system.manifest_path())?;
+
+        let options = ConfigOptions {
+            global,
+            context,
+            admerge,
+            name: system.package(),
+        };
+        cargo_lambda_system::run(&system, &metadata, &options).await
     }
 }
 

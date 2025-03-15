@@ -11,8 +11,15 @@ keywords.workspace = true
 description.workspace = true
 
 [dependencies]
+bat = { version = "0.25.0", default-features = false, features = ["regex-fancy"] }
 cargo-lambda-build.workspace = true
 cargo-lambda-interactive.workspace = true
+cargo-lambda-metadata.workspace = true
 clap.workspace = true
 miette.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yml = "0.0.12"
+strum.workspace = true
+strum_macros.workspace = true
 tracing.workspace = true

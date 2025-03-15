@@ -9,7 +9,7 @@ use miette::{IntoDiagnostic, Result};
 pub fn print_install_options(options: &[InstallOption]) {
     println!("Zig is not installed in your system.");
     if is_stdin_tty() {
-        println!("Run `cargo lambda system --setup` to install Zig.")
+        println!("Run `cargo lambda system --install-zig` to install Zig.")
     }
 
     if !options.is_empty() {
@@ -51,6 +51,7 @@ pub async fn check_installation() -> Result<()> {
     install_zig(options).await
 }
 
+#[derive(Debug)]
 pub enum InstallOption {
     #[cfg(not(windows))]
     Brew,
@@ -61,6 +62,15 @@ pub enum InstallOption {
     Pip3,
     #[cfg(windows)]
     Scoop,
+}
+
+impl serde::Serialize for InstallOption {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.usage())
+    }
 }
 
 impl std::fmt::Display for InstallOption {

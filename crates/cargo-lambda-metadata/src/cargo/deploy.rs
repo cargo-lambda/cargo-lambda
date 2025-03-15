@@ -8,11 +8,12 @@ use std::{collections::HashMap, fmt::Debug, path::PathBuf};
 use strum_macros::{Display, EnumString};
 
 use crate::{
-    cargo::deserialize_vec_or_map,
     env::EnvOptions,
     error::MetadataError,
     lambda::{Memory, MemoryValueParser, Timeout, Tracing},
 };
+
+use crate::cargo::deserialize_vec_or_map;
 
 const DEFAULT_MANIFEST_PATH: &str = "Cargo.toml";
 const DEFAULT_COMPATIBLE_RUNTIMES: &str = "provided.al2,provided.al2023";
@@ -452,8 +453,12 @@ pub struct VpcConfig {
 
     /// Allow outbound IPv6 traffic on VPC functions that are connected to dual-stack subnets
     #[arg(long)]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub ipv6_allowed_for_dual_stack: bool,
+}
+
+fn is_false(b: &bool) -> bool {
+    !b
 }
 
 impl VpcConfig {
@@ -512,7 +517,7 @@ mod tests {
     use crate::{
         cargo::load_metadata,
         config::{ConfigOptions, load_config_without_cli_flags},
-        lambda::{Memory, Timeout},
+        lambda::Timeout,
         tests::fixture_metadata,
     };
 

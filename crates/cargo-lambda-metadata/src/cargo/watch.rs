@@ -228,7 +228,7 @@ pub struct WatchConfig {
 #[derive(Clone, Debug, Default)]
 pub struct FunctionRouter {
     inner: Router<FunctionRoutes>,
-    pub(crate) raw: Vec<(String, FunctionRoutes)>,
+    pub(crate) raw: Vec<Route>,
 }
 
 impl FunctionRouter {
@@ -252,6 +252,14 @@ impl FunctionRouter {
     pub fn insert(&mut self, path: &str, routes: FunctionRoutes) -> Result<(), InsertError> {
         self.inner.insert(path, routes)
     }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct Route {
+    path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    methods: Option<Vec<String>>,
+    function: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -284,15 +292,48 @@ impl<'de> Visitor<'de> for FunctionRouterVisitor {
     {
         let routes: HashMap<String, FunctionRoutes> =
             Deserialize::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
+
         let mut inner = Router::new();
+        let mut raw = Vec::new();
+
+        let mut inverse = HashMap::new();
 
         for (path, route) in &routes {
             inner.insert(path, route.clone()).map_err(|e| {
                 serde::de::Error::custom(format!("Failed to insert route {path}: {e}"))
             })?;
+
+            match route {
+                FunctionRoutes::Single(function) => {
+                    raw.push(Route {
+                        path: path.clone(),
+                        methods: None,
+                        function: function.clone(),
+                    });
+                }
+                FunctionRoutes::Multiple(routes) => {
+                    for (method, function) in routes {
+                        inverse
+                            .entry((path.clone(), function.clone()))
+                            .and_modify(|route: &mut Route| {
+                                let mut methods = route.methods.clone().unwrap_or_default();
+                                methods.push(method.clone());
+                                route.methods = Some(methods);
+                            })
+                            .or_insert_with(|| Route {
+                                path: path.clone(),
+                                methods: Some(vec![method.clone()]),
+                                function: function.clone(),
+                            });
+                    }
+                }
+            }
         }
 
-        let raw: Vec<(String, FunctionRoutes)> = routes.into_iter().collect();
+        for (_, route) in inverse {
+            raw.push(route);
+        }
+
         Ok(FunctionRouter { inner, raw })
     }
 
@@ -300,17 +341,67 @@ impl<'de> Visitor<'de> for FunctionRouterVisitor {
     where
         A: serde::de::SeqAccess<'de>,
     {
-        let raw: Vec<(String, FunctionRoutes)> =
+        let routes: Vec<Route> =
             Deserialize::deserialize(serde::de::value::SeqAccessDeserializer::new(seq))?;
-        let mut inner = Router::new();
 
-        for (path, route) in &raw {
+        let mut inner = Router::new();
+        let mut raw = Vec::new();
+
+        let mut routes_by_path = HashMap::new();
+
+        for route in &routes {
+            routes_by_path
+                .entry(route.path.clone())
+                .and_modify(|routes| merge_routes(routes, route))
+                .or_insert_with(|| decode_route(route));
+
+            raw.push(route.clone());
+        }
+
+        for (path, route) in &routes_by_path {
             inner.insert(path, route.clone()).map_err(|e| {
                 serde::de::Error::custom(format!("Failed to insert route {path}: {e}"))
             })?;
         }
 
         Ok(FunctionRouter { inner, raw })
+    }
+}
+
+fn merge_routes(routes: &mut FunctionRoutes, route: &Route) {
+    let methods = route.methods.clone().unwrap_or_default();
+    match routes {
+        FunctionRoutes::Single(function) if !methods.is_empty() => {
+            let mut tmp = HashMap::new();
+            for method in methods {
+                tmp.insert(method.clone(), function.clone());
+            }
+            *routes = FunctionRoutes::Multiple(tmp);
+        }
+        FunctionRoutes::Multiple(_) if methods.is_empty() => {
+            *routes = FunctionRoutes::Single(route.function.clone());
+        }
+        FunctionRoutes::Multiple(routes) => {
+            for method in methods {
+                routes.insert(method.clone(), route.function.clone());
+            }
+        }
+        FunctionRoutes::Single(_) => {
+            *routes = FunctionRoutes::Single(route.function.clone());
+        }
+    }
+}
+
+fn decode_route(route: &Route) -> FunctionRoutes {
+    match &route.methods {
+        Some(methods) => {
+            let mut routes = HashMap::new();
+            for method in methods {
+                routes.insert(method.clone(), route.function.clone());
+            }
+            FunctionRoutes::Multiple(routes)
+        }
+        None => FunctionRoutes::Single(route.function.clone()),
     }
 }
 
