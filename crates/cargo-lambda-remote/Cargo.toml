@@ -20,7 +20,7 @@ dirs.workspace = true
 miette.workspace = true
 rustls.workspace = true
 rustls-pki-types = "1.10.0"
-rustls-platform-verifier = "0.4.0"
+rustls-platform-verifier = "0.5.1"
 serde.workspace = true
 thiserror.workspace = true
 
