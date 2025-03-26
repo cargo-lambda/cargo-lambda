@@ -134,16 +134,10 @@ pub async fn run(config: &System, metadata: &CargoMetadata, options: &ConfigOpti
 
     match config.output_format {
         Some(OutputFormat::Json) => {
-            println!("{}", serde_json::to_string_pretty(&info).into_diagnostic()?);
+            serde_json::to_writer_pretty(std::io::stdout(), &info).into_diagnostic()?;
         }
         _ => {
-            let data = serde_yml::to_string(&info).unwrap();
-            bat::PrettyPrinter::new()
-                .language("yaml")
-                .input_from_bytes(data.as_bytes())
-                .colored_output(false)
-                .print()
-                .into_diagnostic()?;
+            serde_yml::to_writer(std::io::stdout(), &info).into_diagnostic()?;
         }
     }
 

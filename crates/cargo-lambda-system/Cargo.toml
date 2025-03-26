@@ -11,7 +11,6 @@ keywords.workspace = true
 description.workspace = true
 
 [dependencies]
-bat = { version = "0.25.0", default-features = false, features = ["regex-fancy"] }
 cargo-lambda-build.workspace = true
 cargo-lambda-interactive.workspace = true
 cargo-lambda-metadata.workspace = true

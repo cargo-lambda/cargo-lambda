@@ -76,7 +76,9 @@ pub(crate) async fn deploy(
     let (function_arn, version) =
         upsert_function(config, name, &client, sdk_config, binary_archive, progress).await?;
 
-    if let Some(alias) = &config.remote_config.alias {
+    let alias = config.deploy_alias();
+
+    if let Some(alias) = &alias {
         progress.set_message("updating alias version");
 
         upsert_alias(name, alias, &version, &client).await?;
@@ -85,7 +87,7 @@ pub(crate) async fn deploy(
     let function_url = if config.function_config.enable_function_url {
         progress.set_message("configuring function url");
 
-        Some(upsert_function_url_config(name, &config.remote_config.alias, &client).await?)
+        Some(upsert_function_url_config(name, &alias, &client).await?)
     } else {
         None
     };
@@ -93,7 +95,7 @@ pub(crate) async fn deploy(
     if config.function_config.disable_function_url {
         progress.set_message("deleting function url configuration");
 
-        delete_function_url_config(name, &config.remote_config.alias, &client).await?;
+        delete_function_url_config(name, &alias, &client).await?;
     }
 
     if let Some(retention) = config.function_config.log_retention {
@@ -105,7 +107,7 @@ pub(crate) async fn deploy(
         function_arn,
         function_url,
         version,
-        alias: config.remote_config.alias.clone(),
+        alias,
         binary_modified_at: binary_archive.binary_modified_at.clone(),
     })
 }
@@ -301,7 +303,7 @@ async fn create_function(
     }
 
     if let Some(description) = &config.function_config.description {
-        wait_for_ready_state(lambda_client, name, &config.remote_config.alias, progress).await?;
+        wait_for_ready_state(lambda_client, name, &config.deploy_alias(), progress).await?;
 
         let result = lambda_client
             .publish_version()
@@ -331,6 +333,7 @@ async fn update_function_config(
     conf: FunctionConfiguration,
 ) -> Result<String> {
     let function_arn = conf.function_arn.as_ref().expect("missing function arn");
+    let alias = config.deploy_alias();
 
     let mut wait_for_readiness = false;
     if conf.state.is_none() || conf.state == Some(State::Pending) {
@@ -343,7 +346,7 @@ async fn update_function_config(
         wait_for_readiness = true;
     }
     if wait_for_readiness {
-        wait_for_ready_state(client, name, &config.remote_config.alias, progress).await?;
+        wait_for_ready_state(client, name, &alias, progress).await?;
         progress.set_message("deploying function");
     }
 
@@ -422,7 +425,7 @@ async fn update_function_config(
             .wrap_err("failed to update function configuration")?;
 
         if result.last_update_status() == Some(&LastUpdateStatus::InProgress) {
-            wait_for_ready_state(client, name, &config.remote_config.alias, progress).await?;
+            wait_for_ready_state(client, name, &alias, progress).await?;
         }
         progress.set_message("deploying function");
     }
@@ -479,7 +482,7 @@ async fn update_function_code(
         .wrap_err("failed to update function code")?;
 
     if let Some(description) = &config.function_config.description {
-        wait_for_ready_state(lambda_client, name, &config.remote_config.alias, progress).await?;
+        wait_for_ready_state(lambda_client, name, &config.deploy_alias(), progress).await?;
         let result = lambda_client
             .publish_version()
             .function_name(name)

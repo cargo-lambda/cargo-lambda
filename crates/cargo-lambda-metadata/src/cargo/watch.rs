@@ -87,7 +87,7 @@ pub struct Watch {
     pub tls_options: TlsOptions,
 
     #[arg(skip)]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_empty_router")]
     pub router: Option<FunctionRouter>,
 }
 
@@ -252,6 +252,15 @@ impl FunctionRouter {
     pub fn insert(&mut self, path: &str, routes: FunctionRoutes) -> Result<(), InsertError> {
         self.inner.insert(path, routes)
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.raw.is_empty()
+    }
+}
+
+#[allow(dead_code)]
+fn is_empty_router(router: &Option<FunctionRouter>) -> bool {
+    router.is_none() || router.as_ref().is_some_and(|r| r.is_empty())
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
