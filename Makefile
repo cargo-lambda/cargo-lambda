@@ -1,4 +1,4 @@
-.PHONY: build build-release-tar build-release-zip check fmt install-local publish-all run-integration
+.PHONY: build build-release-tar build-release-zip check fmt install publish-all run-integration
 
 build:
 	cargo build
@@ -23,7 +23,7 @@ check:
 fmt:
 	cargo +nightly fmt --all
 
-install-local:
+install:
 	cargo install --path crates/cargo-lambda-cli
 
 publish-all:

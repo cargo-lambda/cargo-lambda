@@ -10,7 +10,7 @@ We use Cargo Clippy and Cargo Fmt to keep the project formatted and follow best 
 
 ## Building
 
-If you want to compile a release version for testing locally, you can run `make install-local`. This will compile your current project, and will put the `cargo-lambda` binary in `$CARGO_HOME/bin`.
+If you want to compile a release version for testing locally, you can run `make install`. This will compile your current project, and will put the `cargo-lambda` binary in `$CARGO_HOME/bin`.
 
 ## Testing
 

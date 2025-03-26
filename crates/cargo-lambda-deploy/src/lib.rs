@@ -59,7 +59,8 @@ pub async fn run(config: &Deploy, metadata: &CargoMetadata) -> Result<()> {
         .with_max_attempts(3)
         .with_initial_backoff(Duration::from_secs(5));
 
-    let sdk_config = config.remote_config.sdk_config(Some(retry)).await;
+    let remote_config = config.remote_config.clone().unwrap_or_default();
+    let sdk_config = remote_config.sdk_config(Some(retry)).await;
 
     let result = if config.dry {
         dry::DeployOutput::new(config, &name, &archive).map(DeployResult::Dry)

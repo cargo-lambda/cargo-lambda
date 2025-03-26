@@ -26,11 +26,15 @@ const DEFAULT_RUNTIME: &str = "provided.al2023";
 )]
 pub struct Deploy {
     #[command(flatten)]
-    #[serde(flatten)]
-    pub remote_config: RemoteConfig,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_config: Option<RemoteConfig>,
 
     #[command(flatten)]
-    #[serde(flatten)]
+    #[serde(
+        default,
+        flatten,
+        skip_serializing_if = "FunctionDeployConfig::is_empty"
+    )]
     pub function_config: FunctionDeployConfig,
 
     /// Directory where the lambda binaries are located
@@ -176,6 +180,10 @@ impl Deploy {
     pub fn publish_code_without_description(&self) -> bool {
         self.function_config.description.is_none()
     }
+
+    pub fn deploy_alias(&self) -> Option<String> {
+        self.remote_config.as_ref().and_then(|r| r.alias.clone())
+    }
 }
 
 impl Serialize for Deploy {
@@ -199,7 +207,7 @@ impl Serialize for Deploy {
             + self.include.is_some() as usize
             + self.dry as usize
             + self.name.is_some() as usize
-            + self.remote_config.count_fields()
+            + self.remote_config.as_ref().map_or(0, |r| r.count_fields())
             + self.function_config.count_fields();
 
         let mut state = serializer.serialize_struct("Deploy", len)?;
@@ -247,7 +255,9 @@ impl Serialize for Deploy {
             state.serialize_field("name", name)?;
         }
 
-        self.remote_config.serialize_fields::<S>(&mut state)?;
+        if let Some(ref remote_config) = self.remote_config {
+            remote_config.serialize_fields::<S>(&mut state)?;
+        }
         self.function_config.serialize_fields::<S>(&mut state)?;
 
         state.end()
@@ -297,7 +307,7 @@ pub struct FunctionDeployConfig {
     pub timeout: Option<Timeout>,
 
     #[command(flatten)]
-    #[serde(flatten)]
+    #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
     pub env_options: Option<EnvOptions>,
 
     /// Tracing mode with X-Ray
@@ -320,7 +330,7 @@ pub struct FunctionDeployConfig {
     pub layer: Option<Vec<String>>,
 
     #[command(flatten)]
-    #[serde(flatten)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vpc: Option<VpcConfig>,
 
     /// Choose a different Lambda runtime to deploy with.
@@ -346,6 +356,22 @@ fn default_runtime() -> String {
 }
 
 impl FunctionDeployConfig {
+    #[allow(dead_code)]
+    fn is_empty(&self) -> bool {
+        self.runtime.is_none()
+            && self.memory.is_none()
+            && self.timeout.is_none()
+            && self.env_options.is_none()
+            && self.tracing.is_none()
+            && self.role.is_none()
+            && self.vpc.is_none()
+            && self.description.is_none()
+            && self.log_retention.is_none()
+            && self.layer.is_none()
+            && !self.disable_function_url
+            && !self.enable_function_url
+    }
+
     pub fn runtime(&self) -> String {
         self.runtime.clone().unwrap_or_else(default_runtime)
     }

@@ -141,11 +141,12 @@ The deploy configuration is used to configure the deploy process for the Lambda 
 
 The deploy configuration supports the following options:
 
-- `profile`: The AWS profile to use for authorization.
-- `region`: The AWS region to deploy the Lambda function to.
-- `alias`: The AWS Lambda alias to associate the function to.
-- `retry_attempts`: The number of attempts to try failed operations.
-- `endpoint_url`: The custom endpoint URL to target.
+- `remote_config`: The remote configuration to use for the deploy. It includes the following options:
+    - `profile`: The AWS profile to use for authorization.
+    - `region`: The AWS region to deploy the Lambda function to.
+    - `alias`: The AWS Lambda alias to associate the function to.
+    - `retry_attempts`: The number of attempts to try failed operations.
+    - `endpoint_url`: The custom endpoint URL to target.
 - `enable_function_url`: Whether to enable function URL for this function.
 - `disable_function_url`: Whether to disable function URL for this function.
 - `memory`: The memory allocated for the function.
@@ -157,11 +158,14 @@ The deploy configuration supports the following options:
 - `role`: The IAM role associated with the function.
 - `layer`: The Lambda Layer ARN to associate the deployed function with.
 - `runtime`: The Lambda runtime to deploy the function with.
+- `description`: A description for the new function version.
+- `log_retention`: The retention policy for the function's log group.
 - `env_var`: The environment variables to set for the function.
 - `env_file`: The environment file to read the environment variables from.
-- `subnet_ids`: The subnet IDs to associate the deployed function with a VPC.
-- `security_group_ids`: The security group IDs to associate the deployed function.
-- `ipv6_allowed_for_dual_stack`: Whether to allow outbound IPv6 traffic on VPC functions that are connected to dual-stack subnets.
+- `vpc`: The VPC configuration to use for the function. It includes the following options:
+    - `subnet_ids`: The subnet IDs to associate the deployed function with a VPC.
+    - `security_group_ids`: The security group IDs to associate the deployed function.
+    - `ipv6_allowed_for_dual_stack`: Whether to allow outbound IPv6 traffic on VPC functions that are connected to dual-stack subnets.
 - `lambda_dir`: Directory where the lambda binaries are located.
 - `manifest_path`: Path to Cargo.toml.
 - `binary_name`: Name of the binary to deploy if it doesn't match the name that you want to deploy it with.
@@ -181,11 +185,13 @@ Example configuration:
 
 ```toml
 [deploy]
+s3_bucket = "my-s3-bucket"
+s3_key = "my-s3-key"
+
+[deploy.remote_config]
 profile = "my-aws-profile"
 region = "us-east-1"
 alias = "my-alias"
-s3_bucket = "my-s3-bucket"
-s3_key = "my-s3-key"
 ```
 
 ## Watch configuration
