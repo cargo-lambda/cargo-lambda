@@ -104,10 +104,14 @@ pub enum InstallOption {
     #[cfg(windows)]
     Choco,
     #[cfg(not(windows))]
+    Nix,
+    #[cfg(not(windows))]
     Npm,
     Pip3,
     #[cfg(windows)]
     Scoop,
+    #[cfg(windows)]
+    Winget,
 }
 
 impl serde::Serialize for InstallOption {
@@ -127,10 +131,14 @@ impl std::fmt::Display for InstallOption {
             #[cfg(windows)]
             InstallOption::Choco => write!(f, "Install with Chocolatey"),
             #[cfg(not(windows))]
+            InstallOption::Nix => write!(f, "Install with Nix"),
+            #[cfg(not(windows))]
             InstallOption::Npm => write!(f, "Install with NPM"),
             InstallOption::Pip3 => write!(f, "Install with Pip3 (Python 3)"),
             #[cfg(windows)]
             InstallOption::Scoop => write!(f, "Install with Scoop"),
+            #[cfg(windows)]
+            InstallOption::Winget => write!(f, "Install with Winget"),
         }
     }
 }
@@ -143,10 +151,14 @@ impl InstallOption {
             #[cfg(windows)]
             InstallOption::Choco => "choco install zig",
             #[cfg(not(windows))]
+            InstallOption::Nix => "nix-env -iA nixpkgs.zig",
+            #[cfg(not(windows))]
             InstallOption::Npm => "npm install -g @ziglang/cli",
             InstallOption::Pip3 => "pip3 install ziglang",
             #[cfg(windows)]
             InstallOption::Scoop => "scoop install zig",
+            #[cfg(windows)]
+            InstallOption::Winget => "winget install zig.zig",
         }
     }
 
@@ -180,18 +192,29 @@ pub fn install_options() -> Vec<InstallOption> {
         options.push(InstallOption::Choco);
     }
 
-    #[cfg(windows)]
-    if which::which("scoop").is_ok() {
-        options.push(InstallOption::Scoop);
-    }
-
-    if which::which("pip3").is_ok() {
-        options.push(InstallOption::Pip3);
+    #[cfg(not(windows))]
+    if which::which("nix-env").is_ok() {
+        options.push(InstallOption::Nix);
     }
 
     #[cfg(not(windows))]
     if which::which("npm").is_ok() {
         options.push(InstallOption::Npm);
     }
+
+    if which::which("pip3").is_ok() {
+        options.push(InstallOption::Pip3);
+    }
+
+    #[cfg(windows)]
+    if which::which("scoop").is_ok() {
+        options.push(InstallOption::Scoop);
+    }
+
+    #[cfg(windows)]
+    if which::which("winget").is_ok() {
+        options.push(InstallOption::Winget);
+    }
+
     options
 }
