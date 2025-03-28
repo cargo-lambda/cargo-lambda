@@ -13,7 +13,6 @@ use clap::{CommandFactory, Parser, Subcommand};
 use clap_cargo::style::CLAP_STYLING;
 use miette::{ErrorHook, IntoDiagnostic, Result, miette};
 use std::{boxed::Box, env, io::IsTerminal, path::PathBuf, str::FromStr};
-use strum_macros::EnumString;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
@@ -62,7 +61,7 @@ struct Lambda {
     version: bool,
 }
 
-#[derive(Clone, Debug, strum_macros::Display, EnumString)]
+#[derive(Clone, Debug, strum_macros::Display, strum_macros::EnumString)]
 #[strum(ascii_case_insensitive)]
 enum Color {
     Auto,
@@ -213,15 +212,13 @@ impl LambdaSubcommand {
         context: Option<String>,
         admerge: bool,
     ) -> Result<()> {
-        let metadata = load_metadata(system.manifest_path())?;
-
         let options = ConfigOptions {
             global,
             context,
             admerge,
             name: system.package(),
         };
-        cargo_lambda_system::run(&system, &metadata, &options).await
+        cargo_lambda_system::run(&system, &options).await
     }
 }
 

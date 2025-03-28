@@ -60,12 +60,14 @@ cargo binstall cargo-lambda
 
 ## Building from source
 
-You can install cargo-lambda on your host machine with Cargo itself. This method is not recommended because the binary will be compiled in your system, which we cannot always guarantee. Using a package manager, or pre-built binaries is always more encouraged to have a functional service and avoid installation issues.
+You can install Cargo Lambda on your host machine with from its source code repository. This method is not recommended because the binary will be compiled in your system, which we cannot always guarantee. Using a package manager, or pre-built binaries is always more encouraged to have a functional service and avoid installation issues. Cargo Lambda does not publish its source in crates.io anymore because we cannot guarantee the reproducibility of the build when using `cargo install`.
 
 ```sh
-cargo install --locked cargo-lambda
+git clone https://github.com/cargo-lambda/cargo-lambda && \
+  cd cargo-lambda && \
+  make install-release
 ```
 
 ::: warning
-cargo-install compiles the binary in your system, which usually takes more than 10 minutes. This method doesn't install [Zig](https://ziglang.org) either, which is a requirement if you want to cross compile packages from macOS or Windows to Lambda Linux environments.
+Cargo Install compiles the binary in your system, which usually takes more than 10 minutes. This method doesn't install [Zig](https://ziglang.org) either, which is a requirement if you want to cross compile packages from macOS or Windows to Lambda Linux environments.
 :::

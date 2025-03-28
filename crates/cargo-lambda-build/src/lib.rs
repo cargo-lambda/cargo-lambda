@@ -34,10 +34,7 @@ use target_arch::validate_linux_target;
 mod toolchain;
 use toolchain::rustup_cmd;
 
-mod zig;
-pub use zig::{
-    InstallOption, check_installation, install_options, install_zig, print_install_options,
-};
+pub mod zig;
 
 #[tracing::instrument(skip(build, metadata), target = "cargo_lambda")]
 pub async fn run(build: &mut Build, metadata: &CargoMetadata) -> Result<()> {

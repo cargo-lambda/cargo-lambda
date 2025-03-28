@@ -4,6 +4,18 @@ use cargo_lambda_interactive::{
 };
 use cargo_zigbuild::Zig;
 use miette::{IntoDiagnostic, Result};
+use serde::Serialize;
+use std::{path::PathBuf, process::Command};
+
+#[derive(Debug, Default, Serialize)]
+pub struct ZigInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    path: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    install_options: Option<Vec<InstallOption>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
+}
 
 /// Print information about the Zig installation.
 pub fn print_install_options(options: &[InstallOption]) {
@@ -19,12 +31,20 @@ pub fn print_install_options(options: &[InstallOption]) {
         }
     }
     println!(
-        "\t* Download Zig 0.9.1 or newer from https://ziglang.org/download/ and add it to your PATH"
+        "\t* Download Zig 0.13.0 or newer from https://ziglang.org/download/ and add it to your PATH"
     );
 }
 
 /// Install Zig using a choice prompt.
-pub async fn install_zig(options: Vec<InstallOption>) -> Result<()> {
+pub async fn install_zig(options: Vec<InstallOption>, install_non_interactive: bool) -> Result<()> {
+    if install_non_interactive {
+        let Some(choice) = options.first().cloned() else {
+            return Err(BuildError::ZigMissing.into());
+        };
+
+        return choice.install().await;
+    }
+
     let choice = choose_option(
         "Zig is not installed in your system.\nHow do you want to install Zig?",
         options,
@@ -36,22 +56,48 @@ pub async fn install_zig(options: Vec<InstallOption>) -> Result<()> {
     }
 }
 
-pub async fn check_installation() -> Result<()> {
-    if Zig::find_zig().is_ok() {
-        return Ok(());
+pub async fn check_installation(install_non_interactive: bool) -> Result<ZigInfo> {
+    let zig_info = get_zig_info();
+    if zig_info.is_ok() {
+        return zig_info;
     }
 
     let options = install_options();
-
-    if !is_stdin_tty() || options.is_empty() {
-        print_install_options(&options);
-        return Err(BuildError::ZigMissing.into());
+    if !options.is_empty() && (is_stdin_tty() || install_non_interactive) {
+        install_zig(options, install_non_interactive).await?;
+        return get_zig_info();
     }
 
-    install_zig(options).await
+    print_install_options(&options);
+    Err(BuildError::ZigMissing.into())
 }
 
-#[derive(Debug)]
+pub fn get_zig_info() -> Result<ZigInfo> {
+    let Ok((path, run_modifiers)) = Zig::find_zig() else {
+        let options = install_options();
+        return Ok(ZigInfo {
+            install_options: Some(options),
+            ..Default::default()
+        });
+    };
+
+    let mut cmd = Command::new(&path);
+    cmd.args(&run_modifiers);
+    cmd.arg("version");
+    let output = cmd.output().into_diagnostic()?;
+    let version = String::from_utf8(output.stdout)
+        .into_diagnostic()?
+        .trim()
+        .to_string();
+
+    Ok(ZigInfo {
+        path: Some(path),
+        version: Some(version),
+        ..Default::default()
+    })
+}
+
+#[derive(Clone, Debug)]
 pub enum InstallOption {
     #[cfg(not(windows))]
     Brew,

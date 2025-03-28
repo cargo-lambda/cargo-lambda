@@ -1,7 +1,10 @@
-.PHONY: build build-release-tar build-release-zip check fmt install publish-all run-integration
+.PHONY: build build-release build-release-tar build-release-zip check fmt install install-release publish-all run-integration
 
 build:
-	cargo build
+	cargo build --features=skip-build-banner
+
+build-release:
+	cargo build --release --features=skip-build-banner
 
 build-release-tar:
 	cd $(target)-$(tag)-bin && \
@@ -24,7 +27,10 @@ fmt:
 	cargo +nightly fmt --all
 
 install:
-	cargo install --path crates/cargo-lambda-cli
+	cargo install --path crates/cargo-lambda-cli --features=skip-build-banner
+
+install-release:
+	cargo install --release --path crates/cargo-lambda-cli --features=skip-build-banner
 
 publish-all:
 	cargo publish --package cargo-lambda-interactive

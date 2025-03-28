@@ -4,6 +4,9 @@ const fs = require('fs');
 const meta = toml.parse(fs.readFileSync('../Cargo.toml', 'utf-8'));
 const version = meta['workspace']['package']['version'];
 
+fs.mkdirSync('public', { recursive: true });
+fs.writeFileSync('public/latest-version.json', JSON.stringify({ latest: version }));
+
 export default {
     lang: 'en-US',
     title: 'Cargo Lambda',
