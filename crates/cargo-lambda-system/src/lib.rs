@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use cargo_lambda_metadata::{
-    cargo::CargoMetadata,
+    cargo::load_metadata,
     config::{
         Config, ConfigOptions, general_config_figment, get_config_from_all_packages,
         load_config_without_cli_flags,
@@ -10,8 +10,7 @@ use cargo_lambda_metadata::{
 use clap::Args;
 use miette::{IntoDiagnostic, Result};
 
-use cargo_lambda_build::{InstallOption, Zig, install_options, install_zig, print_install_options};
-use cargo_lambda_interactive::is_stdin_tty;
+use cargo_lambda_build::zig::{ZigInfo, check_installation, get_zig_info};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
 use tracing::trace;
@@ -60,14 +59,6 @@ impl System {
     }
 }
 
-#[derive(Debug, Default, Serialize)]
-struct ZigInfo {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    path: Option<PathBuf>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    install_options: Option<Vec<InstallOption>>,
-}
-
 #[derive(Debug, Serialize)]
 struct Info {
     zig: ZigInfo,
@@ -86,27 +77,25 @@ enum ConfigInfo {
 }
 
 #[tracing::instrument(target = "cargo_lambda")]
-pub async fn run(config: &System, metadata: &CargoMetadata, options: &ConfigOptions) -> Result<()> {
+pub async fn run(config: &System, options: &ConfigOptions) -> Result<()> {
     trace!("running config command");
 
     if config.setup {
-        let options = install_options();
-        if is_stdin_tty() {
-            install_zig(options).await?;
-        } else {
-            print_install_options(&options);
+        let zig_info = check_installation(true).await;
+        if let Ok(zig_info) = zig_info {
+            return print_config(config.output_format.as_ref(), zig_info);
         }
-
-        return Ok(());
     }
 
+    let metadata = load_metadata(config.manifest_path())?;
+
     let config_info = if options.name.is_some() || metadata.packages.len() == 1 {
-        let config = load_config_without_cli_flags(metadata, options)?;
+        let config = load_config_without_cli_flags(&metadata, options)?;
         ConfigInfo::Package(config)
     } else {
-        let (_, _, workspace) = general_config_figment(metadata, options)?;
+        let (_, _, workspace) = general_config_figment(&metadata, options)?;
 
-        let packages = get_config_from_all_packages(metadata)?;
+        let packages = get_config_from_all_packages(&metadata)?;
 
         ConfigInfo::Global {
             workspace: workspace.extract().into_diagnostic()?,
@@ -114,32 +103,21 @@ pub async fn run(config: &System, metadata: &CargoMetadata, options: &ConfigOpti
         }
     };
 
-    let zig_info = if let Ok((path, _)) = Zig::find_zig() {
-        ZigInfo {
-            path: Some(path),
-            install_options: None,
-        }
-    } else {
-        let options = install_options();
-        ZigInfo {
-            path: None,
-            install_options: Some(options),
-        }
-    };
-
     let info = Info {
-        zig: zig_info,
+        zig: get_zig_info()?,
         config: config_info,
     };
 
-    match config.output_format {
-        Some(OutputFormat::Json) => {
-            serde_json::to_writer_pretty(std::io::stdout(), &info).into_diagnostic()?;
-        }
-        _ => {
-            serde_yml::to_writer(std::io::stdout(), &info).into_diagnostic()?;
-        }
-    }
+    print_config(config.output_format.as_ref(), info)?;
 
     Ok(())
+}
+
+fn print_config(format: Option<&OutputFormat>, info: impl Serialize) -> Result<()> {
+    match format {
+        Some(OutputFormat::Json) => {
+            serde_json::to_writer_pretty(std::io::stdout(), &info).into_diagnostic()
+        }
+        _ => serde_yml::to_writer(std::io::stdout(), &info).into_diagnostic(),
+    }
 }

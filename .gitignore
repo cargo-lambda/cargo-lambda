@@ -9,4 +9,5 @@ node_modules
 test/integration
 .DS_Store
 docs/.vitepress/cache
+docs/public/latest-version.json
 .idea

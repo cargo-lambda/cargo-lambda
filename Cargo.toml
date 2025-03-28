@@ -94,3 +94,6 @@ zip = { version = "2", features = ["bzip2", "chrono", "deflate"] }
 strip = "symbols"
 codegen-units = 1
 lto = true
+
+[profile.dev.build-override]
+opt-level = 3

@@ -267,7 +267,7 @@ mod tests {
     use super::*;
     use crate::{
         cargo::{build::CompilerOptions, load_metadata},
-        lambda::{Memory, Tracing},
+        lambda::Tracing,
         tests::fixture_metadata,
     };
 

@@ -19,17 +19,13 @@ cargo-lambda-metadata.workspace = true
 cargo-lambda-new.workspace = true
 cargo-lambda-system.workspace = true
 cargo-lambda-watch.workspace = true
-cargo_metadata.workspace = true
 clap = { workspace = true, features = ["suggestions"] }
 clap-cargo = "0.12.0"
-figment.workspace = true
 miette = { workspace = true, features = ["fancy"] }
-serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [build-dependencies]
@@ -45,6 +41,9 @@ url = "2.5.0"
 uuid.workspace = true
 walkdir = "2.4.0"
 zip.workspace = true
+
+[features]
+skip-build-banner = []
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/v{ version }/cargo-lambda-v{ version }.{ target }.tar.gz"
