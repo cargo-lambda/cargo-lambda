@@ -323,7 +323,7 @@ Each route is a key-value pair where the key is the path and the value is either
 This configuration is applied to all functions in your workspace.
 
 ```toml
-[package.metadata.lambda.watch.router]
+[workspace.metadata.lambda.watch.router]
 "/get-product/{id}" = "get-product"
 "/add-product" = "add-product"
 "/users" = [
