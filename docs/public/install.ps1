@@ -43,7 +43,7 @@ Remove-Item $CargoLambdaZip
 
 Write-Output "Cargo Lambda was installed successfully to ${BinDir}"
 
-Write-Output "Installing Zig"
+Write-Output "Checking Zig installation"
 $BinDir\cargo-lambda lambda system --install-zig
 
 Write-Output "Installation complete! Run 'cargo lambda --help' to get started"
