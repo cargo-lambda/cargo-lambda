@@ -32,10 +32,10 @@ jobs:
         uses: actions/configure-pages@v1
       - uses: pnpm/action-setup@v2
         with:
-          version: 6.32.9
+          version: 10.7.0
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 22
           cache: 'pnpm'
           cache-dependency-path: docs/pnpm-lock.yaml
       - name: Build docs
