@@ -110,7 +110,7 @@ download_and_install() {
 
   ohai "Cargo Lambda was installed successfully to ${CARGO_HOME}/bin"
 
-  ohai "Installing Zig"
+  ohai "Checking Zig installation"
   $CARGO_HOME/bin/cargo-lambda lambda system --install-zig
 
   ohai "Installation complete! Run 'cargo lambda --help' to get started"
