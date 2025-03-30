@@ -21,7 +21,7 @@ $CargoLambdaExe = "$BinDir\cargo-lambda.exe"
 $Target = 'x86_64-pc-windows-msvc'
 
 $Version = if (!$Version) {
-  $LatestVersion = $curl.exe --ssl-revoke-best-effort -s "https://get.cargo-lambda.info/latest-version.json"
+  $LatestVersion = $curl.exe --ssl-revoke-best-effort -s "https://www.cargo-lambda.info/latest-version.json"
   $LatestVersion | ConvertFrom-Json | Select-Object -ExpandProperty latest
 } else {
   $Version

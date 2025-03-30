@@ -82,7 +82,7 @@ download_and_install() {
   esac
 
   if [ -z "${CARGO_LAMBDA_VERSION}" ]; then
-    version_json="$(download "https://get.cargo-lambda.info/latest-version.json")" || abort "Download Error!"
+    version_json="$(download "https://www.cargo-lambda.info/latest-version.json")" || abort "Download Error!"
     version="$(echo "$version_json" | grep -o '"latest":[[:space:]]*"[0-9.]*"' | grep -o '[0-9.]*')"
   else
     version="${CARGO_LAMBDA_VERSION}"
