@@ -29,6 +29,7 @@ download() {
 }
 
 expand() {
+  mkdir -p "$2"
   if [ "${platform}" = "windows-x64" ]; then
     unzip "$1" -d "$2"
   else
