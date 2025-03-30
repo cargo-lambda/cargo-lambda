@@ -62,7 +62,8 @@ impl System {
 #[derive(Debug, Serialize)]
 struct Info {
     zig: ZigInfo,
-    config: ConfigInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    config: Option<ConfigInfo>,
 }
 
 #[derive(Debug, Serialize)]
@@ -87,30 +88,33 @@ pub async fn run(config: &System, options: &ConfigOptions) -> Result<()> {
         }
     }
 
-    let metadata = load_metadata(config.manifest_path())?;
-
-    let config_info = if options.name.is_some() || metadata.packages.len() == 1 {
-        let config = load_config_without_cli_flags(&metadata, options)?;
-        ConfigInfo::Package(config)
-    } else {
-        let (_, _, workspace) = general_config_figment(&metadata, options)?;
-
-        let packages = get_config_from_all_packages(&metadata)?;
-
-        ConfigInfo::Global {
-            workspace: workspace.extract().into_diagnostic()?,
-            packages,
-        }
-    };
-
-    let info = Info {
+    let mut info = Info {
         zig: get_zig_info()?,
-        config: config_info,
+        config: None,
     };
+    let manifest_path = config.manifest_path();
 
-    print_config(config.output_format.as_ref(), info)?;
+    if manifest_path.exists() {
+        let metadata = load_metadata(manifest_path)?;
 
-    Ok(())
+        let config_info = if options.name.is_some() || metadata.packages.len() == 1 {
+            let config = load_config_without_cli_flags(&metadata, options)?;
+            ConfigInfo::Package(config)
+        } else {
+            let (_, _, workspace) = general_config_figment(&metadata, options)?;
+
+            let packages = get_config_from_all_packages(&metadata)?;
+
+            ConfigInfo::Global {
+                workspace: workspace.extract().into_diagnostic()?,
+                packages,
+            }
+        };
+
+        info.config = Some(config_info);
+    }
+
+    print_config(config.output_format.as_ref(), info)
 }
 
 fn print_config(format: Option<&OutputFormat>, info: impl Serialize) -> Result<()> {
