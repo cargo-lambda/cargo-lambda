@@ -16,7 +16,7 @@ impl CargoZigbuild {
         skip_target_check: bool,
     ) -> Result<Command> {
         tracing::debug!("compiling with CargoZigbuild");
-        crate::zig::check_installation(false).await?;
+        crate::zig::check_installation().await?;
 
         // confirm that target component is included in host toolchain, or add
         // it with `rustup` otherwise.
