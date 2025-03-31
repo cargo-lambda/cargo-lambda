@@ -19,36 +19,18 @@ pub struct ZigInfo {
 
 /// Print information about the Zig installation.
 pub fn print_install_options(options: &[InstallOption]) {
-    println!("Zig is not installed in your system.");
-    if is_stdin_tty() {
-        println!("Run `cargo lambda system --install-zig` to install Zig.")
-    }
-
-    if !options.is_empty() {
-        println!("You can use any of the following options to install it:");
-        for option in options {
-            println!("\t* {}: `{}`", option, option.usage());
-        }
+    println!("You can use any of the following options to install it:");
+    for option in options {
+        println!("\t* {}: `{}`", option, option.usage());
     }
     println!(
-        "\t* Download Zig 0.13.0 or newer from https://ziglang.org/download/ and add it to your PATH"
+        "Or download Zig 0.13.0 or newer from https://ziglang.org/download/ and add it to your PATH"
     );
 }
 
 /// Install Zig using a choice prompt.
-pub async fn install_zig(options: Vec<InstallOption>, install_non_interactive: bool) -> Result<()> {
-    if install_non_interactive {
-        let Some(choice) = options.first().cloned() else {
-            return Err(BuildError::ZigMissing.into());
-        };
-
-        return choice.install().await;
-    }
-
-    let choice = choose_option(
-        "Zig is not installed in your system.\nHow do you want to install Zig?",
-        options,
-    );
+pub async fn install_zig_interactive(options: Vec<InstallOption>) -> Result<()> {
+    let choice = choose_option("Pick an option to install it:", options);
 
     match choice {
         Ok(choice) => choice.install().await.map(|_| ()),
@@ -56,20 +38,34 @@ pub async fn install_zig(options: Vec<InstallOption>, install_non_interactive: b
     }
 }
 
-pub async fn check_installation(install_non_interactive: bool) -> Result<ZigInfo> {
-    let zig_info = get_zig_info();
-    if zig_info.is_ok() {
-        return zig_info;
+pub async fn check_installation() -> Result<ZigInfo> {
+    if let Ok((path, run_modifiers)) = Zig::find_zig() {
+        return get_zig_version(path, run_modifiers);
     }
 
+    println!("Zig is not installed in your system.");
     let options = install_options();
-    if !options.is_empty() && (is_stdin_tty() || install_non_interactive) {
-        install_zig(options, install_non_interactive).await?;
-        return get_zig_info();
+    if options.is_empty() {
+        println!(
+            "Download Zig 0.13.0 or newer from https://ziglang.org/download/ and add it to your PATH"
+        );
+        return Err(BuildError::ZigMissing.into());
     }
 
-    print_install_options(&options);
-    Err(BuildError::ZigMissing.into())
+    if options.len() == 1 {
+        let Some(choice) = options.first().cloned() else {
+            return Err(BuildError::ZigMissing.into());
+        };
+
+        choice.install().await?;
+        get_zig_info()
+    } else if is_stdin_tty() {
+        install_zig_interactive(options).await?;
+        get_zig_info()
+    } else {
+        print_install_options(&options);
+        Err(BuildError::ZigMissing.into())
+    }
 }
 
 pub fn get_zig_info() -> Result<ZigInfo> {
@@ -81,6 +77,13 @@ pub fn get_zig_info() -> Result<ZigInfo> {
         });
     };
 
+    get_zig_version(path, run_modifiers)
+}
+
+fn get_zig_version(
+    path: PathBuf,
+    run_modifiers: Vec<String>,
+) -> std::result::Result<ZigInfo, miette::Error> {
     let mut cmd = Command::new(&path);
     cmd.args(&run_modifiers);
     cmd.arg("version");

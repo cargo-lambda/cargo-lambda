@@ -49,7 +49,7 @@ nix-env -iA nixpkgs.cargo-lambda
 You can also download any Cargo Lambda binary from the [Release page](https://github.com/cargo-lambda/cargo-lambda/releases).
 
 ::: warning
-When you download a binary directly, [Zig](https://ziglang.org) won't be installed for you.
+When you download a binary directly, [Zig](https://ziglang.org) won't be installed for you. You can run `cargo lambda system --install-zig` to get a list of possible installers for your system.
 :::
 
 You can use a tool like [Cargo Binstall](https://github.com/cargo-bins/cargo-binstall) to automatically download a binary package from GitHub:

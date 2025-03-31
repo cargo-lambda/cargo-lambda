@@ -82,7 +82,7 @@ pub async fn run(config: &System, options: &ConfigOptions) -> Result<()> {
     trace!("running config command");
 
     if config.setup {
-        let zig_info = check_installation(true).await;
+        let zig_info = check_installation().await;
         if let Ok(zig_info) = zig_info {
             return print_config(config.output_format.as_ref(), zig_info);
         }
