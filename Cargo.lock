@@ -1353,6 +1353,7 @@ dependencies = [
  "is-terminal",
  "miette 5.10.0",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

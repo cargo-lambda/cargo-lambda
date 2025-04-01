@@ -17,3 +17,4 @@ inquire = "0.5.2"
 is-terminal = "0.4.0"
 miette.workspace = true
 tokio = { workspace = true, features = ["process"] }
+tracing.workspace = true
