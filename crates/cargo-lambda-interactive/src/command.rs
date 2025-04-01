@@ -1,6 +1,9 @@
-use miette::{IntoDiagnostic, Result, WrapErr};
+use miette::{Diagnostic, Result};
 use std::process::Stdio;
-use tokio::process::Command;
+use tokio::{
+    io::AsyncReadExt,
+    process::{Child, Command},
+};
 
 #[cfg(target_os = "windows")]
 pub fn new_command(cmd: &str) -> Command {
@@ -16,19 +19,86 @@ pub fn new_command(cmd: &str) -> Command {
 }
 
 /// Run a command without producing any output in STDOUT and STDERR
-pub async fn silent_command(cmd: &str, args: &[&str]) -> Result<()> {
-    let mut child = new_command(cmd)
+pub async fn silent_command(cmd: &str, args: &[&str]) -> Result<(), CommandError> {
+    let child = new_command(cmd)
         .args(args)
-        .stderr(Stdio::null())
-        .stdout(Stdio::null())
-        .spawn()
-        .into_diagnostic()
-        .wrap_err_with(|| format!("Failed to run `{} {}`", cmd, args.join(" ")))?;
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn();
+    let Ok(mut child) = child else {
+        return Err(capture_error(cmd, args, None, Some(child.err().unwrap())).await);
+    };
 
-    child
-        .wait()
-        .await
-        .into_diagnostic()
-        .wrap_err_with(|| format!("Failed to wait on {cmd} process"))
-        .map(|_| ())
+    let result = child.wait().await;
+    let Ok(result) = result else {
+        return Err(capture_error(cmd, args, Some(&mut child), None).await);
+    };
+
+    if result.success() {
+        Ok(())
+    } else {
+        Err(capture_error(cmd, args, Some(&mut child), None).await)
+    }
 }
+
+async fn capture_error(
+    cmd: &str,
+    args: &[&str],
+    child: Option<&mut Child>,
+    error: Option<std::io::Error>,
+) -> CommandError {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+
+    if let Some(child) = child {
+        let mut reader = child.stdout.take().expect("stdout is not captured");
+        reader
+            .read_to_end(&mut stdout)
+            .await
+            .expect("Failed to read stdout");
+
+        let mut reader = child.stderr.take().expect("stderr is not captured");
+        reader
+            .read_to_end(&mut stderr)
+            .await
+            .expect("Failed to read stderr");
+    }
+
+    CommandError {
+        command: format!("{} {}", cmd, args.join(" ")),
+        stdout,
+        stderr,
+        error,
+    }
+}
+
+#[derive(Debug, Default, Diagnostic)]
+#[diagnostic(code(command_error))]
+pub struct CommandError {
+    command: String,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+    error: Option<std::io::Error>,
+}
+
+impl std::fmt::Display for CommandError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Command `{}` failed", self.command)?;
+
+        if let Some(error) = &self.error {
+            write!(f, ": {}", error)?;
+        }
+
+        if !self.stdout.is_empty() {
+            write!(f, "\nSTDOUT:\n{}", String::from_utf8_lossy(&self.stdout))?;
+        }
+
+        if !self.stderr.is_empty() {
+            write!(f, "\nSTDERR:\n{}", String::from_utf8_lossy(&self.stderr))?;
+        }
+
+        Ok(())
+    }
+}
+
+impl std::error::Error for CommandError {}
