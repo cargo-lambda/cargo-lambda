@@ -171,14 +171,16 @@ impl InstallOption {
         let usage = usage.as_slice();
         let result = silent_command(usage[0], &usage[1..usage.len()]).await;
 
-        let finish = if result.is_ok() {
-            "Zig installed"
-        } else {
-            "Failed to install Zig"
-        };
-        pb.finish(finish);
-
-        result
+        match result {
+            Ok(_) => {
+                pb.finish("Zig installed");
+                Ok(())
+            }
+            Err(err) => {
+                pb.finish("Zig installation failed");
+                Err(err).into_diagnostic()
+            }
+        }
     }
 }
 

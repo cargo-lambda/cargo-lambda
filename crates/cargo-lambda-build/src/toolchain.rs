@@ -72,7 +72,7 @@ async fn install_target_component(component: &str, toolchain: &str) -> Result<()
         "installing target component"
     );
 
-    silent_command(&cmd, &args).await
+    silent_command(&cmd, &args).await.into_diagnostic()
 }
 
 pub(crate) fn rustup_cmd() -> String {
