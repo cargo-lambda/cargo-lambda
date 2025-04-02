@@ -341,7 +341,7 @@ fn error_hook(color: Option<&Color>) -> ErrorHook {
     Box::new(move |_| {
         Box::new(miette::MietteHandlerOpts::new()
             .terminal_links(true)
-            .footer("Was this error unexpected?\nOpen an issue in https://github.com/cargo-lambda/cargo-lambda/issues".into())
+            .footer("Was this behavior unexpected?\nStart a thread in https://github.com/cargo-lambda/cargo-lambda/discussions".into())
             .color(ansi)
             .build())
     })

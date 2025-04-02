@@ -34,6 +34,8 @@ pub async fn silent_command(cmd: &str, args: &[&str]) -> Result<(), CommandError
         return Err(capture_error(cmd, args, Some(&mut child), None).await);
     };
 
+    tracing::trace!(%result);
+
     if result.success() {
         Ok(())
     } else {
@@ -90,11 +92,11 @@ impl std::fmt::Display for CommandError {
         }
 
         if !self.stdout.is_empty() {
-            write!(f, "\nSTDOUT:\n{}", String::from_utf8_lossy(&self.stdout))?;
+            write!(f, "\n{}", String::from_utf8_lossy(&self.stdout))?;
         }
 
         if !self.stderr.is_empty() {
-            write!(f, "\nSTDERR:\n{}", String::from_utf8_lossy(&self.stderr))?;
+            write!(f, "\n{}", String::from_utf8_lossy(&self.stderr))?;
         }
 
         Ok(())

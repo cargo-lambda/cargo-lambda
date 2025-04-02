@@ -64,6 +64,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Configure cache
         uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.31.x'
 
       - name: Build
         uses: messense/maturin-action@v1
