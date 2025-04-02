@@ -10,7 +10,7 @@ use std::{path::PathBuf, process::Command};
 #[derive(Debug, Default, Serialize)]
 pub struct ZigInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    path: Option<PathBuf>,
+    command: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     install_options: Option<Vec<InstallOption>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -93,8 +93,14 @@ fn get_zig_version(
         .trim()
         .to_string();
 
+    let mut command = format!("{}", path.display());
+    if !run_modifiers.is_empty() {
+        command.push(' ');
+        command.push_str(&run_modifiers.join(" "));
+    };
+
     Ok(ZigInfo {
-        path: Some(path),
+        command: Some(command),
         version: Some(version),
         ..Default::default()
     })
