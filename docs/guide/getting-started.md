@@ -11,32 +11,30 @@ This section will help you build a Rust function for AWS Lambda from scratch. If
 <ClientOnly>
 <SystemMessage>
 <template v-slot:win>
-You can use <a href="https://scoop.sh/">Scoop</a> to install Cargo Lambda on Windows. Run the following commands to add our bucket, and install it:
+You can use <a href="https://learn.microsoft.com/en-us/windows/package-manager/">WinGet</a> to install Cargo Lambda on Windows. Run the following command:
 
 ```sh
-scoop bucket add cargo-lambda https://github.com/cargo-lambda/scoop-cargo-lambda
-scoop install cargo-lambda/cargo-lambda
+winget install CargoLambda.CargoLambda
 ```
 </template>
 <template v-slot:mac>
-You can use <a href="https://brew.sh/">Homebrew</a> to install Cargo Lambda on macOS and Linux. Run the following commands on your terminal to add our tap, and install it:
+You can use <a href="https://brew.sh/">Homebrew</a> to install Cargo Lambda on macOS and Linux. Run the following command on your terminal install it:
 
 ```sh
-brew tap cargo-lambda/cargo-lambda
-brew install cargo-lambda
+brew install cargo-lambda/tap/cargo-lambda
 ```
 </template>
 <template v-slot:linux>
-You can use <a href="https://pypi.org/">PyPI</a> to install Cargo Lambda on Linux:
+You can use <a href="https://curl.se/">Curl</a> to install Cargo Lambda on Linux:
 
 ```sh
-pip3 install cargo-lambda
+curl -fsSL https://cargo-lambda.info/install.sh | sh
 ```
 </template>
 </SystemMessage>
 </ClientOnly>
 
-See all the ways that you can [install Cargo Lambda](/guide/installation) in your system.
+See all the ways that you can [install Cargo Lambda](/guide/installation) in your system if you need other options.
 
 ## Step 2: Create a new project
 
