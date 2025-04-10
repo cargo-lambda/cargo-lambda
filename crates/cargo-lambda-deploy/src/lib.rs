@@ -63,7 +63,7 @@ pub async fn run(config: &Deploy, metadata: &CargoMetadata) -> Result<()> {
     let sdk_config = remote_config.sdk_config(Some(retry)).await;
 
     let result = if config.dry {
-        dry::DeployOutput::new(config, &name, &archive).map(DeployResult::Dry)
+        dry::DeployOutput::new(config, &name, &sdk_config, &archive).map(DeployResult::Dry)
     } else if config.extension {
         extensions::deploy(config, &name, &sdk_config, &archive, &progress)
             .await

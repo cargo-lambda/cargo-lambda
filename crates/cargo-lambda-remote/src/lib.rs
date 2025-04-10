@@ -10,7 +10,7 @@ use clap::Args;
 use serde::{Deserialize, Serialize, ser::SerializeStruct};
 pub mod tls;
 
-const DEFAULT_REGION: &str = "us-east-1";
+pub const DEFAULT_REGION: &str = "us-east-1";
 
 #[derive(Args, Clone, Debug, Default, Deserialize, Serialize)]
 pub struct RemoteConfig {

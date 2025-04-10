@@ -207,7 +207,7 @@ impl Serialize for Deploy {
             + self.include.is_some() as usize
             + self.dry as usize
             + self.name.is_some() as usize
-            + self.remote_config.as_ref().map_or(0, |r| r.count_fields())
+            + self.remote_config.is_some() as usize
             + self.function_config.count_fields();
 
         let mut state = serializer.serialize_struct("Deploy", len)?;
@@ -254,9 +254,8 @@ impl Serialize for Deploy {
         if let Some(ref name) = self.name {
             state.serialize_field("name", name)?;
         }
-
         if let Some(ref remote_config) = self.remote_config {
-            remote_config.serialize_fields::<S>(&mut state)?;
+            state.serialize_field("remote_config", remote_config)?;
         }
         self.function_config.serialize_fields::<S>(&mut state)?;
 
@@ -397,7 +396,7 @@ impl FunctionDeployConfig {
             + self.runtime.is_some() as usize
             + self.description.is_some() as usize
             + self.log_retention.is_some() as usize
-            + self.vpc.as_ref().map_or(0, |vpc| vpc.count_fields())
+            + self.vpc.is_some() as usize
             + self
                 .env_options
                 .as_ref()
@@ -454,7 +453,7 @@ impl FunctionDeployConfig {
         }
 
         if let Some(vpc) = &self.vpc {
-            vpc.serialize_fields::<S>(state)?;
+            state.serialize_field("vpc", vpc)?;
         }
 
         if let Some(env_options) = &self.env_options {
@@ -469,12 +468,12 @@ impl FunctionDeployConfig {
 pub struct VpcConfig {
     /// Subnet IDs to associate the deployed function with a VPC
     #[arg(long, value_delimiter = ',')]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subnet_ids: Option<Vec<String>>,
 
     /// Security Group IDs to associate the deployed function
     #[arg(long, value_delimiter = ',')]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub security_group_ids: Option<Vec<String>>,
 
     /// Allow outbound IPv6 traffic on VPC functions that are connected to dual-stack subnets
@@ -488,32 +487,6 @@ fn is_false(b: &bool) -> bool {
 }
 
 impl VpcConfig {
-    fn count_fields(&self) -> usize {
-        self.subnet_ids.is_some() as usize
-            + self.security_group_ids.is_some() as usize
-            + self.ipv6_allowed_for_dual_stack as usize
-    }
-
-    fn serialize_fields<S>(
-        &self,
-        state: &mut <S as serde::Serializer>::SerializeStruct,
-    ) -> Result<(), S::Error>
-    where
-        S: serde::Serializer,
-    {
-        if let Some(subnet_ids) = &self.subnet_ids {
-            state.serialize_field("subnet_ids", &subnet_ids)?;
-        }
-        if let Some(security_group_ids) = &self.security_group_ids {
-            state.serialize_field("security_group_ids", &security_group_ids)?;
-        }
-        state.serialize_field(
-            "ipv6_allowed_for_dual_stack",
-            &self.ipv6_allowed_for_dual_stack,
-        )?;
-        Ok(())
-    }
-
     pub fn should_update(&self) -> bool {
         let Ok(val) = serde_json::to_value(self) else {
             return false;
