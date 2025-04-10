@@ -731,3 +731,60 @@ fn test_deploy_with_memory_and_timeout_cli_flags() {
         assert_eq!(json_data["config"]["timeout"].as_i64().unwrap(), 60);
     }
 }
+
+#[test]
+fn test_deploy_with_sdk_and_vpc_cli_flags() {
+    let _guard = init_root();
+    let lp = cargo_lambda_new("test-http-function", "function-template");
+
+    lp.new_cmd().arg("--http").arg(&lp.name).assert().success();
+    let project = lp.test_project();
+
+    cargo_lambda_build(project.root()).assert().success();
+
+    let bin = project.lambda_function_bin(&lp.name);
+    assert!(bin.exists(), "{:?} doesn't exist", bin);
+
+    #[cfg(not(windows))]
+    {
+        let output = cargo_lambda_dry_deploy(project.root())
+            .args(["--region", "eu-west-1"])
+            .args(["--profile", "test-profile"])
+            .args(["--endpoint-url", "https://test.endpoint.com"])
+            .args(["--subnet-ids", "subnet-1234567890"])
+            .args(["--security-group-ids", "sg-1234567890"])
+            .arg("--ipv6-allowed-for-dual-stack")
+            .assert()
+            .success();
+
+        let json_data = deploy_output_json(&output).unwrap();
+        assert_eq!(
+            json_data["sdk_config"]["region"].as_str().unwrap(),
+            "eu-west-1"
+        );
+        assert_eq!(
+            json_data["sdk_config"]["profile"].as_str().unwrap(),
+            "test-profile"
+        );
+        assert_eq!(
+            json_data["sdk_config"]["endpoint_url"].as_str().unwrap(),
+            "https://test.endpoint.com"
+        );
+
+        assert!(
+            json_data["config"]["vpc"]["ipv6_allowed_for_dual_stack"]
+                .as_bool()
+                .unwrap()
+        );
+
+        let subnet_ids = json_data["config"]["vpc"]["subnet_ids"].as_array().unwrap();
+        assert_eq!(subnet_ids.len(), 1);
+        assert_eq!(subnet_ids[0].as_str().unwrap(), "subnet-1234567890");
+
+        let security_group_ids = json_data["config"]["vpc"]["security_group_ids"]
+            .as_array()
+            .unwrap();
+        assert_eq!(security_group_ids.len(), 1);
+        assert_eq!(security_group_ids[0].as_str().unwrap(), "sg-1234567890");
+    }
+}
