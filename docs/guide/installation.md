@@ -2,30 +2,51 @@
 
 Cargo Lambda uses [Zig](https://ziglang.org) to link your functions for Linux systems. The installers below also install Zig for you if it's not in your system.
 
-## With Homebrew (macOS and Linux)
+## On Linux and MacOS
 
-You can use [Homebrew](https://brew.sh/) to install Cargo Lambda on macOS and Linux. Run the following commands on your terminal to add our tap, and install it:
+With [Homebrew](https://brew.sh/):
 
 ```sh
-brew tap cargo-lambda/cargo-lambda
-brew install cargo-lambda
+brew install cargo-lambda/tap/cargo-lambda
 ```
 
-## With Scoop (Windows)
+With [Curl](https://curl.se/):
 
-You can use [Scoop](https://scoop.sh/) to install Cargo Lambda on Windows. Run the following commands to add our bucket, and install it:
+```sh
+curl -fsSL https://cargo-lambda.info/install.sh | sh
+```
+
+With [PyPI](https://pypi.org/):
+
+```sh
+pip3 install cargo-lambda
+```
+
+With [Nix](https://nixos.org/manual/nix/stable/introduction.html):
+
+```sh
+nix-env -iA nixpkgs.cargo-lambda
+```
+
+## On Windows
+
+With [WinGet](https://learn.microsoft.com/en-us/windows/package-manager/):
+
+```sh
+winget install CargoLambda.CargoLambda
+```
+
+With [Scoop](https://scoop.sh/):
 
 ```sh
 scoop bucket add cargo-lambda https://github.com/cargo-lambda/scoop-cargo-lambda
 scoop install cargo-lambda/cargo-lambda
 ```
 
-## With PyPI
+With [PowerShell](https://learn.microsoft.com/en-us/powershell/):
 
-You can also use [PyPI](https://pypi.org/) to install Cargo Lambda on any system that has Python 3 installed:
-
-```sh
-pip3 install cargo-lambda
+```powershell
+irm https://cargo-lambda.info/install.ps1 | iex
 ```
 
 ## With Docker
@@ -34,14 +55,6 @@ You can run Cargo Lambda directly from our official Docker image:
 
 ```sh
 docker pull ghcr.io/cargo-lambda/cargo-lambda
-```
-
-## With Nix
-
-You can also use [Nix](https://nixos.org/manual/nix/stable/introduction.html) to install Cargo Lambda on any system that supports it:
-
-```sh
-nix-env -iA nixpkgs.cargo-lambda
 ```
 
 ## Binary releases
