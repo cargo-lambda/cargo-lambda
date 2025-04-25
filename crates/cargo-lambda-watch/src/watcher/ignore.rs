@@ -1,5 +1,10 @@
-use std::{collections::HashSet, path::Path, sync::Arc};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
+use cargo_lambda_metadata::env::EnvVarExtractor;
 use ignore::Match;
 use ignore_files::{IgnoreFile, IgnoreFilter};
 use tracing::{debug, trace, trace_span};
@@ -11,18 +16,78 @@ use watchexec::{
 
 use crate::error::ServerError;
 
-/// we discover ignore files from the `CARGO_LAMBDA_IGNORE_FILES` environment variable,
-/// the current directory, and any parent directories that represent project roots
-pub(crate) async fn discover_files(base: &Path) -> Vec<IgnoreFile> {
+/// Collect ignore files from various sources:
+/// - Files in the system using the keywords `CARGO_LAMBDA` and `cargo-lambda`:
+///   - $HOME/.cargo-lambda/ignore
+///   - $XDG_CONFIG_HOME/cargo-lambda/ignore
+///   - $HOME/.CARGO_LAMBDA/ignore
+///   - $XDG_CONFIG_HOME/CARGO_LAMBDA/ignore
+///
+/// - Origin-based ignore files (like `.gitignore`)
+/// - Project-specific `.cargolambdaignore` file
+/// - Custom ignore file specified via `CARGO_LAMBDA_IGNORE_FILE` environment variable
+///
+/// # Arguments
+///
+/// * `base` - The base path to start searching for ignore files from
+///
+/// # Returns
+///
+/// A vector of [`IgnoreFile`]s discovered from all sources
+pub(crate) async fn discover_files(base: &Path, env: impl EnvVarExtractor) -> Vec<IgnoreFile> {
     let mut ignore_files = HashSet::new();
 
     let (env_ignore, env_ignore_errs) = ignore_files::from_environment(Some("CARGO_LAMBDA")).await;
-    trace!(ignore_files = ?env_ignore, errors = ?env_ignore_errs, "discovered ignore files from environment variable");
-    ignore_files.extend(env_ignore);
+    if !env_ignore.is_empty() {
+        trace!(ignore_files = ?env_ignore, errors = ?env_ignore_errs, "discovered ignore files from environment variable");
+        ignore_files.extend(env_ignore);
+    }
+
+    let (env_ignore, env_ignore_errs) = ignore_files::from_environment(Some("cargo-lambda")).await;
+    if !env_ignore.is_empty() {
+        trace!(ignore_files = ?env_ignore, errors = ?env_ignore_errs, "discovered ignore files from environment variable");
+        ignore_files.extend(env_ignore);
+    }
 
     let (origin_ignore, origin_ignore_errs) = ignore_files::from_origin(base).await;
-    trace!(ignore_files = ?origin_ignore, errors = ?origin_ignore_errs, "discovered ignore files from origin");
-    ignore_files.extend(origin_ignore);
+    if !origin_ignore.is_empty() {
+        trace!(ignore_files = ?origin_ignore, errors = ?origin_ignore_errs, "discovered ignore files from origin");
+        ignore_files.extend(origin_ignore);
+    }
+
+    let mut ignore_files_vec = Vec::new();
+    let mut ignore_files_vec_errs = Vec::new();
+
+    let ignore_repo_rules_file = base.join(".cargolambdaignore");
+    if ignore_repo_rules_file.is_file() {
+        ignore_files::discover_file(
+            &mut ignore_files_vec,
+            &mut ignore_files_vec_errs,
+            None,
+            None,
+            ignore_repo_rules_file,
+        )
+        .await;
+    }
+
+    if let Ok(ignore_env_file) = env.var("CARGO_LAMBDA_IGNORE_FILE") {
+        let path = PathBuf::from(ignore_env_file);
+        if path.is_file() {
+            ignore_files::discover_file(
+                &mut ignore_files_vec,
+                &mut ignore_files_vec_errs,
+                None,
+                None,
+                path,
+            )
+            .await;
+        }
+    }
+
+    if !ignore_files_vec.is_empty() {
+        trace!(ignore_files = ?ignore_files_vec, errors = ?ignore_files_vec_errs, "discovered ignore files");
+        ignore_files.extend(ignore_files_vec);
+    }
 
     let mut origins = HashSet::new();
     let mut current = base;
@@ -153,8 +218,9 @@ impl Filterer for IgnoreFilterer {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Write, path::PathBuf};
+    use std::{fs::File, io::Write, path::PathBuf};
 
+    use cargo_lambda_metadata::env::{HashMapEnvExtractor, SystemEnvExtractor};
     use watchexec::event::Tag;
 
     use super::*;
@@ -259,5 +325,40 @@ mod tests {
             ..Default::default()
         };
         assert!(!filter.check_event(&event, Priority::Normal).unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_discover_project_specific_files() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let ignore_file = tempdir.path().join(".cargolambdaignore");
+        writeln!(File::create(&ignore_file).unwrap(), "*").unwrap();
+
+        let files = discover_files(tempdir.path(), SystemEnvExtractor).await;
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, ignore_file);
+    }
+
+    #[tokio::test]
+    async fn test_discover_project_specific_files_with_env_var() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let ignore_file = tempdir.path().join("clignore");
+        writeln!(File::create(&ignore_file).unwrap(), "*").unwrap();
+
+        let env = HashMapEnvExtractor::from(vec![(
+            "CARGO_LAMBDA_IGNORE_FILE",
+            ignore_file.to_str().unwrap(),
+        )]);
+
+        let files = discover_files(tempdir.path(), env).await;
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, ignore_file);
+    }
+
+    #[tokio::test]
+    async fn test_discover_project_specific_files_with_env_var_not_found() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let env = HashMapEnvExtractor::from(vec![]);
+        let files = discover_files(tempdir.path(), env).await;
+        assert_eq!(files.len(), 0);
     }
 }

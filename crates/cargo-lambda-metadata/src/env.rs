@@ -2,7 +2,7 @@ use clap::{ArgAction, Args, ValueHint};
 use env_file_reader::read_file;
 use miette::Result;
 use serde::{Deserialize, Serialize, ser::SerializeStruct};
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, env::VarError, path::PathBuf};
 
 use crate::{cargo::deserialize_vec_or_map, error::MetadataError};
 
@@ -105,6 +105,39 @@ fn extract_var(line: &str) -> Result<(&str, &str), MetadataError> {
     }
 
     Ok((key, value))
+}
+
+pub trait EnvVarExtractor {
+    fn var(&self, name: &str) -> Result<String, VarError>;
+}
+
+pub struct SystemEnvExtractor;
+
+impl EnvVarExtractor for SystemEnvExtractor {
+    fn var(&self, name: &str) -> Result<String, VarError> {
+        std::env::var(name)
+    }
+}
+
+pub struct HashMapEnvExtractor {
+    env: HashMap<String, String>,
+}
+
+impl From<Vec<(&str, &str)>> for HashMapEnvExtractor {
+    fn from(env: Vec<(&str, &str)>) -> Self {
+        Self {
+            env: env
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        }
+    }
+}
+
+impl EnvVarExtractor for HashMapEnvExtractor {
+    fn var(&self, name: &str) -> Result<String, VarError> {
+        self.env.get(name).cloned().ok_or(VarError::NotPresent)
+    }
 }
 
 #[cfg(test)]
