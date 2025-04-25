@@ -6,7 +6,7 @@ on:
 
 env:
   MATURIN_VERSION: 1.8.2
-  SCCACHE_GHA_ENABLED: "true"
+  SCCACHE_GHA_ENABLED: "false"
   RUSTC_WRAPPER: "sccache"
   CARGO_INCREMENTAL: 0
 
