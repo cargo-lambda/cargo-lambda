@@ -340,3 +340,34 @@ This configuration is applied to a function in a package. It will be merged with
 [package.metadata.lambda.watch.router]
 "/products" = "handle-products"
 ```
+
+## Ignore files from hot reloading
+
+Cargo Lambda supports ignore files and directories to avoid hot reloading when certain files are modified. This is useful to avoid unnecessary recompilations when the files are not relevant to the function.
+
+The ignore files are discovered from the following sources:
+
+- Git ignore rules (`.gitignore`)
+- Files in the system using the keywords `CARGO_LAMBDA` and `cargo-lambda`:
+  - `$HOME/.cargo-lambda/ignore`
+  - `$XDG_CONFIG_HOME/cargo-lambda/ignore`
+  - `$APPDATA/cargo-lambda/ignore`
+  - `$USERPROFILE/.cargo-lambda/ignore`
+
+  - `$HOME/.CARGO_LAMBDA/ignore`
+  - `$XDG_CONFIG_HOME/CARGO_LAMBDA/ignore`
+  - `$APPDATA/CARGO_LAMBDA/ignore`
+  - `$USERPROFILE/.CARGO_LAMBDA/ignore`
+- A file named `.cargolambdaignore` in the root of the project.
+- A file specified in the `CARGO_LAMBDA_IGNORE_FILE` environment variable.
+
+The ignore files are merged together and used to create glob patterns that are used to match the files that will be ignored.
+
+The syntax of the ignore files is the same as the one used by [Git](https://git-scm.com/docs/gitignore).
+
+```
+*.rs
+*.toml
+*.lock
+static/**
+```

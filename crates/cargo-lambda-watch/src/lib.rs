@@ -6,6 +6,7 @@ use cargo_lambda_metadata::{
         CargoMetadata, CargoPackage, filter_binary_targets_from_metadata, kind_bin_filter,
         selected_bin_filter, watch::Watch,
     },
+    env::SystemEnvExtractor,
     lambda::Timeout,
 };
 use cargo_lambda_remote::tls::TlsOptions;
@@ -83,7 +84,7 @@ pub async fn run(
     }
 
     let base = dunce::canonicalize(".").into_diagnostic()?;
-    let ignore_files = watcher::ignore::discover_files(&base).await;
+    let ignore_files = watcher::ignore::discover_files(&base, SystemEnvExtractor).await;
 
     let env = config.lambda_environment(base_env).into_diagnostic()?;
 
