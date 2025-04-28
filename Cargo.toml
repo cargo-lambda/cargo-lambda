@@ -64,7 +64,7 @@ cargo-lambda-system = { version = "1.8.4", path = "crates/cargo-lambda-system" }
 cargo-lambda-watch = { version = "1.8.4", path = "crates/cargo-lambda-watch" }
 cargo_metadata = "0.15.3"
 cargo-options = { version = "0.7.5", features = ["serde"] }
-cargo-zigbuild = "0.19.4"
+cargo-zigbuild = "0.20.0"
 clap = { version = "4.4.2", features = ["derive"] }
 chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
 dirs = "4"
