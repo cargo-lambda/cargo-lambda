@@ -17,10 +17,8 @@ pub(crate) fn routes() -> Router<RefRuntimeState> {
     Router::new()
         .route("/2020-01-01/extension/register", post(register_extension))
         // secondary route is for internal extensions
-        // that have the function name in their path
-        // (which we just discard currently)
         .route(
-            "/:_function_name/2020-01-01/extension/register",
+            "/:function_name/2020-01-01/extension/register",
             post(register_extension),
         )
         .route(
@@ -28,10 +26,8 @@ pub(crate) fn routes() -> Router<RefRuntimeState> {
             get(next_extension_event),
         )
         // secondary route is for internal extensions
-        // that have the function name in their path
-        // (which we just discard currently)
         .route(
-            "/:_function_name/2020-01-01/extension/event/next",
+            "/:function_name/2020-01-01/extension/event/next",
             get(next_extension_event),
         )
         .route("/2020-08-15/logs", put(subcribe_extension_events))

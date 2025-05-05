@@ -275,6 +275,24 @@ The following video shows you how to use the watch subcommand with Lambda extens
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/z2sv41ukHTE" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
+## Graceful shutdown support
+
+The watch subcommand will propagate `SIGTERM` and `SIGINT` signals to your function, with a delay to allow for graceful shutdown logic to fire.
+
+This makes a best-effort attempt to replicate signal handling in AWS Lambda, including allowed shutdown delay, but does not strictly match AWS orchestration. Note that graceful shutdown is only enabled in AWS if extensions are registered. This means that if your function has no registered extensions, it will only receive a `SIGKILL`.
+
+One easy way to trigger a graceful shutdown in a Posix shell is by using `Control-C` in the session
+running your `cargo lambda watch` process.
+
+Some caveats:
+- Graceful shutdown signals are only propagated to the function's process, not that of external extensions.
+- Graceful shutdown signals are not sent properly on hot reload, only direct signaling to the `cargo watch` process.
+- No guarantees are made around sequencing of runtime shutdown and extensions receiving `SHUTDOWN` events.
+
+For more information on graceful shutdown handling, refer to:
+- [AWS documentation](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtime-environment.html#runtimes-lifecycle-shutdown)
+- [AWS Samples repository](https://github.com/aws-samples/graceful-shutdown-with-aws-lambda)
+
 ## TLS support
 
 The watch subcommand supports TLS connections to the runtime if you want to send requests to the runtime securely.

@@ -1,5 +1,11 @@
-use crate::{RefRuntimeState, error::ServerError, requests::*};
-use axum::{Json, body::Body, extract::State, http::Request, response::Response};
+use crate::{RefRuntimeState, error::ServerError, requests::*, state::ExtensionType};
+use axum::{
+    Json,
+    body::Body,
+    extract::{Path, State},
+    http::Request,
+    response::Response,
+};
 use http_body_util::BodyExt;
 use hyper::HeaderMap;
 use serde::{Serialize, de::DeserializeOwned};
@@ -19,6 +25,7 @@ struct RegisterResponse {
 
 pub(crate) async fn register_extension(
     State(state): State<RefRuntimeState>,
+    function_name: Option<Path<String>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, ServerError> {
     let response_body = serde_json::to_vec(&RegisterResponse {
@@ -40,10 +47,20 @@ pub(crate) async fn register_extension(
         )),
     })?;
 
+    // we know that internal extensions are registered from within a function,
+    // therefore have the function name prefixing their path
+    let extension_type = match function_name {
+        Some(_) => ExtensionType::Internal,
+        _ => ExtensionType::External,
+    };
+
     let payload: EventsRequest = extract_json(req).await?;
     debug!(?payload, "registering extension");
 
-    let extension_id = state.ext_cache.register(payload.events).await;
+    let extension_id = state
+        .ext_cache
+        .register(payload.events, extension_type)
+        .await;
     let resp = Response::builder()
         .status(200)
         .header(EXTENSION_ID_HEADER, extension_id)
