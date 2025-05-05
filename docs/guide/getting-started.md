@@ -126,7 +126,7 @@ jobs:
               uses: mlugg/setup-zig@v1
               with:
                 # Note: make sure you are using a recent version of zig (the one below isn't kept in sync with new releases)
-                zig-version: 0.14.0
+                version: 0.14.0
             # Add your build steps below
 ```
 
