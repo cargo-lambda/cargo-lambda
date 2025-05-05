@@ -118,21 +118,15 @@ jobs:
     build:
         runs-on: ubuntu-latest
         steps:
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@stable
+            - name: Install Rust toolchain with Cargo Lambda
+              uses: moonrepo/setup-rust@v1
+              with:
+                bins: cargo-lambda
             - name: Install Zig toolchain
-              uses: korandoru/setup-zig@v1
+              uses: mlugg/setup-zig@v1
               with:
                 # Note: make sure you are using a recent version of zig (the one below isn't kept in sync with new releases)
-                zig-version: 0.13.0
-            - name: Install Cargo Lambda
-              uses: jaxxstorm/action-install-gh-release@v1.9.0
-              with:
-                repo: cargo-lambda/cargo-lambda
-                # Note: make sure you are using a recent version of cargo-lambda (the one below isn't kept in sync with new releases)
-                tag: v1.3.0 # Remove this if you want to grab always the latest version
-                platform: linux # Other valid options: 'windows' or 'darwin'
-                arch: x86_64 # Other valid options for linux: 'aarch64'
+                zig-version: 0.14.0
             # Add your build steps below
 ```
 
