@@ -10,7 +10,11 @@ use std::{
     collections::{HashMap, HashSet, hash_map::Entry},
     net::SocketAddr,
     path::PathBuf,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
 };
 use tokio::sync::{Mutex, RwLock, mpsc, oneshot};
 use tracing::debug;
@@ -226,14 +230,20 @@ pub(crate) struct ExtensionCache {
     extensions: Arc<Mutex<HashMap<String, Vec<String>>>>,
     events: Arc<Mutex<HashMap<String, Vec<String>>>>,
     senders: Arc<Mutex<HashMap<String, mpsc::Sender<NextEvent>>>>,
+    has_internal_extension: Arc<AtomicBool>,
+    has_external_extension: Arc<AtomicBool>,
 }
 
 impl ExtensionCache {
-    pub async fn register(&self, events: Vec<String>) -> String {
+    pub async fn register(&self, events: Vec<String>, extension_type: ExtensionType) -> String {
         let mut extensions = self.extensions.lock().await;
         let extension_id = Uuid::new_v4();
 
         extensions.insert(extension_id.to_string(), events.clone());
+        match extension_type {
+            ExtensionType::Internal => self.has_internal_extension.store(true, Ordering::Relaxed),
+            ExtensionType::External => self.has_external_extension.store(true, Ordering::Relaxed),
+        };
 
         let mut list = self.events.lock().await;
         for event in events {
@@ -287,4 +297,28 @@ impl ExtensionCache {
             }
         }
     }
+
+    /// Returns the allowed duration between SIGTERM and SIGKILL for the function,
+    /// if any. This depends on whether there are any internal or external functions registered.
+    ///
+    /// We don't currently simulate extension shutdown delay.
+    ///
+    /// Ref:
+    /// - https://github.com/aws-samples/graceful-shutdown-with-aws-lambda
+    /// - https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtime-environment.html#runtimes-lifecycle-shutdown
+    pub async fn function_shutdown_delay(&self) -> Option<Duration> {
+        if self.has_internal_extension.load(Ordering::Relaxed) {
+            Some(Duration::from_millis(500))
+        } else if self.has_external_extension.load(Ordering::Relaxed) {
+            Some(Duration::from_millis(300))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ExtensionType {
+    Internal,
+    External,
 }

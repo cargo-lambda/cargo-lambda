@@ -3,7 +3,6 @@ use cargo_lambda_metadata::{
     cargo::load_metadata,
     config::{ConfigOptions, load_config_without_cli_flags},
 };
-// use cargo_lambda_metadata::cargo::function_environment_metadata;
 use ignore::create_filter;
 use ignore_files::IgnoreFile;
 use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc, time::Duration};
@@ -128,11 +127,28 @@ async fn runtime(
         let ext_cache = ext_cache.clone();
         async move {
             if signals.contains(&MainSignal::Terminate) {
+                let function_shutdown_delay = ext_cache.function_shutdown_delay().await;
+                if let Some(delay) = function_shutdown_delay {
+                    function_graceful_shutdown_or_else_sigkill(
+                        action,
+                        MainSignal::Terminate,
+                        delay,
+                    );
+                    return Ok(());
+                }
                 action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
                 return Ok(());
             }
-
             if signals.contains(&MainSignal::Interrupt) {
+                let function_shutdown_delay = ext_cache.function_shutdown_delay().await;
+                if let Some(delay) = function_shutdown_delay {
+                    function_graceful_shutdown_or_else_sigkill(
+                        action,
+                        MainSignal::Interrupt,
+                        delay,
+                    );
+                    return Ok(());
+                }
                 action.outcome(Outcome::both(Outcome::Stop, Outcome::Exit));
                 return Ok(());
             }
@@ -209,6 +225,32 @@ async fn runtime(
     });
 
     Ok(config)
+}
+
+fn function_graceful_shutdown_or_else_sigkill(
+    action: Action,
+    signal_type: MainSignal,
+    max_delay: Duration,
+) {
+    tracing::debug!(
+        ?signal_type,
+        ?max_delay,
+        "attempting graceful function shutdown"
+    );
+    action.outcome(Outcome::both(
+        // send sigterm
+        Outcome::Signal(signal_type),
+        // race graceful shutdown against forced shutdown following max delay
+        Outcome::race(
+            // happy path, process exits then watchexec exits
+            Outcome::both(Outcome::Wait, Outcome::Exit),
+            // unhappy path, we sleep max delay then SIGKILL and exit watchexec
+            Outcome::both(
+                Outcome::Sleep(max_delay),
+                Outcome::both(Outcome::Stop, Outcome::Exit),
+            ),
+        ),
+    ));
 }
 
 fn reload_env(manifest_path: &PathBuf, bin_name: &Option<String>) -> HashMap<String, String> {
