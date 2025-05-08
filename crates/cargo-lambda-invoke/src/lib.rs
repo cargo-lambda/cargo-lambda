@@ -47,7 +47,7 @@ pub struct Invoke {
     invoke_address: String,
 
     /// Local port to send invoke requests
-    #[arg(short = 'p', long, default_value = "9000")]
+    #[arg(short = 'P', long, default_value = "9000")]
     invoke_port: u16,
 
     /// File to read the invoke payload from
