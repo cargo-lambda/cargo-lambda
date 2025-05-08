@@ -44,7 +44,7 @@ pub struct Watch {
     #[serde(default)]
     pub only_lambda_apis: bool,
 
-    #[arg(short = 'a', long, default_value = DEFAULT_INVOKE_ADDRESS)]
+    #[arg(short = 'A', long, default_value = DEFAULT_INVOKE_ADDRESS)]
     #[serde(default = "default_invoke_address")]
     /// Address where users send invoke requests
     pub invoke_address: String,

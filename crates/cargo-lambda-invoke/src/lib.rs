@@ -41,7 +41,7 @@ pub struct Invoke {
     )]
     #[cfg_attr(
         not(target_os = "windows"),
-        arg(short = 'a', long, default_value = "::1")
+        arg(short = 'A', long, default_value = "::1")
     )]
     /// Local address host (IPv4 or IPv6) to send invoke requests
     invoke_address: String,
