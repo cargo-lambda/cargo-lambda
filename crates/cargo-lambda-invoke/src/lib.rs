@@ -41,13 +41,13 @@ pub struct Invoke {
     )]
     #[cfg_attr(
         not(target_os = "windows"),
-        arg(short = 'a', long, default_value = "::1")
+        arg(short = 'A', long, default_value = "::1")
     )]
     /// Local address host (IPv4 or IPv6) to send invoke requests
     invoke_address: String,
 
     /// Local port to send invoke requests
-    #[arg(short = 'p', long, default_value = "9000")]
+    #[arg(short = 'P', long, default_value = "9000")]
     invoke_port: u16,
 
     /// File to read the invoke payload from
