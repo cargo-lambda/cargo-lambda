@@ -73,7 +73,7 @@ cargo binstall cargo-lambda
 
 ## Building from source
 
-You can install Cargo Lambda on your host machine with from its source code repository. This method is not recommended because the binary will be compiled in your system, which we cannot always guarantee. Using a package manager, or pre-built binaries is always more encouraged to have a functional service and avoid installation issues. Cargo Lambda does not publish its source in crates.io anymore because we cannot guarantee the reproducibility of the build when using `cargo install`.
+You can install Cargo Lambda on your host machine from its source code repository. This method is not recommended because the binary will be compiled in your system, which we cannot always guarantee. Using a package manager, or pre-built binaries is always more encouraged to have a functional service and avoid installation issues. Cargo Lambda does not publish its source in crates.io anymore because we cannot guarantee the reproducibility of the build when using `cargo install`.
 
 ```sh
 git clone https://github.com/cargo-lambda/cargo-lambda && \
