@@ -138,7 +138,7 @@ async fn upsert_function(
     let (arn, version) = match action {
         FunctionAction::Create => {
             let function_role = match &config.function_config.role {
-                None => roles::create(sdk_config, progress).await?,
+                None => roles::create(config, sdk_config, progress).await?,
                 Some(role) => FunctionRole::from_existing(role.clone()),
             };
 
