@@ -161,7 +161,7 @@ impl CargoPathExt for Path {
                 if e.kind() == ErrorKind::NotFound {
                     return;
                 }
-                panic!("failed to remove {:?}, could not read: {:?}", self, e);
+                panic!("failed to remove {self:?}, could not read: {e:?}");
             }
         };
         // There is a race condition between fetching the metadata and
@@ -169,10 +169,10 @@ impl CargoPathExt for Path {
         // for our tests.
         if meta.is_dir() {
             if let Err(e) = fs::remove_dir_all(self) {
-                panic!("failed to remove {:?}: {:?}", self, e)
+                panic!("failed to remove {self:?}: {e:?}")
             }
         } else if let Err(e) = fs::remove_file(self) {
-            panic!("failed to remove {:?}: {:?}", self, e)
+            panic!("failed to remove {self:?}: {e:?}")
         }
     }
 
@@ -242,7 +242,7 @@ pub mod paths {
         });
 
         let mut root = global_root();
-        root.push(format!("t{}", id));
+        root.push(format!("t{id}"));
         root
     }
 

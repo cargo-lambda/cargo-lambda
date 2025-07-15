@@ -1,7 +1,7 @@
 use crate::{error::ServerError, requests::NextEvent, state::ExtensionCache};
 use cargo_lambda_metadata::{
     cargo::load_metadata,
-    config::{ConfigOptions, load_config_without_cli_flags},
+    config::{ConfigOptions, FunctionNames, load_config_without_cli_flags},
 };
 use ignore::create_filter;
 use ignore_files::IgnoreFile;
@@ -263,7 +263,7 @@ fn reload_env(manifest_path: &PathBuf, bin_name: &Option<String>) -> HashMap<Str
     };
 
     let options = ConfigOptions {
-        name: bin_name.clone(),
+        names: FunctionNames::new(None, bin_name.clone()),
         ..Default::default()
     };
     let config = match load_config_without_cli_flags(&metadata, &options) {

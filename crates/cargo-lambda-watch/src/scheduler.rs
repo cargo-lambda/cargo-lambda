@@ -116,6 +116,7 @@ fn is_valid_bin_name(name: &str) -> bool {
     !name.is_empty() && name != DEFAULT_PACKAGE_FUNCTION
 }
 
+#[allow(clippy::result_large_err)]
 fn cargo_command(
     name: &str,
     cargo_options: &CargoOptions,

@@ -63,7 +63,7 @@ impl Display for DeployOutput {
         }
 
         if let Some(bucket) = &self.bucket {
-            writeln!(f, "🪣 stored on S3 bucket `{}`", bucket)?;
+            writeln!(f, "🪣 stored on S3 bucket `{bucket}`")?;
         }
 
         if !self.runtimes.is_empty() {
@@ -73,7 +73,7 @@ impl Display for DeployOutput {
         if !self.files.is_empty() {
             writeln!(f, "🗃️  files included in the zip file:")?;
             for file in &self.files {
-                writeln!(f, "  - {}", file)?;
+                writeln!(f, "  - {file}")?;
             }
         }
 
@@ -84,10 +84,10 @@ impl Display for DeployOutput {
             self.sdk_config.region.as_deref().unwrap_or(DEFAULT_REGION)
         )?;
         if let Some(profile) = &self.sdk_config.profile {
-            writeln!(f, "  - profile: {}", profile)?;
+            writeln!(f, "  - profile: {profile}")?;
         }
         if let Some(endpoint_url) = &self.sdk_config.endpoint_url {
-            writeln!(f, "  - endpoint: {}", endpoint_url)?;
+            writeln!(f, "  - endpoint: {endpoint_url}")?;
         }
 
         if self.kind == DeployKind::Function {
@@ -123,7 +123,7 @@ impl Display for DeployOutput {
                 let env = env_options
                     .lambda_environment(&HashMap::new())
                     .unwrap_or_default();
-                writeln!(f, "  - env_options: {:?}", env)?;
+                writeln!(f, "  - env_options: {env:?}")?;
             }
         }
 

@@ -16,9 +16,61 @@ use miette::{IntoDiagnostic, Result};
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
+/// A function can be identified by its package name or by its binary name.
+/// We need both to be able to load the config from the package metadata,
+/// regardless of which one is provided by the user.
+#[derive(Debug, Default)]
+pub struct FunctionNames {
+    package: Option<String>,
+    binary: Option<String>,
+}
+
+impl FunctionNames {
+    pub fn from_package(package: &str) -> Self {
+        FunctionNames::new(Some(package.to_string()), None)
+    }
+
+    pub fn from_binary(binary: &str) -> Self {
+        FunctionNames::new(None, Some(binary.to_string()))
+    }
+
+    pub fn new(package: Option<String>, binary: Option<String>) -> Self {
+        FunctionNames { package, binary }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.package.is_none() && self.binary.is_none()
+    }
+
+    pub fn include(&self, name: &str) -> bool {
+        self.package.as_ref().is_some_and(|p| p == name)
+            || self.binary.as_ref().is_some_and(|b| b == name)
+    }
+
+    pub fn find_binary_metadata<'a>(
+        &'a self,
+        metadata: &'a HashMap<String, PackageMetadata>,
+    ) -> Option<&'a PackageMetadata> {
+        let bin_meta = self.binary.as_ref().and_then(|binary| metadata.get(binary));
+        if bin_meta.is_some() {
+            return bin_meta;
+        }
+
+        self.package
+            .as_ref()
+            .and_then(|package| metadata.get(package))
+    }
+}
+
+impl From<(&str, &str)> for FunctionNames {
+    fn from((package, binary): (&str, &str)) -> Self {
+        FunctionNames::new(Some(package.to_string()), Some(binary.to_string()))
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct ConfigOptions {
-    pub name: Option<String>,
+    pub names: FunctionNames,
     pub context: Option<String>,
     pub global: Option<PathBuf>,
     pub admerge: bool,
@@ -109,8 +161,8 @@ pub fn general_config_figment(
     metadata: &CargoMetadata,
     options: &ConfigOptions,
 ) -> Result<(Option<Config>, Option<Config>, Figment)> {
-    let (ws_metadata, bin_metadata) = workspace_metadata(metadata, options.name.as_deref())?;
-    let package_metadata = package_metadata(metadata, options.name.as_deref())?;
+    let (ws_metadata, bin_metadata) = workspace_metadata(metadata, &options.names)?;
+    let package_metadata = package_metadata(metadata, &options.names)?;
 
     let mut config_file = options
         .global
@@ -155,7 +207,7 @@ pub fn general_config_figment(
 
 fn workspace_metadata(
     metadata: &CargoMetadata,
-    name: Option<&str>,
+    name: &FunctionNames,
 ) -> Result<(Config, Option<Config>)> {
     if metadata.workspace_metadata.is_null() || !metadata.workspace_metadata.is_object() {
         return Ok((Config::default(), None));
@@ -165,8 +217,8 @@ fn workspace_metadata(
         serde_json::from_value(metadata.workspace_metadata.clone()).into_diagnostic()?;
 
     let ws_config = meta.lambda.package.into();
-    if let Some(name) = name {
-        if let Some(bin_config) = meta.lambda.bin.get(name) {
+    if !name.is_empty() {
+        if let Some(bin_config) = name.find_binary_metadata(&meta.lambda.bin) {
             return Ok((ws_config, Some(bin_config.clone().into())));
         }
     }
@@ -174,12 +226,12 @@ fn workspace_metadata(
     Ok((ws_config, None))
 }
 
-fn package_metadata(metadata: &CargoMetadata, name: Option<&str>) -> Result<Option<Config>> {
+fn package_metadata(metadata: &CargoMetadata, name: &FunctionNames) -> Result<Option<Config>> {
     let kind_condition = |pkg: &Package, target: &Target| {
         target.kind.iter().any(|kind| kind == "bin") && pkg.metadata.is_object()
     };
 
-    let Some(name) = name else {
+    if name.is_empty() {
         if metadata.packages.len() == 1 {
             return get_config_from_root(metadata);
         }
@@ -194,7 +246,11 @@ fn package_metadata(metadata: &CargoMetadata, name: Option<&str>) -> Result<Opti
                 .into_iter()
                 .next()
                 .ok_or(MetadataError::MissingBinaryInProject)?;
-            return get_config_from_packages(metadata, kind_condition, &name);
+            return get_config_from_packages(
+                metadata,
+                kind_condition,
+                &FunctionNames::from_package(&name),
+            );
         }
 
         return Ok(None);
@@ -206,15 +262,17 @@ fn package_metadata(metadata: &CargoMetadata, name: Option<&str>) -> Result<Opti
 fn get_config_from_packages(
     metadata: &CargoMetadata,
     kind_condition: impl Fn(&Package, &Target) -> bool,
-    name: &str,
+    name: &FunctionNames,
 ) -> Result<Option<Config>> {
     for pkg in &metadata.packages {
         for target in &pkg.targets {
-            if kind_condition(pkg, target) && target.name == name {
+            if kind_condition(pkg, target)
+                && (name.include(&target.name) || name.include(&pkg.name))
+            {
                 let meta: Metadata =
                     serde_json::from_value(pkg.metadata.clone()).into_diagnostic()?;
 
-                if let Some(bin_config) = meta.lambda.bin.get(name) {
+                if let Some(bin_config) = name.find_binary_metadata(&meta.lambda.bin) {
                     return Ok(Some(bin_config.clone().into()));
                 }
 
@@ -251,11 +309,15 @@ fn get_config_from_root(metadata: &CargoMetadata) -> Result<Option<Config>> {
         return Ok(None);
     };
 
-    if root.metadata.is_null() || !root.metadata.is_object() {
+    get_config_from_package(root)
+}
+
+fn get_config_from_package(package: &Package) -> Result<Option<Config>> {
+    if package.metadata.is_null() || !package.metadata.is_object() {
         return Ok(None);
     }
 
-    let meta: Metadata = serde_json::from_value(root.metadata.clone()).into_diagnostic()?;
+    let meta: Metadata = serde_json::from_value(package.metadata.clone()).into_diagnostic()?;
     Ok(Some(meta.lambda.package.into()))
 }
 
@@ -266,7 +328,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        cargo::{build::CompilerOptions, load_metadata},
+        cargo::{
+            build::{CompilerOptions, OutputFormat},
+            load_metadata,
+        },
         lambda::Tracing,
         tests::fixture_metadata,
     };
@@ -311,7 +376,7 @@ mod tests {
 
         let cargo_compiler = match compiler {
             CompilerOptions::Cargo(opts) => opts,
-            other => panic!("unexpected compiler: {:?}", other),
+            other => panic!("unexpected compiler: {other:?}"),
         };
         assert_eq!(
             cargo_compiler.subcommand,
@@ -326,7 +391,7 @@ mod tests {
     #[test]
     fn test_load_router_from_metadata_admerge() {
         let options = ConfigOptions {
-            name: Some("crate-3".to_string()),
+            names: FunctionNames::from_package("crate-3"),
             admerge: true,
             ..Default::default()
         };
@@ -357,7 +422,7 @@ mod tests {
     #[test]
     fn test_load_router_from_metadata_strict() {
         let options = ConfigOptions {
-            name: Some("crate-3".to_string()),
+            names: FunctionNames::from_package("crate-3"),
             ..Default::default()
         };
 
@@ -379,7 +444,7 @@ mod tests {
     #[test]
     fn test_extend_env_from_workspace() {
         let options = ConfigOptions {
-            name: Some("basic-lambda-1".to_string()),
+            names: FunctionNames::from_binary("basic-lambda-1"),
             admerge: true,
             ..Default::default()
         };
@@ -447,5 +512,22 @@ mod tests {
         let metadata = load_metadata(manifest).unwrap();
         let config = load_config(&args_config, &metadata, &options).unwrap();
         assert_eq!(config.deploy.function_config.memory, Some(2048.into()));
+    }
+
+    #[test]
+    fn test_load_metadata_from_package_workspace() {
+        let options = ConfigOptions {
+            names: FunctionNames::from_package("package-1"),
+            ..Default::default()
+        };
+
+        let metadata = load_metadata(fixture_metadata("workspace-with-package-config")).unwrap();
+        let config = load_config_without_cli_flags(&metadata, &options).unwrap();
+
+        assert_eq!(
+            config.build.cargo_opts.common.features,
+            vec!["lol".to_string()]
+        );
+        assert_eq!(config.build.output_format, Some(OutputFormat::Zip));
     }
 }

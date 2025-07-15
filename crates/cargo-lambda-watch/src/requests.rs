@@ -13,6 +13,7 @@ pub(crate) const AWS_XRAY_TRACE_HEADER: &str = "x-amzn-trace-id";
 /// model, this response is represented as a HTTP Request data object.
 pub type LambdaResponse = Request<Body>;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum Action {
     Invoke(InvokeRequest),

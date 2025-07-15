@@ -88,7 +88,7 @@ impl std::fmt::Display for CommandError {
         write!(f, "Command `{}` failed", self.command)?;
 
         if let Some(error) = &self.error {
-            write!(f, ": {}", error)?;
+            write!(f, ": {error}")?;
         }
 
         if !self.stdout.is_empty() {
