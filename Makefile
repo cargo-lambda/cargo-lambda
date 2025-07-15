@@ -29,9 +29,6 @@ fmt:
 install:
 	cargo install --path crates/cargo-lambda-cli --features=skip-build-banner
 
-install-release:
-	cargo install --release --path crates/cargo-lambda-cli --features=skip-build-banner
-
 publish-all:
 	cargo publish --package cargo-lambda-interactive
 	sleep 10

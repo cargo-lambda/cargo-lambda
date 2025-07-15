@@ -12,6 +12,7 @@ keywords.workspace = true
 description.workspace = true
 
 [dependencies]
+anyhow = "1.0.98"
 cargo-lambda-remote.workspace = true
 cargo_metadata.workspace = true
 cargo-options.workspace = true

@@ -5,13 +5,14 @@ use cargo_lambda_invoke::Invoke;
 use cargo_lambda_metadata::{
     cargo::{build::Build, deploy::Deploy, load_metadata, watch::Watch},
     config::{Config, ConfigOptions, FunctionNames, load_config},
+    error::MetadataError,
 };
 use cargo_lambda_new::{Init, New};
 use cargo_lambda_system::System;
 use cargo_lambda_watch::xray_layer;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_cargo::style::CLAP_STYLING;
-use miette::{ErrorHook, IntoDiagnostic, Result, miette};
+use miette::{ErrorHook, IntoDiagnostic, Result};
 use std::{boxed::Box, env, io::IsTerminal, path::PathBuf, str::FromStr};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -258,21 +259,15 @@ async fn main() -> Result<()> {
     let program_name = program_path.file_stem().expect("missing program name");
 
     if program_name.eq_ignore_ascii_case("ar") {
-        miette::set_hook(error_hook(None))?;
-
         let zig = Zig::Ar {
             args: args.collect(),
         };
-        zig.execute().map_err(|e| miette!(e))
+        run_zig(zig)
     } else {
         let app = App::parse();
 
         match app {
-            App::Zig(zig) => {
-                miette::set_hook(error_hook(None))?;
-
-                zig.execute().map_err(|e| miette!(e))
-            }
+            App::Zig(zig) => run_zig(zig),
             App::Lambda(lambda) => {
                 let color = Color::from_str(&lambda.color)
                     .expect("invalid color option, must be auto, always, or never");
@@ -345,4 +340,11 @@ fn error_hook(color: Option<&Color>) -> ErrorHook {
             .color(ansi)
             .build())
     })
+}
+
+fn run_zig(zig: Zig) -> Result<()> {
+    miette::set_hook(error_hook(None))?;
+    zig.execute()
+        .map_err(MetadataError::ZigBuildError)
+        .into_diagnostic()
 }
