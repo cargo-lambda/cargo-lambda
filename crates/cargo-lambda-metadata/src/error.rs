@@ -44,4 +44,7 @@ pub enum MetadataError {
     #[error(transparent)]
     #[diagnostic()]
     MergeError(#[from] MergeError),
+    #[error(transparent)]
+    #[diagnostic()]
+    ZigBuildError(#[from] anyhow::Error),
 }

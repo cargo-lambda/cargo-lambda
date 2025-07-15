@@ -1,8 +1,8 @@
 use crate::TargetArch;
-use cargo_lambda_metadata::cargo::CargoMetadata;
+use cargo_lambda_metadata::{cargo::CargoMetadata, error::MetadataError};
 use cargo_options::Build;
 use cargo_zigbuild::Build as ZigBuild;
-use miette::Result;
+use miette::{IntoDiagnostic, Result};
 use std::process::Command;
 
 pub(crate) struct CargoZigbuild;
@@ -25,6 +25,9 @@ impl CargoZigbuild {
         }
 
         let zig_build: ZigBuild = cargo.to_owned().into();
-        zig_build.build_command().map_err(|e| miette::miette!(e))
+        zig_build
+            .build_command()
+            .map_err(MetadataError::ZigBuildError)
+            .into_diagnostic()
     }
 }
