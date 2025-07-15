@@ -83,7 +83,7 @@ mod test {
         ];
 
         for (opt, exp) in cases {
-            assert_eq!(exp, opt.add_events_extension(), "options: {:?}", opt);
+            assert_eq!(exp, opt.add_events_extension(), "options: {opt:?}");
         }
     }
 }

@@ -25,6 +25,7 @@ exclude = [
     "tests/fixtures/watch-multi-binary",
     "tests/fixtures/package-with-global-config",
     "tests/fixtures/config-with-context",
+    "tests/fixtures/workspace-with-package-config",
 ]
 
 resolver = "2"

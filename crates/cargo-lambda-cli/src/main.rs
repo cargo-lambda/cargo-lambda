@@ -4,7 +4,7 @@ use cargo_lambda_build::Zig;
 use cargo_lambda_invoke::Invoke;
 use cargo_lambda_metadata::{
     cargo::{build::Build, deploy::Deploy, load_metadata, watch::Watch},
-    config::{Config, ConfigOptions, load_config},
+    config::{Config, ConfigOptions, FunctionNames, load_config},
 };
 use cargo_lambda_new::{Init, New};
 use cargo_lambda_system::System;
@@ -139,18 +139,19 @@ impl LambdaSubcommand {
         context: Option<String>,
         admerge: bool,
     ) -> Result<()> {
+        let options = ConfigOptions {
+            names: FunctionNames::new(build.pkg_name(), build.bin_name()),
+            context,
+            global,
+            admerge,
+        };
+
         let metadata = load_metadata(build.manifest_path())?;
         let args_config = Config {
             build,
             ..Default::default()
         };
 
-        let options = ConfigOptions {
-            context,
-            global,
-            admerge,
-            ..Default::default()
-        };
         let mut config = load_config(&args_config, &metadata, &options)?;
         cargo_lambda_build::run(&mut config.build, &metadata).await
     }
@@ -162,19 +163,19 @@ impl LambdaSubcommand {
         context: Option<String>,
         admerge: bool,
     ) -> Result<()> {
-        let name = watch.package();
+        let options = ConfigOptions {
+            names: FunctionNames::new(watch.pkg_name(), watch.bin_name()),
+            context,
+            global,
+            admerge,
+        };
+
         let metadata = load_metadata(watch.manifest_path())?;
         let args_config = Config {
             watch,
             ..Default::default()
         };
 
-        let options = ConfigOptions {
-            name,
-            context,
-            global,
-            admerge,
-        };
         let config = load_config(&args_config, &metadata, &options)?;
         cargo_lambda_watch::run(&config.watch, &config.env, &metadata, color).await
     }
@@ -185,18 +186,17 @@ impl LambdaSubcommand {
         context: Option<String>,
         admerge: bool,
     ) -> Result<()> {
-        let name = deploy.name.clone();
+        let options = ConfigOptions {
+            names: FunctionNames::new(deploy.name.clone(), deploy.binary_name.clone()),
+            context,
+            global,
+            admerge,
+        };
+
         let metadata = load_metadata(deploy.manifest_path())?;
         let args_config = Config {
             deploy,
             ..Default::default()
-        };
-
-        let options = ConfigOptions {
-            name,
-            context,
-            global,
-            admerge,
         };
 
         let config = load_config(&args_config, &metadata, &options)?;
@@ -213,10 +213,10 @@ impl LambdaSubcommand {
         admerge: bool,
     ) -> Result<()> {
         let options = ConfigOptions {
+            names: FunctionNames::new(system.pkg_name(), None),
             global,
             context,
             admerge,
-            name: system.package(),
         };
         cargo_lambda_system::run(&system, &options).await
     }

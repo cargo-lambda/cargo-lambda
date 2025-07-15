@@ -54,7 +54,7 @@ impl System {
             .unwrap_or_else(|| "Cargo.toml".into())
     }
 
-    pub fn package(&self) -> Option<String> {
+    pub fn pkg_name(&self) -> Option<String> {
         self.package.clone()
     }
 }
@@ -95,7 +95,7 @@ pub async fn run(config: &System, options: &ConfigOptions) -> Result<()> {
     if manifest_path.exists() {
         let metadata = load_metadata(manifest_path)?;
 
-        let config_info = if options.name.is_some() || metadata.packages.len() == 1 {
+        let config_info = if !options.names.is_empty() || metadata.packages.len() == 1 {
             let config = load_config_without_cli_flags(&metadata, options)?;
             ConfigInfo::Package(config)
         } else {

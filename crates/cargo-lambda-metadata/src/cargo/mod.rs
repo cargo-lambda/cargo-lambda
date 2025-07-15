@@ -405,7 +405,7 @@ mod tests {
     fn test_binary_packages_with_mixed_workspace() {
         let bins = binary_targets(fixture_metadata("mixed-workspace-package"), false).unwrap();
         assert_eq!(1, bins.len());
-        assert!(bins.contains("function-crate"), "{:?}", bins);
+        assert!(bins.contains("function-crate"), "{bins:?}");
     }
 
     #[test]

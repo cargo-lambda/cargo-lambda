@@ -10,6 +10,7 @@ use thiserror::Error;
 
 use crate::requests::{Action, InvokeRequest, NextEvent};
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Diagnostic, Error)]
 pub enum ServerError {
     #[error("failed to build a response")]

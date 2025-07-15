@@ -172,10 +172,9 @@ impl TemplatePrompt {
 
     fn help_message(&self) -> Option<String> {
         match (self.choices.is_some(), &self.help) {
-            (true, Some(user_help)) => Some(format!(
-                "{PROMPT_WITH_OPTIONS_HELP_MESSAGE}.\n{}",
-                user_help
-            )),
+            (true, Some(user_help)) => {
+                Some(format!("{PROMPT_WITH_OPTIONS_HELP_MESSAGE}.\n{user_help}"))
+            }
             (true, None) => Some(PROMPT_WITH_OPTIONS_HELP_MESSAGE.to_string()),
             (false, Some(user_help)) => Some(user_help.clone()),
             (false, None) => None,

@@ -379,7 +379,7 @@ async fn proxy(
 
     connection_tracker.spawn(async move {
         if let Err(err) = conn.await {
-            println!("Connection failed: {:?}", err);
+            println!("Connection failed: {err:?}");
         }
     });
 

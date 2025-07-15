@@ -1,0 +1,16 @@
+[package]
+name = "package-1"
+version = "0.1.0"
+edition = "2021"
+
+[package.metadata.lambda.build]
+output_format = "zip"
+features = ["lol"]
+
+[features]
+lol = []
+
+[[bin]]
+name = "binary-function-1"
+path = "src/main.rs"
+test = false
