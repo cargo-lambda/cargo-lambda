@@ -13,6 +13,7 @@ description.workspace = true
 
 [dependencies]
 aws-config.workspace = true
+aws-sdk-iam.workspace = true
 aws-sdk-lambda.workspace = true
 aws-types.workspace = true
 clap.workspace = true

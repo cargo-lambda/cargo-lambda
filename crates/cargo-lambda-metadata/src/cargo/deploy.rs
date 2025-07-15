@@ -1,5 +1,6 @@
 use cargo_lambda_remote::{
     RemoteConfig,
+    aws_sdk_iam::types::Tag,
     aws_sdk_lambda::types::{Environment, TracingConfig},
 };
 use clap::{ArgAction, Args, ValueHint};
@@ -159,6 +160,20 @@ impl Deploy {
             None => None,
             Some(tags) if tags.is_empty() => None,
             Some(tags) => Some(tags.join("&")),
+        }
+    }
+
+    pub fn iam_tags(&self) -> Option<Vec<Tag>> {
+        match &self.tag {
+            None => None,
+            Some(tags) if tags.is_empty() => None,
+            Some(tags) => Some(
+                extract_tags(tags)
+                    .into_iter()
+                    .map(|(k, v)| Tag::builder().key(k).value(v).build())
+                    .collect::<Result<Vec<_>, _>>()
+                    .expect("failed to build IAM tags"),
+            ),
         }
     }
 

@@ -127,6 +127,7 @@ impl RemoteConfig {
 pub mod aws_sdk_config {
     pub use aws_types::SdkConfig;
 }
+pub use aws_sdk_iam;
 pub use aws_sdk_lambda;
 
 #[cfg(test)]

@@ -1338,6 +1338,7 @@ dependencies = [
  "miette 5.10.0",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "tempfile",
  "tokio",
  "tracing",
@@ -1434,6 +1435,7 @@ version = "1.8.5"
 dependencies = [
  "aws-config",
  "aws-credential-types",
+ "aws-sdk-iam",
  "aws-sdk-lambda",
  "aws-types",
  "clap",
