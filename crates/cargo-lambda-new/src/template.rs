@@ -231,8 +231,8 @@ fn adjust_remote_zip_base(url: &str, path: &Path) -> Option<PathBuf> {
     if let Some(caps) = archive_regex.captures(url) {
         let repo = caps.name("repo")?.as_str();
         let reference = caps.name("ref")?.as_str();
-        let reference = reference.replace(&format!("{}-", repo), "");
-        let base_dir = format!("{}-{}", repo, reference);
+        let reference = reference.replace(&format!("{repo}-"), "");
+        let base_dir = format!("{repo}-{reference}");
 
         let base_path = path.join(&base_dir);
         tracing::trace!(

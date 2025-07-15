@@ -530,7 +530,7 @@ fn extract_tags(tags: &Vec<String>) -> HashMap<String, String> {
 mod tests {
     use crate::{
         cargo::load_metadata,
-        config::{ConfigOptions, load_config_without_cli_flags},
+        config::{ConfigOptions, FunctionNames, load_config_without_cli_flags},
         lambda::Timeout,
         tests::fixture_metadata,
     };
@@ -635,7 +635,7 @@ mod tests {
     #[test]
     fn test_load_config_from_workspace() {
         let options = ConfigOptions {
-            name: Some("crate-3".to_string()),
+            names: FunctionNames::from_package("crate-3"),
             admerge: true,
             ..Default::default()
         };

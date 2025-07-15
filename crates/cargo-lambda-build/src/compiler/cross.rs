@@ -42,7 +42,7 @@ fn default_cross_image(target: &str, metadata: &CargoMetadata) -> Option<(String
         return None;
     }
 
-    let env_value = format!("ghcr.io/cross-rs/{}:0.2.5", target);
+    let env_value = format!("ghcr.io/cross-rs/{target}:0.2.5");
     Some((env_name, env_value))
 }
 

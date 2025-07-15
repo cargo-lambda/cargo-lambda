@@ -412,6 +412,7 @@ async fn create_buffered_response(
     Ok((status, resp_body))
 }
 
+#[allow(clippy::result_large_err)]
 fn respond_with_disabled_default_function(
     state: &RefRuntimeState,
     invoke_call: bool,
@@ -436,6 +437,7 @@ fn respond_with_disabled_default_function(
         .map_err(ServerError::ResponseBuild)
 }
 
+#[allow(clippy::result_large_err)]
 fn respond_with_missing_function(
     binaries: &HashSet<String>,
 ) -> Result<Response<Body>, ServerError> {

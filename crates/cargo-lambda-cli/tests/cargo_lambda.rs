@@ -23,7 +23,7 @@ fn test_build_basic_function() {
     cargo_lambda_build(project.root()).assert().success();
 
     let bin = project.lambda_function_bin(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
 
     #[cfg(not(windows))]
     {
@@ -54,7 +54,7 @@ fn test_build_basic_zip_function() {
         .success();
 
     let bin = project.lambda_function_zip(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
     let file = File::open(bin).expect("failed to open zip file");
     let mut zip = ZipArchive::new(file).expect("failed to initialize the zip archive");
     assert!(
@@ -82,7 +82,7 @@ fn test_build_basic_zip_function_with_include() {
         .success();
 
     let bin = project.lambda_function_zip(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
     let file = File::open(bin).expect("failed to open zip file");
     let mut zip = ZipArchive::new(file).expect("failed to initialize the zip archive");
     assert!(
@@ -108,7 +108,7 @@ fn test_build_http_function() {
     cargo_lambda_build(project.root()).assert().success();
 
     let bin = project.lambda_function_bin(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
 
     #[cfg(not(windows))]
     {
@@ -137,7 +137,7 @@ fn test_build_http_feature_function() {
     cargo_lambda_build(project.root()).assert().success();
 
     let bin = project.lambda_function_bin(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
 }
 
 #[test]
@@ -156,7 +156,7 @@ fn test_build_event_type_function() {
     cargo_lambda_build(project.root()).assert().success();
 
     let bin = project.lambda_function_bin(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
 }
 
 #[test]
@@ -177,7 +177,7 @@ fn test_build_basic_extension() {
         .success();
 
     let bin = project.lambda_extension_bin(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
 
     #[cfg(not(windows))]
     cargo_lambda_dry_deploy(project.root())
@@ -206,7 +206,7 @@ fn test_build_logs_extension() {
         .success();
 
     let bin = project.lambda_extension_bin(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
 }
 
 #[test]
@@ -228,7 +228,7 @@ fn test_build_telemetry_extension() {
         .success();
 
     let bin = project.lambda_extension_bin(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
 }
 
 #[test]
@@ -248,7 +248,7 @@ fn test_init_subcommand() {
     cargo_lambda_build(project.root()).assert().success();
 
     let bin = project.lambda_function_bin(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
 }
 
 #[test]
@@ -376,10 +376,10 @@ fn test_build_example() {
         .success();
 
     let bin = project.lambda_function_bin("example-lambda");
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
 
     let bin = project.lambda_function_bin(&lp.name);
-    assert!(!bin.exists(), "{:?} exists, but it shoudn't", bin);
+    assert!(!bin.exists(), "{bin:?} exists, but it shoudn't");
 
     #[cfg(not(windows))]
     cargo_lambda_dry_deploy(project.root())
@@ -394,7 +394,7 @@ fn test_build_example() {
     cargo_lambda_build(project.root()).assert().success();
 
     let bin = project.lambda_function_bin("example-lambda");
-    assert!(!bin.exists(), "{:?} exists, but it shouldn't", bin);
+    assert!(!bin.exists(), "{bin:?} exists, but it shouldn't");
 
     let bin = project.lambda_function_bin(&lp.name);
     assert!(
@@ -508,18 +508,18 @@ members = ["crates/{}", "crates/{}"]
     // Build all binaries first. The second build should zip only one of them.
     cargo_lambda_build(workspace.root()).assert().success();
     let lp_1_bin = workspace.lambda_function_zip(&lp_1.name);
-    assert!(!lp_1_bin.exists(), "{:?} exist", lp_1_bin);
+    assert!(!lp_1_bin.exists(), "{lp_1_bin:?} exist");
     let lp_2_bin = workspace.lambda_function_zip(&lp_2.name);
-    assert!(!lp_2_bin.exists(), "{:?} exist", lp_2_bin);
+    assert!(!lp_2_bin.exists(), "{lp_2_bin:?} exist");
 
     cargo_lambda_build(workspace.root())
         .args(["--bin", &lp_1.name, "--output-format", "zip"])
         .assert()
         .success();
 
-    assert!(lp_1_bin.exists(), "{:?} doesn't exist", lp_1_bin);
+    assert!(lp_1_bin.exists(), "{lp_1_bin:?} doesn't exist");
     // The second zip file should not be created because we're using `--bin`.
-    assert!(!lp_2_bin.exists(), "{:?} exist", lp_2_bin);
+    assert!(!lp_2_bin.exists(), "{lp_2_bin:?} exist");
 }
 
 #[test]
@@ -571,7 +571,7 @@ fn test_deploy_function_with_extra_files() {
     cargo_lambda_build(project.root()).assert().success();
 
     let bin = project.lambda_function_bin(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
 
     #[cfg(not(windows))]
     {
@@ -688,10 +688,10 @@ fn test_deploy_pre_existing_zip_file() {
         .success();
 
     let bin = project.lambda_function_bin(&lp.name);
-    assert!(!bin.exists(), "{:?} exist", bin);
+    assert!(!bin.exists(), "{bin:?} exist");
 
     let zip_path = project.lambda_function_zip(&lp.name);
-    assert!(zip_path.exists(), "{:?} doesn't exist", zip_path);
+    assert!(zip_path.exists(), "{zip_path:?} doesn't exist");
 
     #[cfg(not(windows))]
     {
@@ -743,7 +743,7 @@ fn test_deploy_with_sdk_and_vpc_cli_flags() {
     cargo_lambda_build(project.root()).assert().success();
 
     let bin = project.lambda_function_bin(&lp.name);
-    assert!(bin.exists(), "{:?} doesn't exist", bin);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
 
     #[cfg(not(windows))]
     {

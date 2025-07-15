@@ -101,11 +101,18 @@ impl Watch {
 
     /// Returns the package name if there is only one package in the list of `packages`,
     /// otherwise None.
-    pub fn package(&self) -> Option<String> {
+    pub fn pkg_name(&self) -> Option<String> {
         if self.cargo_opts.packages.len() > 1 {
             return None;
         }
         self.cargo_opts.packages.first().map(|s| s.to_string())
+    }
+
+    pub fn bin_name(&self) -> Option<String> {
+        if self.cargo_opts.bin.len() > 1 {
+            return None;
+        }
+        self.cargo_opts.bin.first().map(|s| s.to_string())
     }
 
     pub fn lambda_environment(

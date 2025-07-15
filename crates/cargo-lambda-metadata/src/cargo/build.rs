@@ -131,6 +131,22 @@ impl Build {
     pub fn output_format(&self) -> &OutputFormat {
         self.output_format.as_ref().unwrap_or(&OutputFormat::Binary)
     }
+
+    /// Returns the package name if there is only one package in the list of `packages`,
+    /// otherwise None.
+    pub fn pkg_name(&self) -> Option<String> {
+        if self.cargo_opts.packages.len() > 1 {
+            return None;
+        }
+        self.cargo_opts.packages.first().map(|s| s.to_string())
+    }
+
+    pub fn bin_name(&self) -> Option<String> {
+        if self.cargo_opts.bin.len() > 1 {
+            return None;
+        }
+        self.cargo_opts.bin.first().map(|s| s.to_string())
+    }
 }
 
 impl Serialize for Build {
