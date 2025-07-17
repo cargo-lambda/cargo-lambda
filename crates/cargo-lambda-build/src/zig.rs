@@ -43,13 +43,9 @@ pub async fn check_installation() -> Result<ZigInfo> {
         return get_zig_version(path, run_modifiers);
     }
 
-    println!("Zig is not installed in your system.");
     let options = install_options();
     if options.is_empty() {
-        println!(
-            "Download Zig 0.13.0 or newer from https://ziglang.org/download/ and add it to your PATH"
-        );
-        return Err(BuildError::ZigMissing.into());
+        return Err(BuildError::ZigMissingInstaller.into());
     }
 
     if options.len() == 1 {
