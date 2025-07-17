@@ -339,6 +339,9 @@ async fn create_streaming_response(
 
     if let Some(headers) = builder.headers_mut() {
         headers.extend(prelude.headers);
+        if let Some(content_length) = headers.remove("content-length") {
+            headers.insert("x-amzn-remapped-content-length", content_length);
+        }
 
         prelude.cookies.iter().try_for_each(|cookie| {
             let header_value =
