@@ -15,9 +15,14 @@ pub(crate) enum BuildError {
     #[error("invalid options: --compiler=cargo is only allowed on Linux")]
     #[diagnostic()]
     InvalidCompilerOption,
-    #[error("install Zig and run cargo-lambda again")]
+    #[error("Zig is not installed in your system, please install it and run Cargo Lambda again")]
     #[diagnostic()]
     ZigMissing,
+    #[error(
+        "no available Zig installers found, please download Zig 0.13.0 or newer from https://ziglang.org/download/ and add it to your PATH"
+    )]
+    #[diagnostic()]
+    ZigMissingInstaller,
     #[error("binary target is missing from this project: {0}")]
     #[diagnostic()]
     FunctionBinaryMissing(String),
