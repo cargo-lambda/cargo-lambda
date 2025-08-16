@@ -25,7 +25,7 @@ impl std::fmt::Display for DeployOutput {
         writeln!(f, "✅ extension uploaded successfully 🎉")?;
         writeln!(
             f,
-            "🛠️  binary last compiled {}",
+            "🛠️ binary last compiled {}",
             self.binary_modified_at.humanize()
         )?;
 
