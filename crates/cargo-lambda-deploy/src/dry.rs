@@ -53,7 +53,7 @@ impl Display for DeployOutput {
         writeln!(f, "🏠 zip file located at {}", self.path.display())?;
         writeln!(
             f,
-            "🛠️  binary last compiled {}",
+            "🛠️ binary last compiled {}",
             self.binary_modified_at.humanize()
         )?;
         writeln!(f, "🏗️  architecture {}", self.arch)?;

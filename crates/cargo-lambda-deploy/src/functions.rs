@@ -49,7 +49,7 @@ impl std::fmt::Display for DeployOutput {
         writeln!(f, "✅ function deployed successfully 🎉")?;
         writeln!(
             f,
-            "🛠️  binary last compiled {}",
+            "🛠️ binary last compiled {}",
             self.binary_modified_at.humanize()
         )?;
         writeln!(f, "🔍 arn: {}", self.function_arn)?;
