@@ -552,7 +552,7 @@ async fn wait_for_ready_state(
             (other, _) => return Err(miette::miette!("unexpected function state: {:?}", other)),
         }
 
-        if attempt == 5 {
+        if attempt == 4 {
             return Err(miette::miette!(
                 "configuration update didn't finish in time, wait a few minutes and try again"
             ));
