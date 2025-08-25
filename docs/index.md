@@ -22,5 +22,5 @@ features:
   - title: Native Developer Experience
     details: Run and test your functions locally without Docker, VMs, or any other additional tools.
   - title: From zero to production with one single tool
-    details: Organize your work-around common workflows. Cargo Lambda helps you start your projects and take them to production when they are ready.
+    details: Organize your work around common workflows. Cargo Lambda helps you start your projects and take them to production when they are ready.
 ---
