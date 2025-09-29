@@ -77,8 +77,8 @@ The build configuration is used to configure the build process for the Lambda fu
 The build configuration supports the following options:
 
 - `output_format`: The format to produce the compile Lambda into. Acceptable values are `Binary` or `Zip`.
-- `lambda_dir`: Base directory where lambda binaries will be located. Each binary will be placed in a subdirectory named after the binary (e.g., `dist/lambda/foo/bootstrap`).
-- `flatten`: Places the bootstrap file directly in the lambda directory (e.g., `dist/lambda/bootstrap`) instead of creating a subdirectory. Specify the binary name to flatten.
+- `lambda_dir`: Base directory where lambda binaries will be located. Each binary will be placed in a subdirectory named after the binary (`<LAMBDA_DIR>/<BIN_NAME>/bootstrap`).
+- `flatten`: Places the bootstrap file directly in the lambda directory (`<LAMBDA_DIR>/bootstrap`) instead of creating a subdirectory. Specify the binary name to flatten.
 - `arm64`: Shortcut for `--target aarch64-unknown-linux-gnu`. When set to `true`, builds for ARM64 architecture.
 - `x86_64`: Shortcut for `--target x86_64-unknown-linux-gnu`. When set to `true`, builds for x86_64 architecture.
 - `extension`: Whether the code that you're building is a Lambda Extension. Set to `true` to build as an extension.

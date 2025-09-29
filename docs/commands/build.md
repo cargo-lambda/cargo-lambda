@@ -94,7 +94,7 @@ Cargo Lambda supports building Rust projects with [cross](https://crates.io/crat
 
 ### Adding Zig to PATH on Windows/WSL
 
-If you installed Zig using Pip3 and still encounter issues with Cargo Lambda not finding Zig, it might be because the Zig binary is not in your system’s `$PATH`. 
+If you installed Zig using Pip3 and still encounter issues with Cargo Lambda not finding Zig, it might be because the Zig binary is not in your system’s `$PATH`.
 
 To resolve this, you need to manually add the Zig installation path to your environment variables.
 
@@ -171,12 +171,12 @@ By default, cargo-lambda places compiled binaries in `target/lambda`. You can cu
 
 **Example:**
 ```bash
-cargo lambda build --bin foo --lambda-dir dist/lambda
+cargo lambda build --bin foo --lambda-dir a/b/c
 ```
 
 **Result:**
 ```
-dist/lambda/foo/bootstrap
+a/b/c/foo/bootstrap
 ```
 
 ### Flattening Directory Structure (`--flatten`)
@@ -184,12 +184,12 @@ dist/lambda/foo/bootstrap
 If you want the binary to be placed directly in the specified directory without the additional subdirectory, use the `--flatten` flag:
 
 ```bash
-cargo lambda build --bin foo --lambda-dir dist/lambda --flatten foo
+cargo lambda build --bin foo --lambda-dir a/b/c --flatten foo
 ```
 
 **Result:**
 ```
-dist/lambda/bootstrap
+a/b/c/bootstrap
 ```
 
 The `--flatten` flag requires you to specify which binary to flatten by providing the binary name.
