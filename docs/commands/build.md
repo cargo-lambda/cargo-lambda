@@ -161,6 +161,39 @@ You can keep some build configuration options in your project's `Cargo.toml` fil
 include = [ "README.md" ]      # Extra list of files to add to the zip bundle
 ```
 
+## Output Directory Structure
+
+### Lambda Directory (`--lambda-dir`)
+
+By default, cargo-lambda places compiled binaries in `target/lambda`. You can customize this location using the `--lambda-dir` flag.
+
+**Important:** The `--lambda-dir` flag specifies a *base directory*. Each binary will be placed in a subdirectory named after the binary within this base directory.
+
+**Example:**
+```bash
+cargo lambda build --bin foo --lambda-dir dist/lambda
+```
+
+**Result:**
+```
+dist/lambda/foo/bootstrap
+```
+
+### Flattening Directory Structure (`--flatten`)
+
+If you want the binary to be placed directly in the specified directory without the additional subdirectory, use the `--flatten` flag:
+
+```bash
+cargo lambda build --bin foo --lambda-dir dist/lambda --flatten foo
+```
+
+**Result:**
+```
+dist/lambda/bootstrap
+```
+
+The `--flatten` flag requires you to specify which binary to flatten by providing the binary name.
+
 ## Adding extra files to the zip file
 
 In some situations, you might want to add extra files inside the zip file built. You can use the option `--include` to add extra files or directories to the zip file. For example, if you have a directory with configuration files, you can add it to the zip file using the command below:
