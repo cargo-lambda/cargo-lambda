@@ -18,7 +18,7 @@ pub struct Build {
     #[serde(default)]
     pub output_format: Option<OutputFormat>,
 
-    /// Directory where the final lambda binaries will be located
+    /// Base directory where lambda binaries will be located (creates subdirectories per binary)
     #[arg(short, long, value_hint = ValueHint::DirPath)]
     #[serde(default)]
     pub lambda_dir: Option<PathBuf>,
@@ -43,8 +43,8 @@ pub struct Build {
     #[serde(default)]
     pub internal: bool,
 
-    /// Put a bootstrap file in the root of the lambda directory.
-    /// Use the name of the compiled binary to choose which file to move.
+    /// Places the bootstrap file directly in the lambda directory instead of creating a subdirectory.
+    /// Specify the binary name to flatten.
     #[arg(long)]
     #[serde(default)]
     pub flatten: Option<String>,
