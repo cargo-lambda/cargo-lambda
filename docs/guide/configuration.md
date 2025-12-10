@@ -154,9 +154,6 @@ The deploy configuration supports the following options:
 - `tracing`: The tracing mode with X-Ray.
 - `role`: The IAM role associated with the function.
 - `layer`: The Lambda Layer ARN to associate the deployed function with.
-- `tracing`: The tracing mode with X-Ray.
-- `role`: The IAM role associated with the function.
-- `layer`: The Lambda Layer ARN to associate the deployed function with.
 - `runtime`: The Lambda runtime to deploy the function with.
 - `description`: A description for the new function version.
 - `log_retention`: The retention policy for the function's log group.
