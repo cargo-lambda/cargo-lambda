@@ -153,7 +153,7 @@ The deploy configuration supports the following options:
 - `timeout`: The timeout for the function.
 - `tracing`: The tracing mode with X-Ray.
 - `role`: The IAM role associated with the function.
-- `layer`: The Lambda Layer ARN to associate the deployed function with.
+- `layer`: An array of Lambda Layer ARNs to associate the deployed function with.
 - `runtime`: The Lambda runtime to deploy the function with.
 - `description`: A description for the new function version.
 - `log_retention`: The retention policy for the function's log group.
