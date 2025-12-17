@@ -135,7 +135,7 @@ pub fn cargo_lambda_dry_deploy<P: AsRef<Path>>(path: P) -> Command {
 }
 
 fn cargo_exe() -> std::path::PathBuf {
-    snapbox::cmd::cargo_bin("cargo-lambda")
+    snapbox::cmd::cargo_bin!("cargo-lambda").to_path_buf()
 }
 
 pub trait LambdaCommandExt {
