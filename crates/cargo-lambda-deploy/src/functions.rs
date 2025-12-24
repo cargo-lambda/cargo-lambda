@@ -790,6 +790,7 @@ mod tests {
     use cargo_lambda_remote::aws_sdk_lambda::config::Config as LambdaConfig;
     use http::{Request, Response};
     use std::io::Read;
+    use http::StatusCode;
 
     #[tokio::test]
     async fn test_update_function_config_no_changes() {
@@ -853,7 +854,7 @@ mod tests {
             Request::builder()
                 .uri("https://lambda.us-east-1.amazonaws.com/2015-03-31/functions/test-function/code")
                 .body(request_body).unwrap(),
-            Response::builder().status(200).body(response_body).unwrap(),
+            Response::builder().status(StatusCode::OK).body(response_body).unwrap(),
         )]);
 
         let lambda_config = LambdaConfig::builder()
@@ -910,7 +911,7 @@ mod tests {
             .body(SdkBody::empty())
             .unwrap();
         let s3_response = Response::builder()
-            .status(200)
+            .status(StatusCode::OK)
             .body(SdkBody::from(r#"{"ETag": "test-etag"}"#))
             .unwrap();
 
@@ -927,7 +928,7 @@ mod tests {
             ))
             .unwrap();
         let lambda_response = Response::builder()
-            .status(200)
+            .status(StatusCode::OK)
             .body(SdkBody::from(
                 serde_json::json!({
                     "FunctionArn": "arn:aws:lambda:us-east-1:123456789012:function:test-function",
@@ -1033,7 +1034,7 @@ mod tests {
                 .method("POST")
                 .body(request_body)
                 .unwrap(),
-            Response::builder().status(200).body(response_body).unwrap(),
+            Response::builder().status(StatusCode::OK).body(response_body).unwrap(),
         )]);
 
         let lambda_config = LambdaConfig::builder()
@@ -1093,7 +1094,7 @@ mod tests {
             .body(SdkBody::empty())
             .unwrap();
         let s3_response = Response::builder()
-            .status(200)
+            .status(StatusCode::OK)
             .body(SdkBody::from(r#"{"ETag": "test-etag"}"#))
             .unwrap();
 
@@ -1122,7 +1123,7 @@ mod tests {
             ))
             .unwrap();
         let lambda_response = Response::builder()
-            .status(200)
+            .status(StatusCode::OK)
             .body(SdkBody::from(
                 serde_json::json!({
                     "FunctionArn": "arn:aws:lambda:us-east-1:123456789012:function:test-function",
@@ -1218,7 +1219,7 @@ mod tests {
                 .method("PUT")
                 .body(request_body)
                 .unwrap(),
-            Response::builder().status(200).body(response_body).unwrap(),
+            Response::builder().status(StatusCode::OK).body(response_body).unwrap(),
         )]);
 
         let config = LambdaConfig::builder()
@@ -1268,7 +1269,7 @@ mod tests {
             .unwrap();
 
         let create_log_group_response = Response::builder()
-            .status(200)
+            .status(StatusCode::OK)
             .body(SdkBody::from("{}"))
             .unwrap();
 
@@ -1286,7 +1287,7 @@ mod tests {
             .unwrap();
 
         let put_retention_response = Response::builder()
-            .status(200)
+            .status(StatusCode::OK)
             .body(SdkBody::from("{}"))
             .unwrap();
 
@@ -1324,7 +1325,7 @@ mod tests {
             .unwrap();
 
         let create_log_group_response = Response::builder()
-            .status(400)
+            .status(StatusCode::BAD_REQUEST)
             .body(SdkBody::from(
                 serde_json::json!({
                     "__type": "ResourceAlreadyExistsException",
@@ -1348,7 +1349,7 @@ mod tests {
             .unwrap();
 
         let put_retention_response = Response::builder()
-            .status(200)
+            .status(StatusCode::OK)
             .body(SdkBody::from("{}"))
             .unwrap();
 
