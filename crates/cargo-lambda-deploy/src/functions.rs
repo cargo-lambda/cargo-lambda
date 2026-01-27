@@ -378,7 +378,7 @@ async fn update_function_config(
         }
 
         // If merge_env is enabled, populate remote_env with existing environment variables
-        let config_with_remote_env = if config.merge_env.unwrap_or(false) {
+        let config_with_remote_env = if config.merge_env {
             let mut config_clone = config.clone();
             config_clone.remote_env = conf
                 .environment
@@ -1427,7 +1427,7 @@ mod tests {
 
         // Setup deploy config with merge_env enabled
         let mut deploy_config = Deploy::default();
-        deploy_config.merge_env = Some(true);
+        deploy_config.merge_env = true;
         deploy_config.function_config.env_options = Some(EnvOptions {
             env_var: Some(vec![
                 "LOCAL_VAR=local_value".to_string(),

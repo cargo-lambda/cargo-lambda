@@ -352,7 +352,7 @@ mod tests {
         assert_eq!(config.env.get("FOO"), Some(&"BAR".to_string()));
         assert_eq!(config.deploy.function_config.memory, Some(512.into()));
         assert_eq!(config.deploy.function_config.timeout, Some(60.into()));
-        assert_eq!(config.deploy.merge_env, Some(true));
+        assert_eq!(config.deploy.merge_env, true);
 
         assert_eq!(
             config.deploy.function_config.layer,
@@ -527,9 +527,9 @@ mod tests {
         };
 
         let config = load_config(&args_config, &metadata, &ConfigOptions::default()).unwrap();
-
+        
         // Should load merge_env=true from Cargo.toml
-        assert_eq!(config.deploy.merge_env, Some(true),
+        assert_eq!(config.deploy.merge_env, true, 
             "merge_env from Cargo.toml should be preserved when CLI doesn't set it");
     }
 
