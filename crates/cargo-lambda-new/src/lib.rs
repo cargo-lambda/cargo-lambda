@@ -434,14 +434,16 @@ fn should_render_file(
         };
 
         if let Some(condition_value) = &condition.r#match
-            && condition_value.to_value() == *variable {
-                return true;
-            }
+            && condition_value.to_value() == *variable
+        {
+            return true;
+        }
 
         if let Some(condition_value) = &condition.not_match
-            && condition_value.to_value() != *variable {
-                return true;
-            }
+            && condition_value.to_value() != *variable
+        {
+            return true;
+        }
     }
 
     false
@@ -480,14 +482,16 @@ fn should_ignore_file(
         };
 
         if let Some(condition_value) = &condition.r#match
-            && condition_value.to_value() == *variable {
-                return true;
-            }
+            && condition_value.to_value() == *variable
+        {
+            return true;
+        }
 
         if let Some(condition_value) = &condition.not_match
-            && condition_value.to_value() != *variable {
-                return true;
-            }
+            && condition_value.to_value() != *variable
+        {
+            return true;
+        }
     }
 
     false
