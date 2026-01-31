@@ -268,11 +268,10 @@ fn is_remote_zip_file(path: &str) -> bool {
 
 fn find_local_zip_file(value: &str) -> Option<PathBuf> {
     // ignore error to fallback to other template options.
-    if let Ok(path) = dunce::realpath(value) {
-        if path.exists() && path.is_file() && path.extension().unwrap_or_default() == "zip" {
+    if let Ok(path) = dunce::realpath(value)
+        && path.exists() && path.is_file() && path.extension().unwrap_or_default() == "zip" {
             return Some(path);
         }
-    }
 
     None
 }
