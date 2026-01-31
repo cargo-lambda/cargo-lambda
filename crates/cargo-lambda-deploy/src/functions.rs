@@ -1444,9 +1444,10 @@ mod tests {
         existing_env.insert("REMOTE_VAR".to_string(), "remote_value".to_string());
         existing_env.insert("OVERRIDE_VAR".to_string(), "old_value".to_string());
 
-        let environment = cargo_lambda_remote::aws_sdk_lambda::types::EnvironmentResponse::builder()
-            .set_variables(Some(existing_env))
-            .build();
+        let environment =
+            cargo_lambda_remote::aws_sdk_lambda::types::EnvironmentResponse::builder()
+                .set_variables(Some(existing_env))
+                .build();
 
         let conf = FunctionConfiguration::builder()
             .function_arn("arn:aws:lambda:us-east-1:123456789012:function:test-function")

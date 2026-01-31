@@ -527,10 +527,12 @@ mod tests {
         };
 
         let config = load_config(&args_config, &metadata, &ConfigOptions::default()).unwrap();
-        
+
         // Should load merge_env=true from Cargo.toml
-        assert_eq!(config.deploy.merge_env, true, 
-            "merge_env from Cargo.toml should be preserved when CLI doesn't set it");
+        assert_eq!(
+            config.deploy.merge_env, true,
+            "merge_env from Cargo.toml should be preserved when CLI doesn't set it"
+        );
     }
 
     #[test]
