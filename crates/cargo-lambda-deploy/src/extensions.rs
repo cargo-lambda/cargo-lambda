@@ -92,6 +92,7 @@ pub(crate) async fn deploy(
         .layer_name(name)
         .compatible_architectures(binary_archive.architecture())
         .set_compatible_runtimes(Some(compatible_runtimes))
+        .set_description(config.function_config.description.clone())
         .content(input)
         .send()
         .await
