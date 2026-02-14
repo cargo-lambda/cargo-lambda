@@ -63,8 +63,11 @@ jobs:
         with:
           zig-version: 0.14.0
 
-      - name: Configure cache
-        uses: mozilla-actions/sccache-action@v0.0.3
+      # sccache provides compilation caching but may fail for fork PRs due to cache access restrictions
+      # We use continue-on-error to ensure builds proceed even if cache setup fails
+      - name: Configure sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+        continue-on-error: true
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2

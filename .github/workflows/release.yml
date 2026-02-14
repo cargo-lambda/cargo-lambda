@@ -33,8 +33,11 @@ jobs:
         with:
           shared-key: "cargo-lambda-release-${{ matrix.platform.target }}"
           cache-on-failure: false
-      - name: Configure cache
-        uses: mozilla-actions/sccache-action@v0.0.3
+      # sccache provides compilation caching but may fail due to cache access restrictions
+      # We use continue-on-error to ensure builds proceed even if cache setup fails
+      - name: Configure sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+        continue-on-error: true
 
       - name: Build
         uses: messense/maturin-action@v1
@@ -72,8 +75,11 @@ jobs:
         with:
           shared-key: "cargo-lambda-release-${{ matrix.platform.target }}"
           cache-on-failure: false
-      - name: Configure cache
-        uses: mozilla-actions/sccache-action@v0.0.3
+      # sccache provides compilation caching but may fail due to cache access restrictions
+      # We use continue-on-error to ensure builds proceed even if cache setup fails
+      - name: Configure sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+        continue-on-error: true
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v2
         with:
@@ -119,8 +125,11 @@ jobs:
         with:
           shared-key: "cargo-lambda-release-${{ matrix.platform.target }}"
           cache-on-failure: false
-      - name: Configure cache
-        uses: mozilla-actions/sccache-action@v0.0.3
+      # sccache provides compilation caching but may fail due to cache access restrictions
+      # We use continue-on-error to ensure builds proceed even if cache setup fails
+      - name: Configure sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+        continue-on-error: true
       - name: Build
         uses: messense/maturin-action@v1
         with:
