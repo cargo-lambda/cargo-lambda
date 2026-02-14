@@ -1,7 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
 use miette::{Context, IntoDiagnostic, Result};
-use rustc_version::Channel;
 
 use crate::error::BuildError;
 
@@ -27,21 +26,18 @@ impl Arch {
 #[derive(Debug)]
 pub struct TargetArch {
     rustc_target: String,
-    channel: Option<Channel>,
 }
 
 impl TargetArch {
     pub fn arm64() -> Self {
         Self {
             rustc_target: TARGET_ARM.into(),
-            channel: None,
         }
     }
 
     pub fn x86_64() -> Self {
         Self {
             rustc_target: TARGET_X86_64.into(),
-            channel: None,
         }
     }
 
@@ -53,7 +49,6 @@ impl TargetArch {
         if !target.compatible_host_linker() {
             target = TargetArch::x86_64();
         }
-        target.channel = Some(rustc_meta.channel);
         Ok(target)
     }
 
@@ -85,16 +80,6 @@ impl TargetArch {
         false
     }
 
-    pub fn channel(&self) -> Result<Channel> {
-        match self.channel {
-            Some(c) => Ok(c),
-            None => rustc_version::version_meta()
-                .map(|m| m.channel)
-                .into_diagnostic()
-                .wrap_err("error reading Rust version information"),
-        }
-    }
-
     pub fn rustc_target_without_glibc_version(&self) -> &str {
         let Some((rustc_target_without_glibc_version, _)) = self.rustc_target.split_once('.')
         else {
@@ -117,7 +102,6 @@ impl FromStr for TargetArch {
     fn from_str(host: &str) -> Result<Self, Self::Err> {
         Ok(Self {
             rustc_target: host.into(),
-            channel: None,
         })
     }
 }

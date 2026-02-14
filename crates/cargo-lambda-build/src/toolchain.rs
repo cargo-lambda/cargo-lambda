@@ -3,7 +3,6 @@ use cargo_lambda_interactive::{
     progress::Progress,
 };
 use miette::{IntoDiagnostic, Result, WrapErr};
-use rustc_version::Channel;
 use std::{env, str};
 
 use crate::target_arch::TargetArch;
@@ -13,16 +12,8 @@ use crate::target_arch::TargetArch;
 pub async fn check_target_component_with_rustc_meta(target_arch: &TargetArch) -> Result<()> {
     let component = target_arch.rustc_target_without_glibc_version();
 
-    // convert `Channel` enum to a lower-cased string representation
-    let toolchain = match target_arch.channel()? {
-        Channel::Stable => "stable",
-        Channel::Nightly => "nightly",
-        Channel::Dev => "dev",
-        Channel::Beta => "beta",
-    };
-
     let cmd = rustup_cmd();
-    let args = [&format!("+{toolchain}"), "target", "list", "--installed"];
+    let args = ["target", "list", "--installed"];
 
     tracing::trace!(
         cmd = ?cmd,
@@ -49,7 +40,7 @@ pub async fn check_target_component_with_rustc_meta(target_arch: &TargetArch) ->
         // install target component using `rustup`
         let pb = Progress::start(format!("Installing target component `{component}`..."));
 
-        let result = install_target_component(component, toolchain).await;
+        let result = install_target_component(component).await;
         let finish = if result.is_ok() {
             "Target component installed"
         } else {
@@ -63,9 +54,9 @@ pub async fn check_target_component_with_rustc_meta(target_arch: &TargetArch) ->
 }
 
 /// Install target component in the host toolchain, using `rustup target add`
-async fn install_target_component(component: &str, toolchain: &str) -> Result<()> {
+async fn install_target_component(component: &str) -> Result<()> {
     let cmd = rustup_cmd();
-    let args = [&format!("+{toolchain}"), "target", "add", component];
+    let args = ["target", "add", component];
     tracing::trace!(
         cmd = ?cmd,
         args = ?args,
