@@ -700,7 +700,7 @@ mod test {
         let data = BinaryData::new("binary-x86-64", false, false);
 
         let bp = "../../tests/binaries/binary-x86-64";
-        let metadata = load_metadata("Cargo.toml").unwrap();
+        let metadata = load_metadata("Cargo.toml", None).unwrap();
         let target_dir =
             target_dir_from_metadata(&metadata).unwrap_or_else(|_| PathBuf::from("target"));
 

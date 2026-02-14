@@ -147,7 +147,10 @@ impl LambdaSubcommand {
             admerge,
         };
 
-        let metadata = load_metadata(build.manifest_path())?;
+        let metadata = load_metadata(
+            build.manifest_path(),
+            build.cargo_opts.common.target_dir.as_deref(),
+        )?;
         let args_config = Config {
             build,
             ..Default::default()
@@ -171,7 +174,10 @@ impl LambdaSubcommand {
             admerge,
         };
 
-        let metadata = load_metadata(watch.manifest_path())?;
+        let metadata = load_metadata(
+            watch.manifest_path(),
+            watch.cargo_opts.common.target_dir.as_deref(),
+        )?;
         let args_config = Config {
             watch,
             ..Default::default()
@@ -194,7 +200,7 @@ impl LambdaSubcommand {
             admerge,
         };
 
-        let metadata = load_metadata(deploy.manifest_path())?;
+        let metadata = load_metadata(deploy.manifest_path(), None)?;
         let args_config = Config {
             deploy,
             ..Default::default()

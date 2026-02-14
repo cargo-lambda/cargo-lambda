@@ -153,7 +153,8 @@ mod tests {
         config.binary_path = Some(PathBuf::from("../../tests/binaries/binary-x86-64"));
         config.include = Some(vec!["src".into()]);
 
-        let metadata = load_metadata("../../tests/fixtures/examples-package/Cargo.toml").unwrap();
+        let metadata =
+            load_metadata("../../tests/fixtures/examples-package/Cargo.toml", None).unwrap();
         let (name, archive) = load_archive(&config, &metadata).unwrap();
         assert_eq!(name, "binary-x86-64");
 

@@ -743,7 +743,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metadata = load_metadata(fixture_metadata("workspace-package")).unwrap();
+        let metadata = load_metadata(fixture_metadata("workspace-package"), None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
         assert_eq!(
             config.deploy.function_config.timeout,
@@ -771,7 +771,7 @@ mod tests {
 
     #[test]
     fn test_load_region_from_package_metadata() {
-        let metadata = load_metadata(fixture_metadata("single-binary-package")).unwrap();
+        let metadata = load_metadata(fixture_metadata("single-binary-package"), None).unwrap();
 
         let options = ConfigOptions {
             names: FunctionNames::from_package("basic-lambda"),

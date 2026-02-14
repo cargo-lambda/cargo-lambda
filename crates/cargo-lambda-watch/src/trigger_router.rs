@@ -583,7 +583,8 @@ mod test {
 
     #[test]
     fn test_extract_path_parameters_with_router_params_and_method() {
-        let metadata = load_metadata("../../tests/fixtures/workspace-package/Cargo.toml").unwrap();
+        let metadata =
+            load_metadata("../../tests/fixtures/workspace-package/Cargo.toml", None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &ConfigOptions::default()).unwrap();
 
         let state = Arc::new(RuntimeState::new(

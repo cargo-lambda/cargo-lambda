@@ -93,7 +93,7 @@ pub async fn run(config: &System, options: &ConfigOptions) -> Result<()> {
     let manifest_path = config.manifest_path();
 
     if manifest_path.exists() {
-        let metadata = load_metadata(manifest_path)?;
+        let metadata = load_metadata(manifest_path, None)?;
 
         let config_info = if !options.names.is_empty() || metadata.packages.len() == 1 {
             let config = load_config_without_cli_flags(&metadata, options)?;

@@ -28,7 +28,7 @@ fn test_env() {
         "#,
         )?;
 
-        let metadata = load_metadata("Cargo.toml").unwrap();
+        let metadata = load_metadata("Cargo.toml", None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &ConfigOptions::default()).unwrap();
 
         assert!(config.build.cargo_opts.release);
@@ -61,7 +61,7 @@ fn test_env_with_context() {
             ..Default::default()
         };
 
-        let metadata = load_metadata("Cargo.toml").unwrap();
+        let metadata = load_metadata("Cargo.toml", None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
 
         assert_eq!(config.deploy.function_config.memory, Some(1024.into()));
@@ -88,7 +88,7 @@ fn test_env_with_arrays() {
             "#,
         )?;
 
-        let metadata = load_metadata("Cargo.toml").unwrap();
+        let metadata = load_metadata("Cargo.toml", None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &ConfigOptions::default()).unwrap();
 
         assert_eq!(config.build.cargo_opts.features, vec!["lambda", "env"]);

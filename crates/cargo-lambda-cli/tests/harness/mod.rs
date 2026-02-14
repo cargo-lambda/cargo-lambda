@@ -179,20 +179,22 @@ pub fn cargo_lambda_init<P: AsRef<Path>>(project_name: &str, template: P) -> Lam
 
 pub fn cargo_lambda_build<P: AsRef<Path>>(path: P) -> Command {
     let path = path.as_ref();
-    let shared_target = std::env::temp_dir().join("cargo-lambda-test-shared-target");
+    let lambda_dir = path.join("target").join("lambda");
 
     Command::cargo_lambda()
         .arg("lambda")
         .arg("build")
         .arg("-vv")
+        .arg("--lambda-dir")
+        .arg(lambda_dir.as_os_str())
         .env("RUST_BACKTRACE", "full")
         .env("CARGO_ZIGBUILD_CACHE_DIR", path.as_os_str())
-        .env("CARGO_BUILD_TARGET_DIR", shared_target.as_os_str())
         .current_dir(path)
 }
 
 pub fn cargo_lambda_dry_deploy<P: AsRef<Path>>(path: P) -> Command {
     let path = path.as_ref();
+    let lambda_dir = path.join("target").join("lambda");
 
     Command::cargo_lambda()
         .arg("lambda")
@@ -200,6 +202,8 @@ pub fn cargo_lambda_dry_deploy<P: AsRef<Path>>(path: P) -> Command {
         .arg("--dry")
         .arg("--output-format")
         .arg("json")
+        .arg("--lambda-dir")
+        .arg(lambda_dir.as_os_str())
         .current_dir(path)
 }
 
