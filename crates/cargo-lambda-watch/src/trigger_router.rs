@@ -562,6 +562,7 @@ mod test {
             false,
             HashSet::new(),
             None,
+            1,
         ));
 
         let (func, path, _) = extract_path_parameters("", &Method::GET, &state);
@@ -611,6 +612,7 @@ mod test {
             false,
             HashSet::new(),
             Some(new_router),
+            1,
         ));
 
         let (func, path, _) = extract_path_parameters("/foo", &Method::GET, &state);
@@ -635,6 +637,7 @@ mod test {
             false,
             HashSet::new(),
             Some(new_router),
+            1,
         ));
 
         // Test with path parameters
@@ -664,6 +667,7 @@ mod test {
             false,
             HashSet::new(),
             config.watch.router,
+            1,
         ));
 
         // Test with path parameters and method

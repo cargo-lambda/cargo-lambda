@@ -52,6 +52,7 @@ use tracing_subscriber::registry::LookupSpan;
 
 mod error;
 pub mod eventstream;
+mod instance_pool;
 mod requests;
 mod runtime;
 
@@ -190,6 +191,7 @@ fn build_runtime_state(
         config.only_lambda_apis,
         binary_packages,
         config.router.clone(),
+        config.concurrency,
     ))
 }
 
@@ -283,7 +285,7 @@ async fn start_server(
     info!(?runtime_addr, "starting Runtime server");
     let out = axum::serve(
         TcpListener::bind(runtime_addr).await.into_diagnostic()?,
-        app.into_make_service(),
+        app.into_make_service_with_connect_info::<SocketAddr>(),
     )
     .with_graceful_shutdown(async move {
         subsys.on_shutdown_requested().await;

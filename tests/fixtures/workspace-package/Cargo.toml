@@ -7,6 +7,9 @@ AWS_REGION = "us-west-2"
 [workspace.metadata.lambda.bin.basic-lambda-1.env]
 EXTRA = "TRUE"
 
+[workspace.metadata.lambda.watch]
+concurrency = 3
+
 [workspace.metadata.lambda.watch.router]
 "/foo" = "crate-1"
 "/bar" = [

@@ -551,4 +551,51 @@ mod tests {
         );
         assert_eq!(config.build.output_format, Some(OutputFormat::Zip));
     }
+
+    #[test]
+    fn test_load_concurrency_from_metadata() {
+        let metadata = load_metadata(fixture_metadata("single-binary-package")).unwrap();
+        let config = load_config_without_cli_flags(&metadata, &ConfigOptions::default()).unwrap();
+
+        assert_eq!(
+            config.watch.concurrency, 5,
+            "concurrency should be loaded from package metadata"
+        );
+    }
+
+    #[test]
+    fn test_concurrency_cli_override() {
+        let metadata = load_metadata(fixture_metadata("single-binary-package")).unwrap();
+
+        let mut watch = Watch::default();
+        watch.concurrency = 10;
+
+        let args_config = Config {
+            watch,
+            ..Default::default()
+        };
+
+        let config = load_config(&args_config, &metadata, &ConfigOptions::default()).unwrap();
+
+        assert_eq!(
+            config.watch.concurrency, 10,
+            "CLI concurrency should override Cargo.toml metadata"
+        );
+    }
+
+    #[test]
+    fn test_load_concurrency_from_workspace_metadata() {
+        let options = ConfigOptions {
+            names: FunctionNames::from_package("crate-1"),
+            ..Default::default()
+        };
+
+        let metadata = load_metadata(fixture_metadata("workspace-package")).unwrap();
+        let config = load_config_without_cli_flags(&metadata, &options).unwrap();
+
+        assert_eq!(
+            config.watch.concurrency, 3,
+            "concurrency should be loaded from workspace metadata"
+        );
+    }
 }
