@@ -24,7 +24,9 @@ impl CargoZigbuild {
             crate::toolchain::check_target_component_with_rustc_meta(target_arch).await?;
         }
 
-        let zig_build: ZigBuild = cargo.to_owned().into();
+        let mut zig_build: ZigBuild = cargo.to_owned().into();
+        zig_build.enable_zig_ar = true;
+
         zig_build
             .build_command()
             .map_err(MetadataError::ZigBuildError)
