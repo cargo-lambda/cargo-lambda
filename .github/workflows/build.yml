@@ -3,23 +3,23 @@ name: Build Crates
 on:
   pull_request:
     paths:
-      - 'crates/**'
-      - 'tests/**'
-      - 'Cargo.toml'
-      - 'deny.toml'
-      - 'rustfmt.toml'
-      - '.github/workflows/build.yml'
+      - "crates/**"
+      - "tests/**"
+      - "Cargo.toml"
+      - "deny.toml"
+      - "rustfmt.toml"
+      - ".github/workflows/build.yml"
 
   push:
-    branches: [ 'main' ]
-    tags-ignore: [ '*' ]
+    branches: ["main"]
+    tags-ignore: ["*"]
     paths:
-      - 'crates/**'
-      - 'tests/**'
-      - 'Cargo.toml'
-      - 'deny.toml'
-      - 'rustfmt.toml'
-      - '.github/workflows/build.yml'
+      - "crates/**"
+      - "tests/**"
+      - "Cargo.toml"
+      - "deny.toml"
+      - "rustfmt.toml"
+      - ".github/workflows/build.yml"
 
   workflow_dispatch:
 
@@ -37,7 +37,7 @@ jobs:
       matrix:
         os:
           - label: MacOS (Intel)
-            runner: macos-13
+            runner: macos-15-intel
           - label: MacOS (ARM)
             runner: macos-latest
           - label: Ubuntu Latest
@@ -63,7 +63,7 @@ jobs:
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: '3.31.x'
+          cmake-version: "3.31.x"
 
       - name: Run cargo test
         run: cargo test --all-features

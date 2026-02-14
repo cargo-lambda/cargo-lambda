@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: [ 'v*' ]
+    tags: ["v*"]
 
 env:
   MATURIN_VERSION: 1.8.2
@@ -22,7 +22,7 @@ jobs:
             os: macos-latest
             label: MacOs (ARM)
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-15-intel
             label: MacOS (Intel)
     steps:
       - uses: actions/checkout@v5
@@ -67,7 +67,7 @@ jobs:
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: '3.31.x'
+          cmake-version: "3.31.x"
 
       - name: Build
         uses: messense/maturin-action@v1
@@ -92,10 +92,11 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        platform: [
-          { target: "x86_64-unknown-linux-musl", image_tag: "x86_64-musl" },
-          { target: "aarch64-unknown-linux-musl", image_tag: "aarch64-musl" },
-        ]
+        platform:
+          [
+            { target: "x86_64-unknown-linux-musl", image_tag: "x86_64-musl" },
+            { target: "aarch64-unknown-linux-musl", image_tag: "aarch64-musl" },
+          ]
     container:
       image: ghcr.io/rust-cross/rust-musl-cross:${{ matrix.platform.image_tag }}
     steps:
@@ -128,7 +129,7 @@ jobs:
   release-all:
     name: Release all artifacts
     runs-on: ubuntu-latest
-    needs: [ release-macos, release-windows, release-linux ]
+    needs: [release-macos, release-windows, release-linux]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
