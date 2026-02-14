@@ -800,9 +800,8 @@ mod tests {
     use base64::prelude::*;
     use cargo_lambda_metadata::lambda::Tracing;
     use cargo_lambda_remote::aws_sdk_lambda::config::Config as LambdaConfig;
-    use http::{Request, Response};
+    use http::{Request, Response, StatusCode};
     use std::io::Read;
-    use http::StatusCode;
 
     #[tokio::test]
     async fn test_update_function_config_no_changes() {
@@ -1046,7 +1045,10 @@ mod tests {
                 .method("POST")
                 .body(request_body)
                 .unwrap(),
-            Response::builder().status(StatusCode::OK).body(response_body).unwrap(),
+            Response::builder()
+                .status(StatusCode::OK)
+                .body(response_body)
+                .unwrap(),
         )]);
 
         let lambda_config = LambdaConfig::builder()
