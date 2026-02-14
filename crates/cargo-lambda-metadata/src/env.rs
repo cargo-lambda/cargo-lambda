@@ -72,6 +72,11 @@ pub(crate) fn lambda_environment(
             for (key, value) in env_variables {
                 env.insert(key, value);
             }
+        } else {
+            return Err(MetadataError::InvalidEnvFile(
+                path.into(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "file not found"),
+            ));
         }
     }
 
@@ -205,5 +210,16 @@ mod test {
         assert_eq!("QUUUX".to_string(), vars["QUUX"]);
         assert!(!vars.contains_key("IGNORE"));
         assert!(!vars.contains_key(""));
+    }
+
+    #[test]
+    fn test_environment_with_missing_file() {
+        let file = temp_dir().join(".env.nonexistent");
+        // Ensure the file doesn't exist
+        let _ = std::fs::remove_file(&file);
+
+        let result = lambda_environment(None, &Some(file), None);
+        assert!(result.is_err());
+        assert!(matches!(result, Err(MetadataError::InvalidEnvFile(_, _))));
     }
 }
