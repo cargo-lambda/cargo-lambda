@@ -155,6 +155,45 @@ The flag `--env-file` will read the variables from a file and add them to the fu
 cargo lambda deploy --env-file .env http-lambda
 ```
 
+### Merging environment variables
+
+By default, when you deploy a function with environment variables, Cargo Lambda will **overwrite** all existing environment variables on AWS Lambda with the ones specified in your configuration. This ensures that your configuration is the single source of truth.
+
+However, in some scenarios (such as hybrid workflows where infrastructure tools like AWS CDK manage some variables and Cargo Lambda manages others), you may want to preserve existing environment variables and only update or add new ones. You can use the `--merge-env` flag to enable this behavior:
+
+```
+cargo lambda deploy --merge-env --env-var NEW_VAR=VALUE http-lambda
+```
+
+When `--merge-env` is enabled:
+- Existing environment variables on the Lambda function are preserved
+- Variables specified in your configuration (via `--env-var`, `--env-vars`, or `--env-file`) are added or updated
+- If a variable exists both remotely and in your configuration, the local value takes precedence
+
+**Example:**
+
+If your Lambda function currently has these environment variables:
+```
+CDK_MANAGED_VAR=value1
+INFRA_VAR=value2
+```
+
+And you deploy with:
+```
+cargo lambda deploy --merge-env --env-var APP_VAR=value3 http-lambda
+```
+
+The final environment variables will be:
+```
+CDK_MANAGED_VAR=value1  (preserved)
+INFRA_VAR=value2         (preserved)
+APP_VAR=value3           (added)
+```
+
+::: warning
+Without the `--merge-env` flag, the default behavior would replace all environment variables, leaving only `APP_VAR=value3`.
+:::
+
 ## Resource tagging
 
 You can use the flag `--tags` to add resource tags to a function or layer. This flag supports a comma separated list of values. If the function is deployed via S3, the tags are also applied to the S3 object:
@@ -204,6 +243,7 @@ tracing = "active"              # Tracing mode
 role = "role-full-arn"          # Function's execution role
 env_file = ".env.production"    # File to load environment variables from
 env = { "VAR1" = "VAL1" }       # Additional environment variables
+merge_env = true                # Merge environment variables with existing ones (default: false)
 layers = [ "layer-full-arn" ]   # List of layers to deploy with your function
 tags = { "team" = "lambda" }    # List of AWS resource tags for this function
 s3_bucket = "deploy-bucket"     # S3 bucket to upload the Lambda function to

@@ -377,7 +377,19 @@ async fn update_function_config(
             builder = builder.set_layers(config.function_config.layer.clone());
         }
 
-        if let Some(environment) = config.lambda_environment()? {
+        // If merge_env is enabled, populate remote_env with existing environment variables
+        let config_with_remote_env = if config.merge_env {
+            let mut config_clone = config.clone();
+            config_clone.remote_env = conf
+                .environment
+                .clone()
+                .and_then(|e| e.variables)
+                .unwrap_or_default();
+            config_clone
+        } else {
+            config.clone()
+        };
+        if let Some(environment) = config_with_remote_env.lambda_environment()? {
             if let Some(vars) = environment.variables() {
                 if !vars.is_empty()
                     && vars
@@ -1367,6 +1379,90 @@ mod tests {
         let result = set_log_retention(&sdk_config, 14, "test-function").await;
 
         assert!(result.is_ok());
+        http_client.assert_requests_match(&[]);
+    }
+
+    #[tokio::test]
+    async fn test_update_function_config_with_merge_env() {
+        use cargo_lambda_metadata::env::EnvOptions;
+        use std::collections::HashMap;
+
+        // Mock request body that should contain merged environment variables
+        let request_body = SdkBody::from(
+            serde_json::json!({
+                "Environment": {
+                    "Variables": {
+                        "REMOTE_VAR": "remote_value",
+                        "LOCAL_VAR": "local_value",
+                        "OVERRIDE_VAR": "overridden_value"
+                    }
+                }
+            })
+            .to_string(),
+        );
+
+        let response_body = SdkBody::from(
+            serde_json::json!({
+                "FunctionArn": "arn:aws:lambda:us-east-1:123456789012:function:test-function",
+                "LastUpdateStatus": "Successful"
+            })
+            .to_string(),
+        );
+
+        let http_client = StaticReplayClient::new(vec![ReplayEvent::new(
+            Request::builder()
+                .uri("https://lambda.us-east-1.amazonaws.com/2015-03-31/functions/test-function/configuration")
+                .method("PUT")
+                .body(request_body)
+                .unwrap(),
+            Response::builder().status(200).body(response_body).unwrap(),
+        )]);
+
+        let config = LambdaConfig::builder()
+            .http_client(http_client.clone())
+            .credentials_provider(Credentials::for_tests())
+            .region(Region::new("us-east-1"))
+            .build();
+        let client = LambdaClient::from_conf(config);
+
+        // Setup deploy config with merge_env enabled
+        let mut deploy_config = Deploy::default();
+        deploy_config.merge_env = true;
+        deploy_config.function_config.env_options = Some(EnvOptions {
+            env_var: Some(vec![
+                "LOCAL_VAR=local_value".to_string(),
+                "OVERRIDE_VAR=overridden_value".to_string(),
+            ]),
+            env_file: None,
+        });
+
+        let name = "test-function";
+        let progress = Progress::start("deploying function");
+
+        // Create a function configuration with existing environment variables
+        let mut existing_env = HashMap::new();
+        existing_env.insert("REMOTE_VAR".to_string(), "remote_value".to_string());
+        existing_env.insert("OVERRIDE_VAR".to_string(), "old_value".to_string());
+
+        let environment =
+            cargo_lambda_remote::aws_sdk_lambda::types::EnvironmentResponse::builder()
+                .set_variables(Some(existing_env))
+                .build();
+
+        let conf = FunctionConfiguration::builder()
+            .function_arn("arn:aws:lambda:us-east-1:123456789012:function:test-function")
+            .state(State::Active)
+            .last_update_status(LastUpdateStatus::Successful)
+            .environment(environment)
+            .build();
+
+        let result = update_function_config(&deploy_config, name, &client, &progress, conf).await;
+
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            "arn:aws:lambda:us-east-1:123456789012:function:test-function"
+        );
         http_client.assert_requests_match(&[]);
     }
 }

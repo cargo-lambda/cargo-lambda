@@ -152,7 +152,7 @@ impl TemplatePrompt {
         }
     }
 
-    fn text_prompt(&self) -> Text {
+    fn text_prompt(&self) -> Text<'_> {
         let mut prompt = Text::new(&self.message);
 
         if let Some(choices) = &self.choices {

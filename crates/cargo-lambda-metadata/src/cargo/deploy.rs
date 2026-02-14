@@ -110,6 +110,13 @@ pub struct Deploy {
     #[serde(default)]
     pub dry: bool,
 
+    /// Merge environment variables with existing ones instead of overwriting them.
+    /// When enabled, existing environment variables on AWS Lambda are preserved,
+    /// and only new variables are added or updated from the configuration.
+    #[arg(long)]
+    #[serde(default)]
+    pub merge_env: bool,
+
     /// Name of the function or extension to deploy
     #[arg(value_name = "NAME")]
     #[serde(default)]
@@ -118,6 +125,10 @@ pub struct Deploy {
     #[arg(skip)]
     #[serde(skip)]
     pub base_env: HashMap<String, String>,
+
+    #[arg(skip)]
+    #[serde(skip)]
+    pub remote_env: HashMap<String, String>,
 }
 
 impl Deploy {
@@ -180,9 +191,23 @@ impl Deploy {
     pub fn lambda_environment(&self) -> Result<Option<Environment>, MetadataError> {
         let builder = Environment::builder();
 
-        let env = match &self.function_config.env_options {
-            None => self.base_env.clone(),
-            Some(env_options) => env_options.lambda_environment(&self.base_env)?,
+        let mut env = if self.merge_env {
+            // Start with remote environment variables when merging
+            self.remote_env.clone()
+        } else {
+            HashMap::new()
+        };
+
+        // Add base environment variables
+        env.extend(self.base_env.clone());
+
+        // Add or override with environment variables from configuration
+        match &self.function_config.env_options {
+            None => {}
+            Some(env_options) => {
+                let local_env = env_options.lambda_environment(&HashMap::new())?;
+                env.extend(local_env);
+            }
         };
 
         if env.is_empty() {
@@ -221,6 +246,7 @@ impl Serialize for Deploy {
             + self.tag.is_some() as usize
             + self.include.is_some() as usize
             + self.dry as usize
+            + self.merge_env as usize
             + self.name.is_some() as usize
             + self.remote_config.is_some() as usize
             + self.function_config.count_fields();
@@ -265,6 +291,9 @@ impl Serialize for Deploy {
         }
         if self.dry {
             state.serialize_field("dry", &self.dry)?;
+        }
+        if self.merge_env {
+            state.serialize_field("merge_env", &self.merge_env)?;
         }
         if let Some(ref name) = self.name {
             state.serialize_field("name", name)?;
@@ -630,6 +659,80 @@ mod tests {
             env.variables().unwrap().get("QUUX"),
             Some(&"QUUX".to_string())
         );
+    }
+
+    #[test]
+    fn test_lambda_environment_merge_mode() {
+        // Test merge_env=false (default behavior - overwrites)
+        let deploy = Deploy {
+            function_config: FunctionDeployConfig {
+                env_options: Some(EnvOptions {
+                    env_var: Some(vec!["LOCAL=VALUE".to_string()]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            remote_env: HashMap::from([
+                ("REMOTE1".to_string(), "REMOTE_VALUE1".to_string()),
+                ("REMOTE2".to_string(), "REMOTE_VALUE2".to_string()),
+            ]),
+            merge_env: false,
+            ..Default::default()
+        };
+        let env = deploy.lambda_environment().unwrap().unwrap();
+        let vars = env.variables().unwrap();
+        // When merge_env is false, only local env vars should be present
+        assert_eq!(vars.len(), 1);
+        assert_eq!(vars.get("LOCAL"), Some(&"VALUE".to_string()));
+        assert_eq!(vars.get("REMOTE1"), None);
+        assert_eq!(vars.get("REMOTE2"), None);
+
+        // Test merge_env=true (merge behavior - preserves remote vars)
+        let deploy = Deploy {
+            function_config: FunctionDeployConfig {
+                env_options: Some(EnvOptions {
+                    env_var: Some(vec!["LOCAL=VALUE".to_string()]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            remote_env: HashMap::from([
+                ("REMOTE1".to_string(), "REMOTE_VALUE1".to_string()),
+                ("REMOTE2".to_string(), "REMOTE_VALUE2".to_string()),
+            ]),
+            merge_env: true,
+            ..Default::default()
+        };
+        let env = deploy.lambda_environment().unwrap().unwrap();
+        let vars = env.variables().unwrap();
+        // When merge_env is true, both remote and local vars should be present
+        assert_eq!(vars.len(), 3);
+        assert_eq!(vars.get("LOCAL"), Some(&"VALUE".to_string()));
+        assert_eq!(vars.get("REMOTE1"), Some(&"REMOTE_VALUE1".to_string()));
+        assert_eq!(vars.get("REMOTE2"), Some(&"REMOTE_VALUE2".to_string()));
+
+        // Test merge_env=true with overlapping keys (local should win)
+        let deploy = Deploy {
+            function_config: FunctionDeployConfig {
+                env_options: Some(EnvOptions {
+                    env_var: Some(vec!["REMOTE1=LOCAL_OVERRIDE".to_string()]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            remote_env: HashMap::from([
+                ("REMOTE1".to_string(), "REMOTE_VALUE1".to_string()),
+                ("REMOTE2".to_string(), "REMOTE_VALUE2".to_string()),
+            ]),
+            merge_env: true,
+            ..Default::default()
+        };
+        let env = deploy.lambda_environment().unwrap().unwrap();
+        let vars = env.variables().unwrap();
+        // Local value should override remote value
+        assert_eq!(vars.len(), 2);
+        assert_eq!(vars.get("REMOTE1"), Some(&"LOCAL_OVERRIDE".to_string()));
+        assert_eq!(vars.get("REMOTE2"), Some(&"REMOTE_VALUE2".to_string()));
     }
 
     #[test]

@@ -352,6 +352,7 @@ mod tests {
         assert_eq!(config.env.get("FOO"), Some(&"BAR".to_string()));
         assert_eq!(config.deploy.function_config.memory, Some(512.into()));
         assert_eq!(config.deploy.function_config.timeout, Some(60.into()));
+        assert_eq!(config.deploy.merge_env, true);
 
         assert_eq!(
             config.deploy.function_config.layer,
@@ -512,6 +513,26 @@ mod tests {
         let metadata = load_metadata(manifest).unwrap();
         let config = load_config(&args_config, &metadata, &options).unwrap();
         assert_eq!(config.deploy.function_config.memory, Some(2048.into()));
+    }
+
+    #[test]
+    fn test_cargo_toml_merge_env_not_overridden_by_cli() {
+        // Test that merge_env from Cargo.toml is NOT overridden when CLI doesn't set it
+        let metadata = load_metadata(fixture_metadata("single-binary-package")).unwrap();
+
+        // CLI with no merge_env set (should be None)
+        let args_config = Config {
+            deploy: Deploy::default(),
+            ..Default::default()
+        };
+
+        let config = load_config(&args_config, &metadata, &ConfigOptions::default()).unwrap();
+
+        // Should load merge_env=true from Cargo.toml
+        assert_eq!(
+            config.deploy.merge_env, true,
+            "merge_env from Cargo.toml should be preserved when CLI doesn't set it"
+        );
     }
 
     #[test]
