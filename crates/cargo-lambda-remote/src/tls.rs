@@ -174,6 +174,15 @@ impl TlsOptions {
 
     #[cfg(not(test))]
     fn config_dir(&self) -> Option<PathBuf> {
+        // First check XDG_CONFIG_HOME environment variable explicitly
+        if let Ok(xdg_config) = std::env::var("XDG_CONFIG_HOME") {
+            let path = PathBuf::from(xdg_config).join("cargo-lambda");
+            if path.exists() {
+                return Some(path);
+            }
+        }
+
+        // Fall back to dirs::config_dir()
         dirs::config_dir().map(|p| p.join("cargo-lambda"))
     }
 
