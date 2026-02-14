@@ -27,7 +27,7 @@ const DEFAULT_RUNTIME: &str = "provided.al2023";
 )]
 pub struct Deploy {
     #[command(flatten)]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
     pub remote_config: Option<RemoteConfig>,
 
     #[command(flatten)]
@@ -248,7 +248,7 @@ impl Serialize for Deploy {
             + self.dry as usize
             + self.merge_env as usize
             + self.name.is_some() as usize
-            + self.remote_config.is_some() as usize
+            + self.remote_config.as_ref().map_or(0, |r| r.count_fields())
             + self.function_config.count_fields();
 
         let mut state = serializer.serialize_struct("Deploy", len)?;
@@ -299,7 +299,7 @@ impl Serialize for Deploy {
             state.serialize_field("name", name)?;
         }
         if let Some(ref remote_config) = self.remote_config {
-            state.serialize_field("remote_config", remote_config)?;
+            remote_config.serialize_fields::<S>(&mut state)?;
         }
         self.function_config.serialize_fields::<S>(&mut state)?;
 
@@ -767,5 +767,67 @@ mod tests {
         );
 
         assert_eq!(config.deploy.function_config.log_retention, Some(14));
+    }
+
+    #[test]
+    fn test_load_region_from_package_metadata() {
+        let metadata = load_metadata(fixture_metadata("single-binary-package")).unwrap();
+
+        let options = ConfigOptions {
+            names: FunctionNames::from_package("basic-lambda"),
+            ..Default::default()
+        };
+
+        let config = load_config_without_cli_flags(&metadata, &options).unwrap();
+
+        // Region and profile should be loaded from package.metadata.lambda.deploy
+        let remote_config = config
+            .deploy
+            .remote_config
+            .expect("remote_config should be Some");
+        assert_eq!(
+            remote_config.region,
+            Some("eu-central-1".to_string()),
+            "region should be loaded from Cargo.toml"
+        );
+        assert_eq!(
+            remote_config.profile,
+            Some("test-profile".to_string()),
+            "profile should be loaded from Cargo.toml"
+        );
+    }
+
+    #[test]
+    fn test_deploy_serialization_with_remote_config() {
+        use cargo_lambda_remote::RemoteConfig;
+
+        let deploy = Deploy {
+            remote_config: Some(RemoteConfig {
+                region: Some("us-west-2".to_string()),
+                profile: Some("production".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        // Serialize to JSON
+        let serialized = serde_json::to_value(&deploy).unwrap();
+
+        // Should serialize as flat fields at top level
+        assert_eq!(serialized["region"], "us-west-2");
+        assert_eq!(serialized["profile"], "production");
+        assert!(
+            !serialized
+                .as_object()
+                .unwrap()
+                .contains_key("remote_config"),
+            "remote_config should be flattened, not nested"
+        );
+
+        // Deserialize back
+        let deserialized: Deploy = serde_json::from_value(serialized).unwrap();
+        let rc = deserialized.remote_config.unwrap();
+        assert_eq!(rc.region, Some("us-west-2".to_string()));
+        assert_eq!(rc.profile, Some("production".to_string()));
     }
 }

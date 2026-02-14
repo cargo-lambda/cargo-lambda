@@ -788,3 +788,53 @@ fn test_deploy_with_sdk_and_vpc_cli_flags() {
         assert_eq!(security_group_ids[0].as_str().unwrap(), "sg-1234567890");
     }
 }
+
+#[test]
+fn test_deploy_with_region_from_cargo_toml() {
+    let _guard = init_root();
+    let lp = cargo_lambda_new("test-region-config", "function-template");
+
+    lp.new_cmd()
+        .arg("--no-interactive")
+        .arg(&lp.name)
+        .assert()
+        .success();
+
+    let project = lp.test_project();
+
+    // Add region and profile configuration to Cargo.toml metadata
+    let package_manifest = read_to_string(project.root().join("Cargo.toml")).unwrap();
+    let mut package_manifest: DocumentMut = package_manifest.parse::<DocumentMut>().unwrap();
+    package_manifest["package"]["metadata"]["lambda"]["deploy"]["region"] = value("eu-central-1");
+    package_manifest["package"]["metadata"]["lambda"]["deploy"]["profile"] = value("test-profile");
+    std::fs::write(
+        project.root().join("Cargo.toml"),
+        package_manifest.to_string(),
+    )
+    .unwrap();
+
+    cargo_lambda_build(project.root()).assert().success();
+
+    let bin = project.lambda_function_bin(&lp.name);
+    assert!(bin.exists(), "{bin:?} doesn't exist");
+
+    #[cfg(not(windows))]
+    {
+        // Deploy without specifying region/profile via CLI - should read from Cargo.toml
+        let output = cargo_lambda_dry_deploy(project.root()).assert().success();
+
+        let json_data = deploy_output_json(&output).unwrap();
+
+        // Verify that region and profile from Cargo.toml are picked up
+        assert_eq!(
+            json_data["sdk_config"]["region"].as_str().unwrap(),
+            "eu-central-1",
+            "region should be loaded from Cargo.toml metadata"
+        );
+        assert_eq!(
+            json_data["sdk_config"]["profile"].as_str().unwrap(),
+            "test-profile",
+            "profile should be loaded from Cargo.toml metadata"
+        );
+    }
+}

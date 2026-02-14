@@ -12,6 +12,8 @@ tokio = { version = "1", features = ["macros"] }
 FOO = "BAR"
 
 [package.metadata.lambda.deploy]
+region = "eu-central-1"
+profile = "test-profile"
 memory = 512
 timeout = 60
 merge_env = true
