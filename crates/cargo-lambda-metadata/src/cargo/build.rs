@@ -1,11 +1,15 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use cargo_options::Build as CargoBuild;
 use clap::{Args, ValueHint};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
 
-use crate::cargo::{count_common_options, serialize_common_options};
+use crate::{
+    cargo::{count_common_options, serialize_common_options},
+    env::{EnvOptions, Environment},
+    error::MetadataError,
+};
 
 #[derive(Args, Clone, Debug, Default, Deserialize)]
 #[command(
@@ -68,6 +72,10 @@ pub struct Build {
     #[arg(short, long)]
     #[serde(default)]
     pub include: Option<Vec<String>>,
+
+    #[command(flatten)]
+    #[serde(default, flatten)]
+    pub env_options: EnvOptions,
 
     #[command(flatten)]
     #[serde(default, flatten)]
@@ -147,6 +155,10 @@ impl Build {
         }
         self.cargo_opts.bin.first().map(|s| s.to_string())
     }
+
+    pub fn build_environment(&self) -> Result<Environment, MetadataError> {
+        self.env_options.lambda_environment(&HashMap::new())
+    }
 }
 
 impl Serialize for Build {
@@ -181,7 +193,8 @@ impl Serialize for Build {
             + !self.cargo_opts.test.is_empty() as usize
             + self.cargo_opts.benches as usize
             + !self.cargo_opts.bench.is_empty() as usize
-            + count_common_options(&self.cargo_opts.common);
+            + count_common_options(&self.cargo_opts.common)
+            + self.env_options.count_fields();
 
         let mut state = serializer.serialize_struct("Build", field_count)?;
 
@@ -221,6 +234,9 @@ impl Serialize for Build {
         if self.disable_optimizations {
             state.serialize_field("disable_optimizations", &true)?;
         }
+
+        // Environment options
+        self.env_options.serialize_fields::<S>(&mut state)?;
 
         // Cargo opts fields
         if let Some(ref manifest_path) = self.cargo_opts.manifest_path {
@@ -396,5 +412,52 @@ mod tests {
                 "all_features": true
             })
         );
+    }
+
+    #[test]
+    fn test_deserialize_with_env_var() {
+        let config = json!({
+            "env_var": ["KEY1=VALUE1", "KEY2=VALUE2"]
+        });
+        let build: Build = serde_json::from_value(config).unwrap();
+        assert_eq!(
+            build.env_options.env_var,
+            Some(vec!["KEY1=VALUE1".to_string(), "KEY2=VALUE2".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_deserialize_with_env_file() {
+        let config = json!({
+            "env_file": "/tmp/.env"
+        });
+        let build: Build = serde_json::from_value(config).unwrap();
+        assert_eq!(build.env_options.env_file, Some(PathBuf::from("/tmp/.env")));
+    }
+
+    #[test]
+    fn test_serialize_with_env_options() {
+        let build = Build {
+            env_options: EnvOptions {
+                env_var: Some(vec!["FOO=BAR".to_string()]),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let serialized = serde_json::to_value(&build).unwrap();
+        assert_eq!(serialized["env_var"], json!(["FOO=BAR"]));
+    }
+
+    #[test]
+    fn test_build_environment() {
+        let build = Build {
+            env_options: EnvOptions {
+                env_var: Some(vec!["KEY=VALUE".to_string()]),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let env = build.build_environment().unwrap();
+        assert_eq!(env.get("KEY").unwrap(), "VALUE");
     }
 }

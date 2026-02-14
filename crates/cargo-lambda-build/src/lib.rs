@@ -126,6 +126,13 @@ pub async fn run(build: &mut Build, metadata: &CargoMetadata) -> Result<()> {
         Err(err) => return Err(err),
     };
 
+    // Apply build environment variables
+    if let Ok(env_vars) = build.build_environment() {
+        for (key, value) in env_vars {
+            cmd.env(key, value);
+        }
+    }
+
     let mut child = cmd.spawn().map_err(BuildError::FailedBuildCommand)?;
     let status = child.wait().map_err(BuildError::FailedBuildCommand)?;
     if !status.success() {
