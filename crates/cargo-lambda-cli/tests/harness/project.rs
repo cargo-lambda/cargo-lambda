@@ -222,6 +222,9 @@ pub mod paths {
     pub fn init_root() -> TestIdGuard {
         static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
+        // Warm up the build cache on first test initialization
+        super::super::warmup_build_cache();
+
         let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
         TEST_ID.with(|n| *n.borrow_mut() = Some(id));
 

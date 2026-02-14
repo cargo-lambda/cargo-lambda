@@ -6,7 +6,7 @@ on:
 
 env:
   MATURIN_VERSION: 1.8.2
-  SCCACHE_GHA_ENABLED: "false"
+  SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
   CARGO_INCREMENTAL: 0
 
@@ -28,6 +28,11 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "cargo-lambda-release-${{ matrix.platform.target }}"
+          cache-on-failure: false
       - name: Configure cache
         uses: mozilla-actions/sccache-action@v0.0.3
 
@@ -62,6 +67,11 @@ jobs:
       - uses: actions/setup-python@v3
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "cargo-lambda-release-${{ matrix.platform.target }}"
+          cache-on-failure: false
       - name: Configure cache
         uses: mozilla-actions/sccache-action@v0.0.3
       - name: Setup cmake
@@ -104,6 +114,11 @@ jobs:
       - name: Store git commit
         run: |
           echo "CARGO_LAMBDA_RELEASE_GIT_SHA=$GITHUB_SHA" >> $GITHUB_ENV
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "cargo-lambda-release-${{ matrix.platform.target }}"
+          cache-on-failure: false
       - name: Configure cache
         uses: mozilla-actions/sccache-action@v0.0.3
       - name: Build

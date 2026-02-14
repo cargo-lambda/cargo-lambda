@@ -57,6 +57,12 @@ jobs:
         with:
           components: clippy
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "cargo-lambda-clippy-v1"
+          cache-on-failure: false
+
       - name: Run clippy check
         id: cargoClippy
         shell: bash

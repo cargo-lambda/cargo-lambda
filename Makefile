@@ -1,4 +1,4 @@
-.PHONY: build build-release build-release-tar build-release-zip check fmt install install-release publish-all run-integration
+.PHONY: build build-release build-release-tar build-release-zip check fmt install install-nextest install-release publish-all run-integration test
 
 build:
 	cargo build --features=skip-build-banner
@@ -58,3 +58,9 @@ clippy:
 
 clippy-fix:
 	cargo clippy --workspace --all-features --allow-dirty --allow-staged --fix
+
+install-nextest:
+	cargo install cargo-nextest --locked
+
+test:
+	cargo nextest run --all-features

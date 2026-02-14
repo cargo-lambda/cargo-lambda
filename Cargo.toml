@@ -98,3 +98,10 @@ lto = true
 
 [profile.dev.build-override]
 opt-level = 3
+
+[profile.test]
+opt-level = 1  # Slight optimization for test code
+debug = 1      # Reduce debug info size
+
+[profile.dev.package."*"]
+opt-level = 2  # Optimize dependencies in dev mode
