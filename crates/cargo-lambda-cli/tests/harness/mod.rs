@@ -1,77 +1,10 @@
-use std::{
-    path::{Path, PathBuf},
-    sync::Once,
-};
+use std::path::{Path, PathBuf};
 
 use snapbox::cmd::{Command, OutputAssert};
 
 mod project;
 use project::Project;
 pub use project::{CargoPathExt, paths::init_root, project};
-
-static WARMUP: Once = Once::new();
-
-/// Pre-compile common dependencies to warm the shared build cache.
-/// This is called once before running tests to reduce compilation time.
-pub fn warmup_build_cache() {
-    WARMUP.call_once(|| {
-        let shared_target = std::env::temp_dir().join("cargo-lambda-test-shared-target");
-
-        // Create a minimal warmup project
-        let warmup_dir = std::env::temp_dir().join("cargo-lambda-warmup-project");
-
-        // Clean up any existing warmup directory
-        if warmup_dir.exists() {
-            let _ = std::fs::remove_dir_all(&warmup_dir);
-        }
-
-        // Create a basic Rust project structure
-        std::fs::create_dir_all(&warmup_dir).ok();
-
-        let cargo_toml = r#"[package]
-name = "warmup"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-lambda_runtime = "0.13"
-tokio = { version = "1", features = ["macros"] }
-serde = { version = "1", features = ["derive"] }
-"#;
-
-        let main_rs = r#"use lambda_runtime::{service_fn, LambdaEvent, Error};
-use serde::{Deserialize, Serialize};
-
-#[derive(Deserialize)]
-struct Request {}
-
-#[derive(Serialize)]
-struct Response {}
-
-async fn handler(_event: LambdaEvent<Request>) -> Result<Response, Error> {
-    Ok(Response {})
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Error> {
-    lambda_runtime::run(service_fn(handler)).await
-}
-"#;
-
-        std::fs::write(warmup_dir.join("Cargo.toml"), cargo_toml).ok();
-        let src_dir = warmup_dir.join("src");
-        std::fs::create_dir_all(&src_dir).ok();
-        std::fs::write(src_dir.join("main.rs"), main_rs).ok();
-
-        // Pre-compile the project to warm the cache
-        let _ = std::process::Command::new("cargo")
-            .arg("check")
-            .arg("--target=x86_64-unknown-linux-gnu")
-            .current_dir(&warmup_dir)
-            .env("CARGO_BUILD_TARGET_DIR", &shared_target)
-            .output();
-    });
-}
 
 pub struct LambdaProject {
     pub name: String,

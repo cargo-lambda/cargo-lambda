@@ -194,10 +194,9 @@ pub mod paths {
     use super::CargoPathExt;
     use std::{
         cell::RefCell,
-        env, fs,
         path::PathBuf,
         sync::{
-            Mutex, Once, OnceLock,
+            Mutex, OnceLock,
             atomic::{AtomicUsize, Ordering},
         },
     };
@@ -217,30 +216,11 @@ pub mod paths {
     impl Drop for TestIdGuard {
         fn drop(&mut self) {
             TEST_ID.with(|n| *n.borrow_mut() = None);
-
-            // Clean up shared cache on last test completion
-            // This runs when the guard is dropped, which happens after each test
-            static CLEANUP_ONCE: Once = Once::new();
-            CLEANUP_ONCE.call_once(|| {
-                let shared_target = env::temp_dir().join("cargo-lambda-test-shared-target");
-                if shared_target.exists() {
-                    let _ = fs::remove_dir_all(shared_target);
-                }
-            });
         }
     }
 
     pub fn init_root() -> TestIdGuard {
         static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
-
-        // Warm up the build cache on first test initialization
-        super::super::warmup_build_cache();
-
-        // Set shared target directory for all cargo invocations in this test
-        let shared_target = env::temp_dir().join("cargo-lambda-test-shared-target");
-        unsafe {
-            env::set_var("CARGO_BUILD_TARGET_DIR", shared_target);
-        }
 
         let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
         TEST_ID.with(|n| *n.borrow_mut() = Some(id));
