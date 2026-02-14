@@ -1,6 +1,7 @@
 use crate::{
     RefRuntimeState,
     error::ServerError,
+    eventstream,
     requests::*,
     runtime::{LAMBDA_RUNTIME_AWS_REQUEST_ID, LAMBDA_RUNTIME_XRAY_TRACE_HEADER},
 };
@@ -41,6 +42,10 @@ pub(crate) fn routes() -> Router<RefRuntimeState> {
         .route(
             "/2015-03-31/functions/:function_name/invocations",
             post(invoke_handler),
+        )
+        .route(
+            "/2015-03-31/functions/:function_name/response-streaming-invocations",
+            post(invoke_with_response_stream_handler),
         )
         .route("/lambda-url/:function_name/*path", any(furls_handler))
         .fallback(furls_handler)
@@ -224,6 +229,72 @@ async fn invoke_handler(
     }
 
     builder.body(body).map_err(ServerError::ResponseBuild)
+}
+
+async fn invoke_with_response_stream_handler(
+    State(state): State<RefRuntimeState>,
+    Extension(cmd_tx): Extension<Sender<Action>>,
+    Path(function_name): Path<String>,
+    req: Request<Body>,
+) -> Result<Response<Body>, ServerError> {
+    tracing::debug!(%function_name, "response streaming invocation received");
+
+    if function_name == DEFAULT_PACKAGE_FUNCTION && !state.is_default_function_enabled() {
+        tracing::error!(available_functions = ?state.initial_functions, "the default function route is disabled, use /lambda-url/:function_name to trigger a function call");
+        return respond_with_disabled_default_function(&state, true);
+    }
+
+    if function_name != DEFAULT_PACKAGE_FUNCTION {
+        if let Err(binaries) = state.is_function_available(&function_name) {
+            return respond_with_missing_function(&binaries);
+        }
+    }
+
+    let resp = schedule_invocation(&cmd_tx, function_name, req).await?;
+    let status_code = resp
+        .extensions()
+        .get::<StatusCode>()
+        .cloned()
+        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+
+    let (info, mut body) = resp.into_parts();
+
+    let mut builder = Response::builder().status(status_code);
+
+    // For response streaming invocations, we expect a streaming response
+    if is_streaming_response(&info.headers) && status_code == StatusCode::OK {
+        // Parse the streaming prelude to get metadata
+        let prelude = body
+            .frame()
+            .await
+            .ok_or(ServerError::MissingStreamingPrelude)?
+            .map_err(ServerError::DataDeserialization)?
+            .into_data()
+            .map_err(|_| ServerError::StreamingPreludeDeserialization)?;
+
+        let prelude: StreamingPrelude =
+            serde_json::from_slice(&prelude).map_err(ServerError::SerializationError)?;
+
+        // Skip the separator frame
+        let _separator = body
+            .frame()
+            .await
+            .ok_or(ServerError::MissingStreamingPrelude)?
+            .map_err(ServerError::DataDeserialization)?;
+
+        // Set response status from prelude
+        builder = builder.status(prelude.status_code);
+
+        // Transform the streaming body into EventStream format
+        eventstream::create_eventstream_response(builder, &mut body).await
+    } else {
+        // Non-streaming responses or errors should return an error
+        // For now, just return the body as-is with an error status
+        builder
+            .status(StatusCode::BAD_REQUEST)
+            .body(Body::from("Function did not return a streaming response"))
+            .map_err(ServerError::ResponseBuild)
+    }
 }
 
 async fn schedule_invocation(

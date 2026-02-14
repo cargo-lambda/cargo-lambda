@@ -52,10 +52,8 @@ pub(crate) async fn new(
     let init = crate::watcher::init();
     let runtime = crate::watcher::runtime(cmd, wc, ext_cache).await?;
 
-    let wx = Watchexec::new(init, runtime).map_err(ServerError::WatcherError)?;
-    wx.send_event(Event::default(), Priority::Urgent)
-        .await
-        .map_err(ServerError::WatcherError)?;
+    let wx = Watchexec::new(init, runtime)?;
+    wx.send_event(Event::default(), Priority::Urgent).await?;
 
     Ok(wx)
 }

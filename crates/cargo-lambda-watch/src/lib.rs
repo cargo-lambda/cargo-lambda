@@ -51,6 +51,7 @@ use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::registry::LookupSpan;
 
 mod error;
+pub mod eventstream;
 mod requests;
 mod runtime;
 

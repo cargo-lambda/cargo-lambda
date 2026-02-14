@@ -1471,6 +1471,11 @@ dependencies = [
 name = "cargo-lambda-watch"
 version = "1.8.6"
 dependencies = [
+ "aws-config",
+ "aws-credential-types",
+ "aws-sdk-lambda",
+ "aws-smithy-eventstream",
+ "aws-smithy-types",
  "aws_lambda_events",
  "axum",
  "base64 0.21.7",
