@@ -152,6 +152,50 @@ type = "cargo"
 
 The concept of compilers on Cargo Lambda is an abstraction on top of different shell commands. If you want to add an additional compiler, you need to implement [Compiler](https://github.com/cargo-lambda/cargo-lambda/blob/main/crates/cargo-lambda-build/src/compiler/mod.rs#L14) trait. The command to execute needs to follow Rust compilations' convenctions, for example, if the user wants to build an Arm64 binary with the `release` profile, Cargo Lambda will expect that the resulting binary is in `target/aarch64-unknown-linux-gnu/release/`.
 
+## Environment Variables
+
+You can pass explicit environment variables to the cargo build process if you want to keep them all together under the same configuration.
+
+### Using command line flags
+
+Use `--env-var` to pass environment variables directly:
+
+```bash
+cargo lambda build --env-var LEPTOS_OUTPUT_NAME=myapp
+```
+
+You can pass multiple environment variables by repeating the flag or using comma separation:
+
+```bash
+cargo lambda build --env-var KEY1=VALUE1 --env-var KEY2=VALUE2
+# or
+cargo lambda build --env-var KEY1=VALUE1,KEY2=VALUE2
+```
+
+### Using environment files
+
+Use `--env-file` to load environment variables from a file:
+
+```bash
+cargo lambda build --env-file .env.build
+```
+
+The file should contain environment variables in `KEY=VALUE` format, one per line:
+
+```
+LEPTOS_OUTPUT_NAME=myapp
+RUST_LOG=debug
+```
+
+### Environment variable precedence
+
+When environment variables are specified in multiple ways, they are merged in the following order (later sources override earlier ones):
+
+1. Variables from `--env-file`
+2. Variables from `--env-var`
+
+This allows you to set base configuration in a file and override specific values via command line flags.
+
 ## Build configuration in Cargo's Metadata
 
 You can keep some build configuration options in your project's `Cargo.toml` file. This give you a more "configuration as code" approach since you can store that configuration alongside your project. The following example shows the options that you can specify in the metadata, all of them are optional:
@@ -159,7 +203,14 @@ You can keep some build configuration options in your project's `Cargo.toml` fil
 ```toml
 [package.metadata.lambda.build]
 include = [ "README.md" ]      # Extra list of files to add to the zip bundle
+env_var = [                    # Environment variables to set during build
+    "LEPTOS_OUTPUT_NAME=myapp",
+    "RUST_LOG=debug"
+]
+env_file = ".env.build"        # Path to environment file
 ```
+
+Environment variables specified via command line flags (`--env-var` and `--env-file`) will override those specified in the metadata.
 
 ## Output Directory Structure
 
