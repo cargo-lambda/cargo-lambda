@@ -13,6 +13,8 @@ description.workspace = true
 
 [dependencies]
 aws_lambda_events = { version = "0.15", features = ["apigw"] }
+aws-smithy-eventstream = "0.60.5"
+aws-smithy-types.workspace = true
 axum = "0.7"
 base64.workspace = true
 bytes = "1.8.0"
@@ -53,3 +55,8 @@ tracing-opentelemetry = "0.17.2"
 tracing-subscriber.workspace = true
 uuid.workspace = true
 watchexec = "2.3.0"
+
+[dev-dependencies]
+aws-config.workspace = true
+aws-credential-types.workspace = true
+aws-sdk-lambda.workspace = true

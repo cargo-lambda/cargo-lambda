@@ -63,7 +63,7 @@ pub enum ServerError {
 
     #[error("failed to run watcher")]
     #[diagnostic()]
-    WatcherError(#[from] watchexec::error::CriticalError),
+    WatcherError(Box<watchexec::error::CriticalError>),
 
     #[error("failed to load ignore files")]
     #[diagnostic()]
@@ -106,11 +106,21 @@ pub enum ServerError {
     #[error(transparent)]
     #[diagnostic()]
     TlsError(#[from] TlsError),
+
+    #[error("failed to encode EventStream message")]
+    #[diagnostic()]
+    EventStreamEncodingError(#[from] aws_smithy_eventstream::error::Error),
 }
 
 // Explicitly implement Send + Sync
 unsafe impl Send for ServerError {}
 unsafe impl Sync for ServerError {}
+
+impl From<watchexec::error::CriticalError> for ServerError {
+    fn from(err: watchexec::error::CriticalError) -> Self {
+        ServerError::WatcherError(Box::new(err))
+    }
+}
 
 #[derive(Clone, Debug, Default, Serialize)]
 #[cfg_attr(test, derive(PartialEq))]
