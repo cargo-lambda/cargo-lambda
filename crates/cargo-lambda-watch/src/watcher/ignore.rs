@@ -1,6 +1,7 @@
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
+    slice,
     sync::Arc,
 };
 
@@ -142,7 +143,7 @@ pub(crate) async fn create_filter(
             .applies_in
             .clone()
             .unwrap_or_else(|| base.to_path_buf());
-        let filter = IgnoreFilter::new(&base, std::slice::from_ref(file))
+        let filter = IgnoreFilter::new(&base, slice::from_ref(file))
             .await
             .map_err(ServerError::InvalidIgnoreFiles)?;
         filters.push(filter);
