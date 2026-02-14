@@ -141,6 +141,26 @@ You can pass a list of features separated by comma to the `watch` command to loa
 cargo lambda watch --features feature-1,feature-2
 ```
 
+## Concurrent invocations
+
+By default, `cargo lambda watch` processes Lambda invocations sequentially with a single function instance.
+You can enable concurrent request processing by specifying the maximum number of instances:
+
+```
+cargo lambda watch --concurrency 5
+```
+
+This will spawn up to 5 function instances dynamically based on demand, allowing multiple requests to be processed simultaneously. 
+This matches AWS Lambda's behavior with [managed instances](https://aws.amazon.com/blogs/compute/introducing-aws-lambda-response-streaming/).
+
+### How it works
+
+- Instances are spawned on-demand when requests arrive and all current instances are busy
+- Each instance continuously polls for requests from a shared queue
+- Instances remain warm after processing requests (no repeated cold starts)
+- The concurrency limit is enforced globally per function
+- Each instance runs with `AWS_LAMBDA_MAX_CONCURRENCY=1` (single-worker mode)
+
 ## Debug with breakpoints
 
 You have two options to debug your application, set breakpoints, and step through your code using a debugger like GDB or LLDB.

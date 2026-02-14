@@ -1,6 +1,7 @@
 use crate::{
     RUNTIME_EMULATOR_PATH,
     error::ServerError,
+    instance_pool::{InstanceId, InstancePool},
     requests::{InvokeRequest, LambdaResponse, NextEvent},
 };
 use cargo_lambda_metadata::cargo::{binary_targets, watch::FunctionRouter};
@@ -12,7 +13,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -32,6 +33,9 @@ pub(crate) struct RuntimeState {
     pub req_cache: RequestCache,
     pub res_cache: ResponseCache,
     pub ext_cache: ExtensionCache,
+    pub instance_pools: Arc<RwLock<HashMap<String, InstancePool>>>,
+    pub connection_tracker: ConnectionTracker,
+    pub max_concurrency: usize,
 }
 
 pub(crate) type RefRuntimeState = Arc<RuntimeState>;
@@ -44,6 +48,7 @@ impl RuntimeState {
         only_lambda_apis: bool,
         initial_functions: HashSet<String>,
         function_router: Option<FunctionRouter>,
+        max_concurrency: usize,
     ) -> RuntimeState {
         RuntimeState {
             runtime_addr,
@@ -56,6 +61,9 @@ impl RuntimeState {
             req_cache: RequestCache::new(),
             res_cache: ResponseCache::new(),
             ext_cache: ExtensionCache::default(),
+            instance_pools: Arc::new(RwLock::new(HashMap::new())),
+            connection_tracker: ConnectionTracker::new(),
+            max_concurrency,
         }
     }
 
@@ -91,6 +99,7 @@ impl RuntimeState {
 pub(crate) struct RequestQueue {
     tx: Arc<Sender<InvokeRequest>>,
     rx: Arc<Mutex<Receiver<InvokeRequest>>>,
+    depth: Arc<AtomicUsize>,
 }
 
 impl RequestQueue {
@@ -100,19 +109,30 @@ impl RequestQueue {
         RequestQueue {
             tx: Arc::new(tx),
             rx: Arc::new(Mutex::new(rx)),
+            depth: Arc::new(AtomicUsize::new(0)),
         }
     }
 
     pub async fn pop(&self) -> Option<InvokeRequest> {
         let mut rx = self.rx.lock().await;
-        rx.recv().await
+        let result = rx.recv().await;
+        if result.is_some() {
+            self.depth.fetch_sub(1, Ordering::Relaxed);
+        }
+        result
     }
 
     pub async fn push(&self, req: InvokeRequest) -> Result<(), ServerError> {
         self.tx
             .send(req)
             .await
-            .map_err(|e| ServerError::SendInvokeMessage(Box::new(e)))
+            .map_err(|e| ServerError::SendInvokeMessage(Box::new(e)))?;
+        self.depth.fetch_add(1, Ordering::Relaxed);
+        Ok(())
+    }
+
+    pub fn depth(&self) -> usize {
+        self.depth.load(Ordering::Relaxed)
     }
 }
 
@@ -190,15 +210,17 @@ impl RequestCache {
         stack.pop().await
     }
 
-    pub async fn clean(&self, function_name: &str) {
-        let mut inner = self.inner.write().await;
-        inner.remove(function_name);
-        debug!(function_name, "request stack cleaned");
-    }
-
     pub async fn keys(&self) -> Vec<String> {
         let inner = self.inner.read().await;
         inner.keys().cloned().collect()
+    }
+
+    pub async fn queue_depth(&self, function_name: &str) -> usize {
+        let inner = self.inner.read().await;
+        inner
+            .get(function_name)
+            .map(|queue| queue.depth())
+            .unwrap_or(0)
     }
 }
 
@@ -321,4 +343,31 @@ impl ExtensionCache {
 pub enum ExtensionType {
     Internal,
     External,
+}
+
+/// Tracks TCP connections to map peer addresses to instance IDs
+#[derive(Clone)]
+pub struct ConnectionTracker {
+    connections: Arc<RwLock<HashMap<SocketAddr, (String, InstanceId)>>>,
+}
+
+impl ConnectionTracker {
+    pub fn new() -> Self {
+        Self {
+            connections: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Register a connection from an instance
+    pub async fn register(&self, peer: SocketAddr, function_name: String, instance_id: InstanceId) {
+        let mut connections = self.connections.write().await;
+        connections.insert(peer, (function_name.clone(), instance_id));
+        debug!(?peer, ?function_name, ?instance_id, "registered connection");
+    }
+
+    /// Get the instance ID for a connection, if registered
+    pub async fn get(&self, peer: &SocketAddr) -> Option<(String, InstanceId)> {
+        let connections = self.connections.read().await;
+        connections.get(peer).cloned()
+    }
 }

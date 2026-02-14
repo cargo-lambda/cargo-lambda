@@ -31,3 +31,6 @@ tags = { "organization" = "aws", "team" = "lambda" }
 type = "cargo"
 subcommand = ["brazil", "build"]
 extra_args = ["--release"]
+
+[package.metadata.lambda.watch]
+concurrency = 5

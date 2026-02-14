@@ -86,6 +86,11 @@ pub struct Watch {
     #[serde(flatten)]
     pub tls_options: TlsOptions,
 
+    /// Maximum number of concurrent instances per function (default: 1).
+    #[arg(long, default_value = "1")]
+    #[serde(default = "default_concurrency")]
+    pub concurrency: usize,
+
     #[arg(skip)]
     #[serde(default, skip_serializing_if = "is_empty_router")]
     pub router: Option<FunctionRouter>,
@@ -139,6 +144,7 @@ impl Serialize for Watch {
             + self.wait as usize
             + self.disable_cors as usize
             + self.timeout.is_some() as usize
+            + (self.concurrency != 1) as usize
             + self.router.is_some() as usize
             + self.cargo_opts.manifest_path.is_some() as usize
             + self.cargo_opts.release as usize
@@ -180,6 +186,9 @@ impl Serialize for Watch {
         // Only serialize Some values for Options
         if let Some(timeout) = &self.timeout {
             state.serialize_field("timeout", timeout)?;
+        }
+        if self.concurrency != 1 {
+            state.serialize_field("concurrency", &self.concurrency)?;
         }
         if let Some(router) = &self.router {
             state.serialize_field("router", router)?;
@@ -225,6 +234,10 @@ fn default_invoke_address() -> String {
 
 fn default_invoke_port() -> u16 {
     DEFAULT_INVOKE_PORT
+}
+
+fn default_concurrency() -> usize {
+    1
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

@@ -1,20 +1,23 @@
 use crate::{
     RefRuntimeState,
     error::ServerError,
+    instance_pool::InstanceId,
     requests::*,
     runtime::LAMBDA_RUNTIME_XRAY_TRACE_HEADER,
     state::{RequestCache, ResponseCache},
 };
 use axum::{
     body::Body,
-    extract::{Path, Request, State},
+    extract::{ConnectInfo, Path, Request, State},
     http::StatusCode,
     response::Response,
 };
 use base64::{Engine as _, engine::general_purpose as b64};
 use cargo_lambda_metadata::DEFAULT_PACKAGE_FUNCTION;
 use http::request::Parts;
+use std::net::SocketAddr;
 use tracing::debug;
+use uuid::Uuid;
 
 use super::LAMBDA_RUNTIME_AWS_REQUEST_ID;
 
@@ -25,22 +28,25 @@ pub(crate) const LAMBDA_RUNTIME_FUNCTION_ARN: &str = "lambda-runtime-invoked-fun
 
 pub(crate) async fn next_request(
     State(state): State<RefRuntimeState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     Path(function_name): Path<String>,
     parts: Parts,
 ) -> Result<Response<Body>, ServerError> {
-    process_next_request(&state, &function_name, parts).await
+    process_next_request(&state, &function_name, peer, parts).await
 }
 
 pub(crate) async fn bare_next_request(
     State(state): State<RefRuntimeState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     parts: Parts,
 ) -> Result<Response<Body>, ServerError> {
-    process_next_request(&state, DEFAULT_PACKAGE_FUNCTION, parts).await
+    process_next_request(&state, DEFAULT_PACKAGE_FUNCTION, peer, parts).await
 }
 
 pub(crate) async fn process_next_request(
     state: &RefRuntimeState,
     function_name: &str,
+    peer: SocketAddr,
     parts: Parts,
 ) -> Result<Response<Body>, ServerError> {
     let function_name = if function_name.is_empty() {
@@ -48,6 +54,8 @@ pub(crate) async fn process_next_request(
     } else {
         function_name
     };
+
+    let instance_id = get_or_register_instance(state, peer, function_name).await;
 
     let req_id = parts
         .headers
@@ -60,13 +68,27 @@ pub(crate) async fn process_next_request(
         .header(LAMBDA_RUNTIME_FUNCTION_ARN, "function-arn");
 
     let resp = match state.req_cache.pop(function_name).await {
-        None => builder.status(StatusCode::NO_CONTENT).body(Body::empty()),
+        None => {
+            if let Some(instance_id) = instance_id {
+                mark_instance_idle(state, function_name, &instance_id).await;
+            }
+            builder.status(StatusCode::NO_CONTENT).body(Body::empty())
+        }
         Some(invoke) => {
+            if let Some(instance_id) = instance_id {
+                mark_instance_busy(state, function_name, &instance_id).await;
+            }
+
             let req_id = req_id
                 .to_str()
                 .map_err(ServerError::InvalidRequestIdHeader)?;
 
-            debug!(req_id = ?req_id, function = ?function_name, "processing request");
+            debug!(
+                req_id = ?req_id,
+                function = ?function_name,
+                ?instance_id,
+                "processing request"
+            );
             let next_event = NextEvent::invoke(req_id, &invoke);
             state.ext_cache.send_event(next_event).await?;
 
@@ -193,4 +215,53 @@ async fn respond_to_invocation(
     }
 
     Ok(Response::new(Body::empty()))
+}
+
+/// Get or register the instance ID for a connection
+async fn get_or_register_instance(
+    state: &RefRuntimeState,
+    peer: SocketAddr,
+    function_name: &str,
+) -> Option<InstanceId> {
+    if let Some((_fn, instance_id)) = state.connection_tracker.get(&peer).await {
+        return Some(instance_id);
+    }
+
+    let pools = state.instance_pools.read().await;
+    if let Some(_pool) = pools.get(function_name) {
+        let instance_id = Uuid::new_v4();
+        state
+            .connection_tracker
+            .register(peer, function_name.to_string(), instance_id)
+            .await;
+        Some(instance_id)
+    } else {
+        None
+    }
+}
+
+/// Mark instance as busy (processing a request)
+async fn mark_instance_busy(
+    state: &RefRuntimeState,
+    function_name: &str,
+    instance_id: &InstanceId,
+) {
+    let pools = state.instance_pools.read().await;
+    if let Some(pool) = pools.get(function_name) {
+        pool.mark_busy(instance_id).await;
+        debug!(?function_name, ?instance_id, "instance marked busy");
+    }
+}
+
+/// Mark instance as idle (waiting for requests)
+async fn mark_instance_idle(
+    state: &RefRuntimeState,
+    function_name: &str,
+    instance_id: &InstanceId,
+) {
+    let pools = state.instance_pools.read().await;
+    if let Some(pool) = pools.get(function_name) {
+        pool.mark_idle(instance_id).await;
+        debug!(?function_name, ?instance_id, "instance marked idle");
+    }
 }

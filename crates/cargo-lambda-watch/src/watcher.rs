@@ -1,4 +1,6 @@
-use crate::{error::ServerError, requests::NextEvent, state::ExtensionCache};
+use crate::{
+    error::ServerError, instance_pool::InstanceId, requests::NextEvent, state::ExtensionCache,
+};
 use cargo_lambda_metadata::{
     cargo::load_metadata,
     config::{ConfigOptions, FunctionNames, load_config_without_cli_flags},
@@ -32,6 +34,7 @@ pub(crate) struct WatcherConfig {
     pub only_lambda_apis: bool,
     pub env: HashMap<String, String>,
     pub wait: bool,
+    pub instance_id: Option<InstanceId>,
 }
 
 impl WatcherConfig {
@@ -202,6 +205,7 @@ async fn runtime(
         let manifest_path = wc.manifest_path.clone();
         let bin_name = wc.bin_name.clone();
         let base_env = wc.env.clone();
+        let instance_id = wc.instance_id;
 
         async move {
             trace!("loading watch environment metadata");
@@ -216,6 +220,12 @@ async fn runtime(
                     .envs(new_env)
                     .env("AWS_LAMBDA_RUNTIME_API", &runtime_api)
                     .env("AWS_LAMBDA_FUNCTION_NAME", &name);
+
+                command.env("AWS_LAMBDA_MAX_CONCURRENCY", "1");
+
+                if let Some(id) = instance_id {
+                    command.env("AWS_LAMBDA_INSTANCE_ID", id.to_string());
+                }
             }
 
             Ok::<(), Infallible>(())
