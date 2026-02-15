@@ -17,7 +17,7 @@ on:
       - '.github/workflows/format.yml'
 
 permissions:
-  pull-requests: write
+  contents: read
 
 jobs:
   format:
@@ -32,22 +32,21 @@ jobs:
         id: cargoFmt
         shell: bash
         run: cargo +nightly fmt --all -- --check
-      - name: Notify fmt check
-        if: failure() && steps.cargoFmt.outcome == 'failure'
-        uses: actions/github-script@v6
+
+      - name: Save fmt check result
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          mkdir -p ./pr-check-results
+          echo "${{ steps.cargoFmt.outcome }}" > ./pr-check-results/fmt-outcome.txt
+          echo "${{ github.event.pull_request.number }}" > ./pr-check-results/pr-number.txt
+          echo "${{ github.event.pull_request.head.sha }}" > ./pr-check-results/pr-head-sha.txt
+
+      - name: Upload fmt check result
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const message = `👋 It looks like your code is not formatted like we expect.
-
-              Please run \`make fmt\` and push the code again.`;
-
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: message,
-            });
-            core.setFailed('It looks like there are formatting errors');
+          name: fmt-check-result
+          path: ./pr-check-results/
 
   linting:
     runs-on: ubuntu-latest
@@ -57,26 +56,31 @@ jobs:
         with:
           components: clippy
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "cargo-lambda-clippy-v1"
+          cache-on-failure: false
+
       - name: Run clippy check
         id: cargoClippy
         shell: bash
         run: make clippy
-      - name: Notify fmt check
-        if: failure() && steps.cargoClippy.outcome == 'failure'
-        uses: actions/github-script@v6
+
+      - name: Save clippy check result
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          mkdir -p ./pr-check-results
+          echo "${{ steps.cargoClippy.outcome }}" > ./pr-check-results/clippy-outcome.txt
+          echo "${{ github.event.pull_request.number }}" > ./pr-check-results/pr-number.txt
+          echo "${{ github.event.pull_request.head.sha }}" > ./pr-check-results/pr-head-sha.txt
+
+      - name: Upload clippy check result
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const message = `👋 It looks like your code has some linting issues.
-
-              Please run \`cargo clippy --fix\` and push the code again.`;
-
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: message,
-            });
-            core.setFailed('It looks like there are linting errors');
+          name: clippy-check-result
+          path: ./pr-check-results/
   licenses:
     runs-on: ubuntu-22.04
     steps:

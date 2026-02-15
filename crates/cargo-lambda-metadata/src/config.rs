@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_load_env_from_metadata() {
-        let metadata = load_metadata(fixture_metadata("single-binary-package")).unwrap();
+        let metadata = load_metadata(fixture_metadata("single-binary-package"), None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &ConfigOptions::default()).unwrap();
 
         assert_eq!(
@@ -397,7 +397,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metadata = load_metadata(fixture_metadata("workspace-package")).unwrap();
+        let metadata = load_metadata(fixture_metadata("workspace-package"), None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
 
         let router = config.watch.router.unwrap();
@@ -427,7 +427,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metadata = load_metadata(fixture_metadata("workspace-package")).unwrap();
+        let metadata = load_metadata(fixture_metadata("workspace-package"), None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
 
         let router = config.watch.router.unwrap();
@@ -450,7 +450,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metadata = load_metadata(fixture_metadata("workspace-package")).unwrap();
+        let metadata = load_metadata(fixture_metadata("workspace-package"), None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
 
         assert_eq!(config.env.get("FOO"), Some(&"BAR".to_string()));
@@ -469,7 +469,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metadata = load_metadata(manifest).unwrap();
+        let metadata = load_metadata(manifest, None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
         assert_eq!(config.deploy.function_config.memory, Some(1024.into()));
 
@@ -510,7 +510,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metadata = load_metadata(manifest).unwrap();
+        let metadata = load_metadata(manifest, None).unwrap();
         let config = load_config(&args_config, &metadata, &options).unwrap();
         assert_eq!(config.deploy.function_config.memory, Some(2048.into()));
     }
@@ -518,7 +518,7 @@ mod tests {
     #[test]
     fn test_cargo_toml_merge_env_not_overridden_by_cli() {
         // Test that merge_env from Cargo.toml is NOT overridden when CLI doesn't set it
-        let metadata = load_metadata(fixture_metadata("single-binary-package")).unwrap();
+        let metadata = load_metadata(fixture_metadata("single-binary-package"), None).unwrap();
 
         // CLI with no merge_env set (should be None)
         let args_config = Config {
@@ -542,7 +542,8 @@ mod tests {
             ..Default::default()
         };
 
-        let metadata = load_metadata(fixture_metadata("workspace-with-package-config")).unwrap();
+        let metadata =
+            load_metadata(fixture_metadata("workspace-with-package-config"), None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
 
         assert_eq!(

@@ -67,7 +67,7 @@ pub fn binary_targets<P: AsRef<Path> + Debug>(
     manifest_path: P,
     build_examples: bool,
 ) -> Result<HashSet<String>, MetadataError> {
-    let metadata = load_metadata(manifest_path)?;
+    let metadata = load_metadata(manifest_path, None)?;
     Ok(binary_targets_from_metadata(&metadata, build_examples))
 }
 
@@ -112,7 +112,7 @@ where
     F: FnMut(&CargoTarget) -> bool,
     K: FnMut(&&CargoPackage) -> bool,
 {
-    let metadata = load_metadata(manifest_path)?;
+    let metadata = load_metadata(manifest_path, None)?;
     Ok(filter_binary_targets_from_metadata(
         &metadata,
         target_filter,
@@ -200,12 +200,18 @@ fn cargo_release_profile_config_from_metadata(metadata: Metadata) -> HashSet<&'s
 #[tracing::instrument(target = "cargo_lambda")]
 pub fn load_metadata<P: AsRef<Path> + Debug>(
     manifest_path: P,
+    target_dir: Option<&Path>,
 ) -> Result<CargoMetadata, MetadataError> {
     trace!("loading Cargo metadata");
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
     metadata_cmd
         .no_deps()
         .verbose(enabled!(target: "cargo_lambda", Level::TRACE));
+
+    // If target-dir was explicitly specified, pass it to cargo metadata
+    if let Some(dir) = target_dir {
+        metadata_cmd.other_options(vec![format!("--target-dir={}", dir.display())]);
+    }
 
     // try to split manifest path and assign current_dir to enable parsing a project-specific
     // cargo config
@@ -420,7 +426,7 @@ mod tests {
     #[test]
     fn test_main_binary_with_package_name() {
         let manifest_path = fixture_metadata("single-binary-package");
-        let metadata = load_metadata(manifest_path).unwrap();
+        let metadata = load_metadata(manifest_path, None).unwrap();
         let name = main_binary_from_metadata(&metadata).unwrap();
         assert_eq!("basic-lambda", name);
     }
@@ -428,7 +434,7 @@ mod tests {
     #[test]
     fn test_main_binary_with_binary_name() {
         let manifest_path = fixture_metadata("single-binary-different-name");
-        let metadata = load_metadata(manifest_path).unwrap();
+        let metadata = load_metadata(manifest_path, None).unwrap();
         let name = main_binary_from_metadata(&metadata).unwrap();
         assert_eq!("basic-lambda-binary", name);
     }
@@ -436,7 +442,7 @@ mod tests {
     #[test]
     fn test_main_binary_multi_binaries() {
         let manifest_path = fixture_metadata("multi-binary-package");
-        let metadata = load_metadata(manifest_path).unwrap();
+        let metadata = load_metadata(manifest_path, None).unwrap();
         let err = main_binary_from_metadata(&metadata).unwrap_err();
         assert_eq!(
             "there are more than one binary in the project, please specify a binary name with --binary-name or --binary-path. This is the list of binaries I found: delete-product, dynamodb-streams, get-product, get-products, put-product",
@@ -447,7 +453,7 @@ mod tests {
     #[test]
     fn test_select_binary() {
         let manifest_path = fixture_metadata("multi-binary-package");
-        let metadata = load_metadata(manifest_path).unwrap();
+        let metadata = load_metadata(manifest_path, None).unwrap();
 
         let package_filter: Option<fn(&&CargoPackage) -> bool> = None;
 
@@ -479,7 +485,7 @@ mod tests {
 
     #[test]
     fn test_release_config_with_workspace() {
-        let metadata = load_metadata(fixture_metadata("workspace-package")).unwrap();
+        let metadata = load_metadata(fixture_metadata("workspace-package"), None).unwrap();
         let config = cargo_release_profile_config(&metadata).unwrap();
         assert!(config.contains(STRIP_CONFIG));
         assert!(!config.contains(LTO_CONFIG));

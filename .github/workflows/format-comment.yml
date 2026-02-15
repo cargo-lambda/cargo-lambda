@@ -1,0 +1,171 @@
+name: Post Format/Lint Check Comments
+
+on:
+  workflow_run:
+    workflows: ["Formatting and Linting"]
+    types:
+      - completed
+
+permissions:
+  pull-requests: write
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion != 'cancelled'
+    steps:
+      - name: Download fmt check artifact
+        id: download-fmt
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }},
+            });
+
+            const fmtArtifact = artifacts.data.artifacts.find(a => a.name === 'fmt-check-result');
+            if (fmtArtifact) {
+              const download = await github.rest.actions.downloadArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: fmtArtifact.id,
+                archive_format: 'zip',
+              });
+
+              const fs = require('fs');
+              fs.writeFileSync('${{ github.workspace }}/fmt-artifact.zip', Buffer.from(download.data));
+              return true;
+            }
+            return false;
+
+      - name: Extract fmt artifact
+        if: steps.download-fmt.outputs.result == 'true'
+        run: |
+          unzip -o fmt-artifact.zip -d fmt-results || true
+
+      - name: Download clippy check artifact
+        id: download-clippy
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }},
+            });
+
+            const clippyArtifact = artifacts.data.artifacts.find(a => a.name === 'clippy-check-result');
+            if (clippyArtifact) {
+              const download = await github.rest.actions.downloadArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: clippyArtifact.id,
+                archive_format: 'zip',
+              });
+
+              const fs = require('fs');
+              fs.writeFileSync('${{ github.workspace }}/clippy-artifact.zip', Buffer.from(download.data));
+              return true;
+            }
+            return false;
+
+      - name: Extract clippy artifact
+        if: steps.download-clippy.outputs.result == 'true'
+        run: |
+          unzip -o clippy-artifact.zip -d clippy-results || true
+
+      - name: Post comments
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read PR number and commit SHA
+            let prNumber, headSha;
+            try {
+              prNumber = fs.readFileSync('fmt-results/pr-number.txt', 'utf8').trim();
+              headSha = fs.readFileSync('fmt-results/pr-head-sha.txt', 'utf8').trim();
+            } catch (e) {
+              try {
+                prNumber = fs.readFileSync('clippy-results/pr-number.txt', 'utf8').trim();
+                headSha = fs.readFileSync('clippy-results/pr-head-sha.txt', 'utf8').trim();
+              } catch (e2) {
+                console.log('Could not read PR info from artifacts');
+                return;
+              }
+            }
+
+            console.log(`Processing PR #${prNumber} at commit ${headSha}`);
+
+            // Read check outcomes
+            let fmtOutcome, clippyOutcome;
+            try {
+              fmtOutcome = fs.readFileSync('fmt-results/fmt-outcome.txt', 'utf8').trim();
+            } catch (e) {
+              fmtOutcome = 'success';
+            }
+
+            try {
+              clippyOutcome = fs.readFileSync('clippy-results/clippy-outcome.txt', 'utf8').trim();
+            } catch (e) {
+              clippyOutcome = 'success';
+            }
+
+            console.log(`fmt outcome: ${fmtOutcome}, clippy outcome: ${clippyOutcome}`);
+
+            // Define comment markers and messages
+            const FMT_MARKER = '<!-- cargo-lambda-fmt-check -->';
+            const CLIPPY_MARKER = '<!-- cargo-lambda-clippy-check -->';
+
+            const fmtMessage = `${FMT_MARKER}
+👋 It looks like your code is not formatted like we expect.
+
+Please run \`make fmt\` and push the code again.`;
+
+            const clippyMessage = `${CLIPPY_MARKER}
+👋 It looks like your code has some linting issues.
+
+Please run \`cargo clippy --fix\` and push the code again.`;
+
+            // Get existing comments
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            // Helper function to handle comments (create or delete)
+            async function handleComment(marker, message, shouldExist) {
+              const existingComment = comments.find(c => c.body.includes(marker));
+
+              if (shouldExist) {
+                if (!existingComment) {
+                  console.log(`Creating new comment for ${marker}`);
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    body: message,
+                  });
+                } else {
+                  console.log(`Comment for ${marker} already exists`);
+                }
+              } else if (existingComment) {
+                console.log(`Deleting resolved comment for ${marker}`);
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existingComment.id,
+                });
+              }
+            }
+
+            // Handle fmt comment
+            await handleComment(FMT_MARKER, fmtMessage, fmtOutcome === 'failure');
+
+            // Handle clippy comment
+            await handleComment(CLIPPY_MARKER, clippyMessage, clippyOutcome === 'failure');

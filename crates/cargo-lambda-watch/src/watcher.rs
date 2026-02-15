@@ -262,7 +262,7 @@ fn function_graceful_shutdown_or_else_sigkill(
 }
 
 fn reload_env(manifest_path: &PathBuf, bin_name: &Option<String>) -> HashMap<String, String> {
-    let metadata = match load_metadata(manifest_path) {
+    let metadata = match load_metadata(manifest_path, None) {
         Ok(metadata) => metadata,
         Err(e) => {
             error!("failed to reload metadata: {}", e);
