@@ -3,7 +3,8 @@ fn main() {
 
     let git_commit = build_data::get_git_commit_short().unwrap_or_else(|_| git_sha_from_env());
     let git_dirty = build_data::get_git_dirty().unwrap_or_default();
-    let build_date = build_data::format_date(build_data::now());
+    let build_date =
+        build_data::format_date(build_data::now()).unwrap_or_else(|_| String::from("unknown date"));
 
     let build_info = if !git_commit.is_empty() {
         let git_info = if git_dirty {
@@ -18,7 +19,7 @@ fn main() {
     };
 
     println!("cargo:rustc-env=CARGO_LAMBDA_BUILD_INFO={build_info}");
-    build_data::no_debug_rebuilds();
+    let _ = build_data::no_debug_rebuilds();
 }
 
 fn git_sha_from_env() -> String {

@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use cargo_options::Build as CargoBuild;
 use clap::{Args, ValueHint};
 use serde::{Deserialize, Serialize};
-use strum_macros::{Display, EnumString};
+use strum::{Display, EnumString};
 
 use crate::{
     cargo::{count_common_options, serialize_common_options},

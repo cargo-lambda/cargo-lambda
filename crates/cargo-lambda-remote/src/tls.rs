@@ -115,20 +115,23 @@ impl TlsOptions {
     pub fn client_config(&self) -> Result<ClientConfig> {
         CELL.get_or_init(install_default_tls_provider);
 
-        let builder = if let Some(path) = self.ca_path() {
-            let mut root_store = RootCertStore::empty();
-            root_store.add_parsable_certificates(parse_certificates(path)?);
-            ClientConfig::builder().with_root_certificates(root_store)
-        } else {
-            use rustls_platform_verifier::BuilderVerifierExt;
-            ClientConfig::builder().with_platform_verifier()
-        };
-
         let (cert, key) = parse_cert_and_key(self.cert_path().as_ref(), self.key_path().as_ref())?;
 
-        let config = builder
-            .with_client_auth_cert(cert, key)
-            .map_err(TlsError::FailedToParseConfig)?;
+        let config = if let Some(path) = self.ca_path() {
+            let mut root_store = RootCertStore::empty();
+            root_store.add_parsable_certificates(parse_certificates(path)?);
+            ClientConfig::builder()
+                .with_root_certificates(root_store)
+                .with_client_auth_cert(cert, key)
+                .map_err(TlsError::FailedToParseConfig)?
+        } else {
+            use rustls_platform_verifier::BuilderVerifierExt;
+            ClientConfig::builder()
+                .with_platform_verifier()
+                .map_err(TlsError::FailedToParseConfig)?
+                .with_client_auth_cert(cert, key)
+                .map_err(TlsError::FailedToParseConfig)?
+        };
 
         Ok(config)
     }

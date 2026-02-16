@@ -20,23 +20,21 @@ cargo-lambda-new.workspace = true
 cargo-lambda-system.workspace = true
 cargo-lambda-watch.workspace = true
 clap = { workspace = true, features = ["suggestions"] }
-clap-cargo = "0.12.0"
+clap-cargo = "0.18.3"
 miette = { workspace = true, features = ["fancy"] }
-serde_json.workspace = true
 strum.workspace = true
-strum_macros.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing-subscriber.workspace = true
 
 [build-dependencies]
-build-data = "0.1"
+build-data = "0.3.3"
 
 [dev-dependencies]
 assertables.workspace = true
 dunce = "1.0.3"
 serde_json.workspace = true
-snapbox = { version = "0.4.3", features = ["cmd", "debug", "path"] }
-toml_edit = "0.22.24"
+snapbox = { version = "1.0.0", features = ["cmd", "debug", "path"] }
+toml_edit = "0.25.1"
 url = "2.5.0"
 uuid.workspace = true
 walkdir = "2.4.0"
