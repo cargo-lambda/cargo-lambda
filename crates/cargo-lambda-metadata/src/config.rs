@@ -7,7 +7,7 @@ use crate::{
     },
     error::MetadataError,
 };
-use cargo_metadata::{Package, Target};
+use cargo_metadata::{Package, Target, TargetKind};
 use figment::{
     Figment,
     providers::{Env, Format, Serialized, Toml},
@@ -228,7 +228,11 @@ fn workspace_metadata(
 
 fn package_metadata(metadata: &CargoMetadata, name: &FunctionNames) -> Result<Option<Config>> {
     let kind_condition = |pkg: &Package, target: &Target| {
-        target.kind.iter().any(|kind| kind == "bin") && pkg.metadata.is_object()
+        target
+            .kind
+            .iter()
+            .any(|kind| matches!(kind, TargetKind::Bin))
+            && pkg.metadata.is_object()
     };
 
     if name.is_empty() {
@@ -286,7 +290,11 @@ fn get_config_from_packages(
 
 pub fn get_config_from_all_packages(metadata: &CargoMetadata) -> Result<HashMap<String, Config>> {
     let kind_condition = |pkg: &Package, target: &Target| {
-        target.kind.iter().any(|kind| kind == "bin") && pkg.metadata.is_object()
+        target
+            .kind
+            .iter()
+            .any(|kind| matches!(kind, TargetKind::Bin))
+            && pkg.metadata.is_object()
     };
 
     let mut configs = HashMap::new();
@@ -296,7 +304,7 @@ pub fn get_config_from_all_packages(metadata: &CargoMetadata) -> Result<HashMap<
                 let meta: Metadata =
                     serde_json::from_value(pkg.metadata.clone()).into_diagnostic()?;
 
-                configs.insert(pkg.name.clone(), meta.lambda.package.into());
+                configs.insert(pkg.name.to_string(), meta.lambda.package.into());
             }
         }
     }
@@ -555,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_load_concurrency_from_metadata() {
-        let metadata = load_metadata(fixture_metadata("single-binary-package")).unwrap();
+        let metadata = load_metadata(fixture_metadata("single-binary-package"), None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &ConfigOptions::default()).unwrap();
 
         assert_eq!(
@@ -566,7 +574,7 @@ mod tests {
 
     #[test]
     fn test_concurrency_cli_override() {
-        let metadata = load_metadata(fixture_metadata("single-binary-package")).unwrap();
+        let metadata = load_metadata(fixture_metadata("single-binary-package"), None).unwrap();
 
         let mut watch = Watch::default();
         watch.concurrency = 10;
@@ -591,7 +599,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metadata = load_metadata(fixture_metadata("workspace-package")).unwrap();
+        let metadata = load_metadata(fixture_metadata("workspace-package"), None).unwrap();
         let config = load_config_without_cli_flags(&metadata, &options).unwrap();
 
         assert_eq!(

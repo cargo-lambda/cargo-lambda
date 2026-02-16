@@ -18,7 +18,7 @@ use std::{
     path::PathBuf,
     str::{FromStr, from_utf8},
 };
-use strum_macros::{Display, EnumString};
+use strum::{Display, EnumString};
 use tracing::debug;
 
 mod error;

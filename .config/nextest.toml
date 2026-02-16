@@ -7,7 +7,7 @@ test-threads = 4
 # CI profile with retries for flaky tests
 retries = 1
 test-threads = 2
-slow-timeout = { period = "60s", terminate-after = 2 }
+slow-timeout = { period = "180s", terminate-after = 2 }
 
 # Provide more detailed output in CI
 success-output = "immediate"

@@ -8,7 +8,7 @@ use serde::{
     de::{Deserializer, Error, Visitor},
 };
 use std::{ffi::OsStr, fmt, str::FromStr, time::Duration};
-use strum_macros::{Display, EnumString};
+use strum::{Display, EnumString};
 
 use crate::error::MetadataError;
 

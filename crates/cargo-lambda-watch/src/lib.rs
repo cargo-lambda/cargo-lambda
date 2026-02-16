@@ -11,6 +11,7 @@ use cargo_lambda_metadata::{
 };
 use cargo_lambda_remote::tls::TlsOptions;
 use cargo_options::Run as CargoOptions;
+use http::StatusCode;
 use http_body_util::{BodyExt, combinators::BoxBody};
 use hyper::{Request, Response, body::Incoming, client::conn::http1, service::service_fn};
 use hyper_util::{
@@ -237,7 +238,10 @@ async fn start_server(
         app = app.layer(CorsLayer::very_permissive());
     }
     if let Some(timeout) = timeout {
-        app = app.layer(TimeoutLayer::new(timeout.duration()));
+        app = app.layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            timeout.duration(),
+        ));
     }
     let app = app.with_state(state_ref);
 
@@ -277,8 +281,8 @@ async fn start_server(
     if let (Some(tls_config), Some(proxy_addr)) = (tls_config, proxy_addr) {
         let tls_tracker = tls_tracker.clone();
 
-        subsys.start(SubsystemBuilder::new("TLS proxy", move |s| async move {
-            start_tls_proxy(s, tls_tracker, tls_config, proxy_addr, runtime_addr).await
+        subsys.start(SubsystemBuilder::new("TLS proxy", move |s| {
+            start_tls_proxy(s, tls_tracker, tls_config, proxy_addr, runtime_addr)
         }));
     }
 

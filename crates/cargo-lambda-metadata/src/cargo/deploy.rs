@@ -6,7 +6,7 @@ use cargo_lambda_remote::{
 use clap::{ArgAction, Args, ValueHint};
 use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use std::{collections::HashMap, fmt::Debug, path::PathBuf};
-use strum_macros::{Display, EnumString};
+use strum::{Display, EnumString};
 
 use crate::{
     env::EnvOptions,
