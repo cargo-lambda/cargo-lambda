@@ -12,8 +12,8 @@ keywords.workspace = true
 description.workspace = true
 
 [dependencies]
-indicatif = "0.17.2"
-inquire = "0.5.2"
+indicatif = "0.18.4"
+inquire = "0.9.3"
 is-terminal = "0.4.0"
 miette.workspace = true
 tokio = { workspace = true, features = ["io-util", "process"] }

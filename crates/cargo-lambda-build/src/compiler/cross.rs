@@ -1,5 +1,5 @@
 use crate::TargetArch;
-use cargo_lambda_metadata::cargo::CargoMetadata;
+use cargo_lambda_metadata::cargo::{CargoMetadata, TargetKind};
 use cargo_options::Build;
 use miette::Result;
 use std::{collections::VecDeque, env, ffi::OsStr, fs, process::Command};
@@ -50,7 +50,12 @@ fn is_build_image_configured(target_arch: &str, env_name: &str, metadata: &Cargo
     // Check for cross configuration in the package's Cargo.toml
     'outer: for pkg in &metadata.packages {
         for target in &pkg.targets {
-            if target.kind.iter().any(|kind| kind == "bin") && pkg.metadata.is_object() {
+            if target
+                .kind
+                .iter()
+                .any(|kind| matches!(kind, TargetKind::Bin))
+                && pkg.metadata.is_object()
+            {
                 let Some(cross) = pkg.metadata.get("cross") else {
                     break 'outer;
                 };

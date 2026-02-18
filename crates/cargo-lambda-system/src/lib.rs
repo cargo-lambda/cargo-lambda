@@ -12,7 +12,7 @@ use miette::{IntoDiagnostic, Result};
 
 use cargo_lambda_build::zig::{ZigInfo, check_installation, get_zig_info};
 use serde::{Deserialize, Serialize};
-use strum_macros::{Display, EnumString};
+use strum::{Display, EnumString};
 use tracing::trace;
 
 #[derive(Clone, Debug, Default, Deserialize, Display, EnumString, Serialize)]
