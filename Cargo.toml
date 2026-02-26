@@ -31,7 +31,7 @@ exclude = [
 resolver = "2"
 
 [workspace.package]
-version = "1.9.0"
+version = "1.9.1"
 authors = ["David Calavera"]
 edition = "2024"
 license = "MIT"
@@ -54,15 +54,15 @@ aws-smithy-runtime = { version = "1.7.5", features = ["test-util"] }
 aws-smithy-types = "1.2.10"
 aws-types = "1.3.3"
 base64 = "0.21.2"
-cargo-lambda-build = { version = "1.9.0", path = "crates/cargo-lambda-build" }
-cargo-lambda-deploy = { version = "1.9.0", path = "crates/cargo-lambda-deploy" }
-cargo-lambda-interactive = { version = "1.9.0", path = "crates/cargo-lambda-interactive" }
-cargo-lambda-invoke = { version = "1.9.0", path = "crates/cargo-lambda-invoke" }
-cargo-lambda-metadata = { version = "1.9.0", path = "crates/cargo-lambda-metadata" }
-cargo-lambda-new = { version = "1.9.0", path = "crates/cargo-lambda-new" }
-cargo-lambda-remote = { version = "1.9.0", path = "crates/cargo-lambda-remote" }
-cargo-lambda-system = { version = "1.9.0", path = "crates/cargo-lambda-system" }
-cargo-lambda-watch = { version = "1.9.0", path = "crates/cargo-lambda-watch" }
+cargo-lambda-build = { version = "1.9.1", path = "crates/cargo-lambda-build" }
+cargo-lambda-deploy = { version = "1.9.1", path = "crates/cargo-lambda-deploy" }
+cargo-lambda-interactive = { version = "1.9.1", path = "crates/cargo-lambda-interactive" }
+cargo-lambda-invoke = { version = "1.9.1", path = "crates/cargo-lambda-invoke" }
+cargo-lambda-metadata = { version = "1.9.1", path = "crates/cargo-lambda-metadata" }
+cargo-lambda-new = { version = "1.9.1", path = "crates/cargo-lambda-new" }
+cargo-lambda-remote = { version = "1.9.1", path = "crates/cargo-lambda-remote" }
+cargo-lambda-system = { version = "1.9.1", path = "crates/cargo-lambda-system" }
+cargo-lambda-watch = { version = "1.9.1", path = "crates/cargo-lambda-watch" }
 cargo_metadata = "0.15.3"
 cargo-options = { version = "0.7.5", features = ["serde"] }
 cargo-zigbuild = "0.20.1"
