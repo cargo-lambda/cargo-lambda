@@ -69,7 +69,9 @@ async fn start_scheduler(
                 tracing::trace!(?action, "request action received");
                 let start_function_name = match action {
                     Action::Invoke(req) => {
-                        state.req_cache.upsert(req).await?
+                        let function_name = req.function_name.clone();
+                        state.req_cache.upsert(req).await?;
+                        Some(function_name)
                     },
                     Action::Init => {
                         state.req_cache.init(DEFAULT_PACKAGE_FUNCTION).await;
