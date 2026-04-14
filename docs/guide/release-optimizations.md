@@ -51,7 +51,7 @@ If you want to learn more about the possible values for these options, check out
 
 Cargo Lambda also optimizes the resulting binaries for specific CPU instruction sets.
 
-AWS Lambda uses the Neoverse N1 core for ARM architectures, and the Haswell code for X86-64 architectures. When you compile your code with Cargo Lambda, the right core is added to the `target-cpu` flag using Cargo's `build.rustflags` configuration option.
+AWS Lambda uses the Neoverse N1 core for ARM architectures, and the Haswell core for X86-64 architectures. When you compile your code with Cargo Lambda, the right core is added to the `target-cpu` flag using Cargo's `build.rustflags` configuration option.
 
 If you want to provide other rustflags options in the `.cargo/config.toml` file in your project you need to ensure the value is an array of options. That will ensure that both options, your flags and the `target-cpu` flag, are merged correctly.
 
