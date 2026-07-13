@@ -28,6 +28,81 @@ With [Nix](https://nixos.org/manual/nix/stable/introduction.html):
 nix-env -iA nixpkgs.cargo-lambda
 ```
 
+With [Nix Flakes](https://nixos.wiki/wiki/flakes):
+```nix
+{
+  description = "Rust development environment";
+
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+    rust-overlay.url = "github:oxalica/rust-overlay";
+
+  };
+
+   outputs = { self, nixpkgs, flake-utils, rust-overlay }:
+    flake-utils.lib.eachDefaultSystem (system:
+    let
+      overlays = [ (import rust-overlay) ];
+      pkgs = import nixpkgs {
+        inherit system overlays;
+        config = {
+          packageOverrides = pkgs: {
+          rust-bin.stable.latest.default = pkgs.rust-bin.stable.latest.default.override {
+              targets = [
+                "aarch64-unknown-linux-gnu"
+                "aarch64-apple-darwin"
+                "x86_64-unknown-linux-gnu"
+              ];
+          };
+          };
+        };
+      };
+      lib = import lib {
+        inherit lib;
+      };
+      stdenv = import stdenv {
+        inherit stdenv;
+      };
+    in
+    {
+      devShells.default = pkgs.mkShell {
+
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            cargo
+            cargo-lambda
+            glibc
+          ];
+
+        buildInputs = with pkgs;[
+            #qemu uncomment if crossplatform builds
+            openssl
+            rustfmt
+            clippy
+            rust-analyzer
+        ];
+        extraPackages = with pkgs;[
+          rust-bin.stable.latest.default
+        ];
+        shellHook = ''
+          export LD_LIBRARY_PATH=$NIX_LD_LIBRARY_PATH
+        '';
+        env = {
+          # uncomment if doing crossplatform builds CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER = "${pkgs.stdenv.cc.targetPrefix}cc";
+          # uncomment if doing crossplatform builds  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER = "qemu-aarch64";
+          # for more information on crossplatform builds  https://github.com/oxalica/rust-overlay/blob/master/docs/cross_compilation.md
+          # example flake for crossplatform build https://github.com/oxalica/rust-overlay/blob/master/examples/cross-aarch64/flake.nix
+          AWS_ACCESS_KEY_ID = "XXXXXXXXXXXXXXXXX"; # this is for aws-cdk and cli
+          AWS_SECRET_ACCESS_KEY = "XXXXXXXXXXXXXXXX"; # this is for aws-cdk and cli
+        };
+      };
+    }
+  );
+}
+
+```
+
 ## On Windows
 
 With [WinGet](https://learn.microsoft.com/en-us/windows/package-manager/):
