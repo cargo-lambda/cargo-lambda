@@ -360,7 +360,7 @@ mod tests {
         assert_eq!(config.env.get("FOO"), Some(&"BAR".to_string()));
         assert_eq!(config.deploy.function_config.memory, Some(512.into()));
         assert_eq!(config.deploy.function_config.timeout, Some(60.into()));
-        assert_eq!(config.deploy.merge_env, true);
+        assert!(config.deploy.merge_env);
 
         assert_eq!(
             config.deploy.function_config.layer,
@@ -537,8 +537,8 @@ mod tests {
         let config = load_config(&args_config, &metadata, &ConfigOptions::default()).unwrap();
 
         // Should load merge_env=true from Cargo.toml
-        assert_eq!(
-            config.deploy.merge_env, true,
+        assert!(
+            config.deploy.merge_env,
             "merge_env from Cargo.toml should be preserved when CLI doesn't set it"
         );
     }
@@ -576,8 +576,10 @@ mod tests {
     fn test_concurrency_cli_override() {
         let metadata = load_metadata(fixture_metadata("single-binary-package"), None).unwrap();
 
-        let mut watch = Watch::default();
-        watch.concurrency = 10;
+        let watch = Watch {
+            concurrency: 10,
+            ..Default::default()
+        };
 
         let args_config = Config {
             watch,
