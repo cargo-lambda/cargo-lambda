@@ -53,7 +53,7 @@ impl Project {
     pub fn from_template(template_path: impl AsRef<std::path::Path>) -> Self {
         let root = paths::root();
         let project_root = root.join("case");
-        snapbox::path::copy_template(template_path.as_ref(), &project_root).unwrap();
+        snapbox::dir::copy_template(template_path.as_ref(), &project_root).unwrap();
         Self { root: project_root }
     }
 
@@ -281,7 +281,7 @@ pub(crate) fn assert_ui() -> snapbox::Assert {
     let root_url = url::Url::from_file_path(&root).unwrap().to_string();
     let root = root.display().to_string();
 
-    let mut subs = snapbox::Substitutions::new();
+    let mut subs = snapbox::Redactions::new();
     subs.extend([
         (
             "[EXE]",
@@ -292,6 +292,6 @@ pub(crate) fn assert_ui() -> snapbox::Assert {
     ])
     .unwrap();
     snapbox::Assert::new()
-        .action_env(snapbox::DEFAULT_ACTION_ENV)
-        .substitutions(subs)
+        .action_env(snapbox::assert::DEFAULT_ACTION_ENV)
+        .redact_with(subs)
 }

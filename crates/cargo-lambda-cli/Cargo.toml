@@ -33,7 +33,7 @@ build-data = "0.3.3"
 assertables.workspace = true
 dunce = "1.0.3"
 serde_json.workspace = true
-snapbox = { version = "1.0.0", features = ["cmd", "debug", "path"] }
+snapbox = { version = "1.0.0", features = ["cmd", "debug", "dir"] }
 toml_edit = "0.25.1"
 url = "2.5.0"
 uuid.workspace = true
