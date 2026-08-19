@@ -40,14 +40,14 @@ const LAMBDA_URL_PREFIX: &str = "lambda-url";
 pub(crate) fn routes() -> Router<RefRuntimeState> {
     Router::new()
         .route(
-            "/2015-03-31/functions/:function_name/invocations",
+            "/2015-03-31/functions/{function_name}/invocations",
             post(invoke_handler),
         )
         .route(
-            "/2015-03-31/functions/:function_name/response-streaming-invocations",
+            "/2015-03-31/functions/{function_name}/response-streaming-invocations",
             post(invoke_with_response_stream_handler),
         )
-        .route("/lambda-url/:function_name/*path", any(furls_handler))
+        .route("/lambda-url/{function_name}/{*path}", any(furls_handler))
         .fallback(furls_handler)
 }
 
@@ -127,41 +127,39 @@ async fn furls_handler(
         path = format!("/{path}");
     }
 
-    let request_context = ApiGatewayV2httpRequestContext {
-        stage: Some("$default".into()),
-        route_key: Some("$default".into()),
-        request_id: Some(req_id.into()),
-        domain_name: Some("localhost".into()),
-        domain_prefix: Some(function_name.clone()),
-        http: ApiGatewayV2httpRequestContextHttpDescription {
-            method: parts.method.clone(),
-            path: Some(path.clone()),
-            protocol: Some("http".into()),
-            source_ip: Some("127.0.0.1".into()),
-            user_agent: Some("cargo-lambda".into()),
-        },
-        time: Some(time.format("%d/%b/%Y:%T %z").to_string()),
-        time_epoch: time.timestamp(),
-        account_id: None,
-        authorizer: None,
-        authentication: None,
-        apiid: None,
-    };
+    let mut http_description = ApiGatewayV2httpRequestContextHttpDescription::default();
+    http_description.method = parts.method.clone();
+    http_description.path = Some(path.clone());
+    http_description.protocol = Some("http".into());
+    http_description.source_ip = Some("127.0.0.1".into());
+    http_description.user_agent = Some("cargo-lambda".into());
 
-    let event = ApiGatewayV2httpRequest {
-        version: Some("2.0".into()),
-        route_key: Some("$default".into()),
-        raw_path: Some(path),
-        raw_query_string: uri.query().map(String::from),
-        headers: headers.clone(),
-        body,
-        request_context,
-        cookies,
-        query_string_parameters,
-        is_base64_encoded,
-        path_parameters,
-        ..Default::default()
-    };
+    let mut request_context = ApiGatewayV2httpRequestContext::default();
+    request_context.stage = Some("$default".into());
+    request_context.route_key = Some("$default".into());
+    request_context.request_id = Some(req_id.into());
+    request_context.domain_name = Some("localhost".into());
+    request_context.domain_prefix = Some(function_name.clone());
+    request_context.http = http_description;
+    request_context.time = Some(time.format("%d/%b/%Y:%T %z").to_string());
+    request_context.time_epoch = time.timestamp();
+    request_context.account_id = None;
+    request_context.authorizer = None;
+    request_context.authentication = None;
+    request_context.apiid = None;
+
+    let mut event = ApiGatewayV2httpRequest::default();
+    event.version = Some("2.0".into());
+    event.route_key = Some("$default".into());
+    event.raw_path = Some(path);
+    event.raw_query_string = uri.query().map(String::from);
+    event.headers = headers.clone();
+    event.body = body;
+    event.request_context = request_context;
+    event.cookies = cookies;
+    event.query_string_parameters = query_string_parameters;
+    event.is_base64_encoded = is_base64_encoded;
+    event.path_parameters = path_parameters;
     let event = serde_json::to_string(&event).map_err(ServerError::SerializationError)?;
 
     let req = Request::from_parts(parts, event.into());
@@ -202,7 +200,7 @@ async fn invoke_handler(
     tracing::debug!(%function_name, "invocation received");
 
     if function_name == DEFAULT_PACKAGE_FUNCTION && !state.is_default_function_enabled() {
-        tracing::error!(available_functions = ?state.initial_functions, "the default function route is disabled, use /lambda-url/:function_name to trigger a function call");
+        tracing::error!(available_functions = ?state.initial_functions, "the default function route is disabled, use /lambda-url/{function_name} to trigger a function call");
         return respond_with_disabled_default_function(&state, true);
     }
 
@@ -240,7 +238,7 @@ async fn invoke_with_response_stream_handler(
     tracing::debug!(%function_name, "response streaming invocation received");
 
     if function_name == DEFAULT_PACKAGE_FUNCTION && !state.is_default_function_enabled() {
-        tracing::error!(available_functions = ?state.initial_functions, "the default function route is disabled, use /lambda-url/:function_name to trigger a function call");
+        tracing::error!(available_functions = ?state.initial_functions, "the default function route is disabled, use /lambda-url/{function_name} to trigger a function call");
         return respond_with_disabled_default_function(&state, true);
     }
 
@@ -467,6 +465,7 @@ async fn create_buffered_response(
         ),
         LambdaBody::Text(s) => Body::from(s),
         LambdaBody::Binary(b) => Body::from(b),
+        _ => Body::empty(),
     };
     if let Some(headers) = builder.headers_mut() {
         headers.extend(resp_event.headers);
@@ -494,7 +493,7 @@ fn respond_with_disabled_default_function(
     let detail = if invoke_call {
         "the default function route is disabled. To trigger a function call, add the name of a function as the invoke argument"
     } else {
-        "the default function route is disabled, use /lambda-url/:function_name to trigger a function call"
+        "the default function route is disabled, use /lambda-url/{function_name} to trigger a function call"
     };
     tracing::error!(available_functions = ?state.initial_functions, detail);
 

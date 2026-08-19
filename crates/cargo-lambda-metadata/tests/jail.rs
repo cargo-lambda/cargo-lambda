@@ -1,6 +1,9 @@
 // Jail tests are in a separate module because they mess with the current path
 // where cargo runs from, and it makes other tests fail randomly because they
 // cannot find the Cargo.toml file for test fixtures.
+ 
+// For return type of Jail::expect_with()
+#![allow(clippy::result_large_err)]
 
 use figment::Jail;
 

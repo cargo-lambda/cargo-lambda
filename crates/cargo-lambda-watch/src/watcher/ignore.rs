@@ -295,12 +295,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_filter_with_ignore_files() {
+        // `IgnoreFilter::new` canonicalizes `applies_in`, so it must point at a
+        // directory that actually exists on disk.
+        let tempdir = tempfile::tempdir().unwrap();
+        let applies_in = tempdir.path().join("foo");
+        std::fs::create_dir(&applies_in).unwrap();
+
         let mut tempfile = tempfile::NamedTempFile::new().unwrap();
         writeln!(tempfile, "*").unwrap();
 
         let ignore_file = IgnoreFile {
             path: tempfile.path().to_path_buf(),
-            applies_in: Some(PathBuf::from("./foo")),
+            applies_in: Some(applies_in.clone()),
             applies_to: None,
         };
 
@@ -320,7 +326,7 @@ mod tests {
 
         let event = Event {
             tags: vec![Tag::Path {
-                path: "./foo/main.rs".into(),
+                path: applies_in.join("main.rs"),
                 file_type: Some(FileType::File),
             }],
             ..Default::default()

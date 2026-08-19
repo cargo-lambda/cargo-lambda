@@ -29,7 +29,7 @@ pub(crate) struct Options {
     event_type: Option<String>,
 }
 
-#[derive(Clone, Debug, strum_macros::Display, strum_macros::EnumString)]
+#[derive(Clone, Debug, strum::Display, strum::EnumString)]
 #[strum(ascii_case_insensitive, serialize_all = "snake_case")]
 pub(crate) enum HttpFeature {
     Alb,

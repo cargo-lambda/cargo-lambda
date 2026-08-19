@@ -18,15 +18,14 @@ cargo-lambda-remote.workspace = true
 clap.workspace = true
 dirs.workspace = true
 miette.workspace = true
-reqwest = { workspace = true, features = ["rustls-tls"] }
+reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 strum.workspace = true
-strum_macros.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-httpmock = "0.7.0"
+httpmock = "0.8.3"
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "test-util"] }

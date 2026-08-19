@@ -20,7 +20,7 @@ cargo-zigbuild.workspace = true
 chrono.workspace = true
 chrono-humanize = "0.2.3"
 miette.workspace = true
-object = "0.28.4"
+object = "0.38.1"
 rustc_version = "0.4.0"
 sha2 = "0.10.2"
 serde.workspace = true
@@ -34,5 +34,5 @@ zip.workspace = true
 
 [dev-dependencies]
 assertables.workspace = true
-rstest = "0.21.0"
+rstest = "0.26.1"
 tokio = { workspace = true, features = ["macros", "rt"] }
