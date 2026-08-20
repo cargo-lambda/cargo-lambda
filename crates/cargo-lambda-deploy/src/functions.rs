@@ -672,6 +672,21 @@ pub(crate) async fn upsert_function_url_config(
                 .into_diagnostic()
                 .wrap_err("failed to enable function url invocations")?;
 
+            let invoke_statement_2 =
+                format!("FunctionUrlInvokeAllowPublicAccess-{}", Uuid::new_v4());
+            client
+                .add_permission()
+                .function_name(name)
+                .set_qualifier(alias.clone())
+                .action("lambda:InvokeFunction")
+                .principal("*")
+                .statement_id(invoke_statement_2)
+                .invoked_via_function_url(true)
+                .send()
+                .await
+                .into_diagnostic()
+                .wrap_err("failed to enable function url invocations")?;
+
             let output = client
                 .create_function_url_config()
                 .function_name(name)
