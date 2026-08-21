@@ -283,15 +283,12 @@ async fn create_project<T: AsRef<Path> + Debug>(
                 template
                     .render_to(&mut file, globals)
                     .into_diagnostic()
-                    .wrap_err_with(|| format!("failed to render template file: {:?}", &new_path))?;
+                    .wrap_err_with(|| format!("failed to render template file: {new_path:?}"))?;
             } else {
                 copy_file(entry_path, &new_path)
                     .into_diagnostic()
                     .wrap_err_with(|| {
-                        format!(
-                            "failed to copy file: from {:?} to {:?}",
-                            &entry_path, &new_path
-                        )
+                        format!("failed to copy file: from {entry_path:?} to {new_path:?}",)
                     })?;
             }
         }

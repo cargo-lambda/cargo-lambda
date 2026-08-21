@@ -197,7 +197,7 @@ async fn download_zip_template(url: &str, template_root: &Path) -> Result<PathBu
     let tmp_file = template_root.join("cargo-lambda-template.zip");
     let mut writer = File::create(&tmp_file)
         .into_diagnostic()
-        .wrap_err_with(|| format!("unable to create file: {:?}", &tmp_file))?;
+        .wrap_err_with(|| format!("unable to create file: {tmp_file:?}"))?;
     copy(&mut bytes, &mut writer).into_diagnostic()?;
 
     Ok(tmp_file)
@@ -320,10 +320,10 @@ fn match_git_ssh_url(value: &str) -> Option<GitRepo> {
     .expect("invalid Git SSH regex");
 
     let (auth_user, caps) = match ssh_regex.captures(value) {
-        None => match git_regex.captures(value) {
-            None => return None,
-            Some(caps) => (Some("git".into()), caps),
-        },
+        None => {
+            let caps = git_regex.captures(value)?;
+            (Some("git".into()), caps)
+        }
         Some(caps) => (None, caps),
     };
 

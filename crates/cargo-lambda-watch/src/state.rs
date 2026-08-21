@@ -72,7 +72,7 @@ impl RuntimeState {
     }
 
     pub(crate) fn function_addr(&self, name: &str) -> String {
-        format!("{}/{}", &self.runtime_url, name)
+        format!("{}/{name}", self.runtime_url)
     }
 
     pub(crate) fn is_default_function_enabled(&self) -> bool {
