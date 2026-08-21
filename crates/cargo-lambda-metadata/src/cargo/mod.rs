@@ -319,8 +319,8 @@ where
     if !opts.unstable_flags.is_empty() {
         state.serialize_field("unstable_flags", &opts.unstable_flags)?;
     }
-    if let Some(timings) = &opts.timings {
-        state.serialize_field("timings", timings)?;
+    if opts.timings {
+        state.serialize_field("timings", &true)?;
     }
 
     Ok(())
@@ -344,7 +344,7 @@ pub(crate) fn count_common_options(opts: &CommonOptions) -> usize {
         + opts.offline as usize
         + !opts.config.is_empty() as usize
         + !opts.unstable_flags.is_empty() as usize
-        + opts.timings.is_some() as usize
+        + opts.timings as usize
 }
 
 pub(crate) fn deserialize_vec_or_map<'de, D>(
