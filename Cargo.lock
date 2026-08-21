@@ -1307,7 +1307,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "assertables",
  "build-data",
@@ -1337,7 +1337,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-build"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "assertables",
  "cargo-lambda-interactive",
@@ -1365,7 +1365,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-deploy"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "assertables",
  "aws-credential-types",
@@ -1393,7 +1393,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-interactive"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "indicatif",
  "inquire",
@@ -1405,7 +1405,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-invoke"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "base64 0.21.7",
  "cargo-lambda-metadata",
@@ -1427,7 +1427,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-metadata"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "anyhow",
  "assertables",
@@ -1452,7 +1452,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-new"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "assertables",
  "cargo-lambda-interactive",
@@ -1478,7 +1478,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-remote"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "aws-config",
  "aws-credential-types",
@@ -1499,7 +1499,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-system"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "cargo-lambda-build",
  "cargo-lambda-metadata",
@@ -1515,7 +1515,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-lambda-watch"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
  "aws-config",
  "aws-credential-types",
