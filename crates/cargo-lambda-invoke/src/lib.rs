@@ -231,7 +231,7 @@ impl Invoke {
 
         let url = format!(
             "{}://{}:{}/2015-03-31/functions/{}/invocations",
-            protocol, &host, self.invoke_port, &self.function_name
+            protocol, host, self.invoke_port, self.function_name
         );
 
         let mut req = client.post(url).body(data.to_string());

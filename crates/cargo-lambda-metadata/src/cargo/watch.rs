@@ -674,7 +674,7 @@ mod tests {
                     offline: true,
                     config: vec!["config.toml".to_string()],
                     unstable_flags: vec!["flag1".to_string()],
-                    timings: None,
+                    timings: false,
                 },
                 manifest_path: None,
                 release: false,
