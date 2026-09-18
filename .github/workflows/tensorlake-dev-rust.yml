@@ -1,0 +1,133 @@
+name: Tensorlake DEV Rust cache
+run-name: Tensorlake DEV ${{ inputs.cache_state }} Rust build (${{ inputs.cache_key }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      cache_state:
+        description: Cold requires an empty cache; warm requires a successful prior cold build.
+        type: choice
+        required: true
+        options: [cold, warm]
+      cache_key:
+        description: Use a new key for the cold run and the identical key for its warm run.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tensorlake-dev-rust-${{ inputs.cache_key }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: tensorlake-large
+    timeout-minutes: 60
+    env:
+      CACHE_STATE: ${{ inputs.cache_state }}
+      CACHE_KEY: ${{ inputs.cache_key }}
+      CARGO_TERM_COLOR: never
+      CARGO_BUILD_JOBS: 4
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+
+      - name: Configure Tensorlake persistent Cargo and target caches
+        uses: tensorlakeai/tensorlake-github-runners/actions/setup-rust-cache@c095878eb76e4786906ea7abdad93d20287b0536
+        with:
+          cache-namespace: dev-e2e-${{ inputs.cache_key }}
+          cache-cargo-home: "true"
+          cache-target: "true"
+          cache-sccache: "false"
+          prefetch: "false"
+
+      - name: Verify cold or warm cache and pin dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CACHE_KEY" =~ ^[A-Za-z0-9_-]{1,64}$ ]]
+          [[ "$CACHE_STATE" == cold || "$CACHE_STATE" == warm ]]
+          : "${TENSORLAKE_CACHE_DIR:?Persistent cache must be mounted}"
+          proof_dir="$TENSORLAKE_CACHE_DIR/dev-e2e/$CACHE_KEY"
+          mkdir -p "$proof_dir"
+          echo "CACHE_PROOF_DIR=$proof_dir" >> "$GITHUB_ENV"
+          export CACHE_PROOF_DIR="$proof_dir"
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          root = pathlib.Path(os.environ["CACHE_PROOF_DIR"])
+          marker = root / "cold-build.json"
+          if os.environ["CACHE_STATE"] == "cold":
+              assert not marker.exists(), "Choose a new key: this cache already has a cold build"
+              assert not any(pathlib.Path(os.environ["CARGO_TARGET_DIR"]).iterdir()), "Cold target cache is not empty"
+              print("COLD_CACHE_VERIFIED: no build marker or target artifacts")
+          else:
+              previous = json.loads(marker.read_text())
+              assert previous["repository"] == os.environ["GITHUB_REPOSITORY"], "Repository cache isolation failed"
+              assert previous["sha"] == os.environ["GITHUB_SHA"], "Warm build must use the same source commit"
+              assert previous["run_id"] != os.environ["GITHUB_RUN_ID"], "Warm proof requires a separate workflow run"
+              assert previous["runner"] != os.environ["RUNNER_NAME"], "Warm proof requires a new ephemeral runner"
+              assert previous["rustc"] == subprocess.check_output(["rustc", "-Vv"], text=True), "Toolchain changed"
+              assert any(pathlib.Path(os.environ["CARGO_TARGET_DIR"]).iterdir()), "Warm target cache is empty"
+              print("WARM_CACHE_VERIFIED: prior run", previous["run_id"], "on a different runner")
+          PY
+          if [[ ! -f Cargo.lock ]]; then
+            if [[ "$CACHE_STATE" == warm ]]; then
+              cp "$proof_dir/Cargo.lock" Cargo.lock
+            else
+              cargo generate-lockfile
+            fi
+          fi
+          if [[ "$CACHE_STATE" == cold ]]; then
+            cp Cargo.lock "$proof_dir/Cargo.lock"
+          else
+            cmp Cargo.lock "$proof_dir/Cargo.lock"
+          fi
+
+      - name: Build Rust workspace and record reuse
+        shell: bash
+        run: |
+          set -euo pipefail
+          started=$SECONDS
+          cargo build --workspace --locked --verbose 2>&1 | tee "$RUNNER_TEMP/tensorlake-cargo-build.log"
+          export BUILD_SECONDS=$((SECONDS - started))
+          python3 - <<'PY'
+          import json, os, pathlib, re, subprocess
+          log = pathlib.Path(os.environ["RUNNER_TEMP"], "tensorlake-cargo-build.log").read_text()
+          fresh = len(re.findall(r"^\s*Fresh ", log, re.MULTILINE))
+          compiled = len(re.findall(r"^\s*Compiling ", log, re.MULTILINE))
+          mode = os.environ["CACHE_STATE"]
+          assert (fresh > 0 if mode == "warm" else compiled > 0), "Expected cached/uncached compilation evidence is missing"
+          result = {
+              "cache_state": mode,
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "sha": os.environ["GITHUB_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "runner": os.environ["RUNNER_NAME"],
+              "rustc": subprocess.check_output(["rustc", "-Vv"], text=True),
+              "seconds": int(os.environ["BUILD_SECONDS"]),
+              "fresh_crates": fresh,
+              "compiled_crates": compiled,
+          }
+          if mode == "cold":
+              with pathlib.Path(os.environ["CACHE_PROOF_DIR"], "cold-build.json").open("x") as file:
+                  json.dump(result, file)
+                  file.flush()
+                  os.fsync(file.fileno())
+          print("TENSORLAKE_BUILD_RESULT=" + json.dumps(result))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(f"\n### {mode.title()} Rust build\n\n")
+              summary.write(f"- Repository: {result['repository']}\n- Duration: {result['seconds']}s\n")
+              summary.write(f"- Fresh crates reused: {fresh}\n- Crates compiled: {compiled}\n")
+              summary.write("- Cache storage: Tensorlake persistent repository filesystem\n")
+          PY
