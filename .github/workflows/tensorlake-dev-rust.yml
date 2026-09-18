@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: tensorlake-large
+    runs-on: tensorlake-medium
     timeout-minutes: 60
     env:
       CACHE_STATE: ${{ inputs.cache_state }}
