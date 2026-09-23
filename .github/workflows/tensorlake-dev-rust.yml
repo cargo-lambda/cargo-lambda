@@ -31,7 +31,7 @@ jobs:
           cache-namespace: builds
           cache-target: "true"
           cache-sccache: "false"
-          prefetch: "false"
+          prefetch: "true"
 
       - name: Build Rust workspace
         run: cargo build --workspace --locked
