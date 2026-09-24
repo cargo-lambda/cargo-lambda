@@ -20,18 +20,14 @@ jobs:
         with:
           persist-credentials: false
 
+      # Before the toolchain, so a restored rustup toolchain is reused.
+      - name: Restore Rust cache
+        uses: tensorlakeai/github-runners@e518a64e35fb199666ef52e9895202b80a49f3ab # v1.3.0
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           toolchain: stable
-
-      - name: Set up Rust cache
-        uses: tensorlakeai/tensorlake-github-runners/actions/setup-rust-cache@c095878eb76e4786906ea7abdad93d20287b0536
-        with:
-          cache-namespace: builds
-          cache-target: "true"
-          cache-sccache: "false"
-          prefetch: "true"
 
       - name: Build Rust workspace
         run: cargo build --workspace --locked
