@@ -22,8 +22,8 @@ jobs:
 
       # Before the toolchain, so a restored rustup toolchain is reused.
       - name: Restore Rust cache
-        uses: tensorlakeai/github-runners@e518a64e35fb199666ef52e9895202b80a49f3ab # v1.3.0
-
+        uses: tensorlakeai/github-runners@9adec6a59d25f7fe100eded52d2c3cb75bb5c582
+        
       - name: Install Rust
         uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
