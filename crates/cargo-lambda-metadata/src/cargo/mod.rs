@@ -490,4 +490,13 @@ mod tests {
         assert!(config.contains(STRIP_CONFIG));
         assert!(!config.contains(LTO_CONFIG));
     }
+
+    #[test]
+    fn test_release_config_with_toml_1_1_manifest() {
+        let metadata = load_metadata(fixture_metadata("toml-1-1-package"), None).unwrap();
+        let config = cargo_release_profile_config(&metadata).unwrap();
+        assert!(!config.contains(STRIP_CONFIG));
+        assert!(!config.contains(LTO_CONFIG));
+        assert!(config.contains(CODEGEN_CONFIG));
+    }
 }
